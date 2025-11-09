@@ -1,0 +1,30 @@
+# Backend
+server
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+/data
+/tmp
+
+# Frontend
+node_modules/
+dist/
+web/dist/
+*.log
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+*.tar.gz
