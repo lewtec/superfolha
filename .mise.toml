@@ -1,0 +1,92 @@
+[tools]
+go = "1.21"
+node = "20"
+
+[tasks.install-frontend]
+description = "Install frontend dependencies"
+run = "cd frontend && npm install"
+
+[tasks.install-backend]
+description = "Install backend dependencies"
+run = "go mod download"
+
+[tasks.install]
+description = "Install all dependencies"
+depends = ["install-frontend", "install-backend"]
+
+[tasks.dev-frontend]
+description = "Run frontend dev server"
+run = "cd frontend && npm run dev"
+
+[tasks.dev-backend]
+description = "Run backend server"
+run = "go run cmd/server/main.go --db=\"${DATABASE_URL}\" --state-dir=./data"
+env = { DATABASE_URL = "${DATABASE_URL:-postgres://localhost/latex_editor?sslmode=disable}" }
+
+[tasks.dev]
+description = "Run development servers (frontend and backend)"
+run = """
+  echo "Starting development servers..."
+  echo "Backend will run on :8080"
+  echo "Frontend will run on :5173"
+  mise run dev-frontend &
+  mise run dev-backend
+"""
+
+[tasks.build-frontend]
+description = "Build frontend for production"
+run = "cd frontend && npm run build"
+
+[tasks.build-backend]
+description = "Build backend binary"
+depends = ["build-frontend"]
+run = "go build -o server cmd/server/main.go"
+
+[tasks.build]
+description = "Build complete application"
+depends = ["build-backend"]
+run = "echo 'Build complete! Binary: ./server'"
+
+[tasks.generate]
+description = "Generate GraphQL and sqlc code"
+run = """
+  go run github.com/99designs/gqlgen generate
+  sqlc generate
+"""
+
+[tasks.migrate]
+description = "Run database migrations"
+run = "dbmate up"
+env = { DATABASE_URL = "${DATABASE_URL:-postgres://localhost/latex_editor?sslmode=disable}" }
+
+[tasks.clean]
+description = "Clean build artifacts"
+run = """
+  rm -f server
+  rm -rf web/dist/*
+  rm -rf frontend/dist
+  rm -rf data
+"""
+
+[tasks.docker]
+description = "Build Docker image"
+depends = ["build"]
+run = "docker build -t latex-editor ."
+
+[tasks.test]
+description = "Run tests"
+run = "go test ./..."
+
+[tasks.fmt]
+description = "Format code"
+run = """
+  go fmt ./...
+  cd frontend && npm run format 2>/dev/null || true
+"""
+
+[tasks.lint]
+description = "Lint code"
+run = """
+  go vet ./...
+  cd frontend && npm run lint 2>/dev/null || true
+"""
