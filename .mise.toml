@@ -21,7 +21,11 @@ run = "cd frontend && npm run dev"
 [tasks.dev-backend]
 description = "Run backend server"
 run = "go run cmd/server/main.go --db=\"${DATABASE_URL}\" --state-dir=./data"
-env = { DATABASE_URL = "${DATABASE_URL:-postgres://localhost/latex_editor?sslmode=disable}" }
+env = {
+  DATABASE_URL = "${DATABASE_URL:-postgres://localhost/latex_editor?sslmode=disable}",
+  JWT_SECRET = "${JWT_SECRET:-dev-secret-key}",
+  GO_ENV = "${GO_ENV:-development}"
+}
 
 [tasks.dev]
 description = "Run development servers (frontend and backend)"

@@ -49,8 +49,10 @@ mise install
 # Install dependencies
 mise run install
 
-# Set database URL
+# Set environment variables
 export DATABASE_URL="postgres://user:pass@localhost/latex_editor?sslmode=disable"
+export JWT_SECRET="dev-secret-key-change-in-production"
+export GO_ENV="development"
 
 # Run development server
 mise run dev
@@ -115,11 +117,39 @@ docker run -v /data:/data -p 8080:8080 \
 
 ## Configuration
 
-Via CLI flags or environment variables:
+### Environment Variables
 
-- `--state-dir` / `STATE_DIR`: Directory for Git repositories (default: `./data`)
-- `--db` / `DATABASE_URL`: PostgreSQL connection string (required)
-- `--port` / `PORT`: Server port (default: `8080`)
+- `DATABASE_URL`: PostgreSQL connection string (required)
+- `JWT_SECRET`: Secret key for JWT token signing (required in production)
+- `STATE_DIR`: Directory for Git repositories (default: `./data`)
+- `PORT`: Server port (default: `8080`)
+- `GO_ENV`: Set to `development` for dev mode (allows JWT_SECRET fallback)
+
+### CLI Flags
+
+- `--db`: PostgreSQL connection string (overrides `DATABASE_URL`)
+- `--state-dir`: Directory for Git repositories (overrides `STATE_DIR`)
+- `--port`: Server port (overrides `PORT`)
+
+### Example Configuration
+
+```bash
+export DATABASE_URL="postgres://user:pass@localhost/latex_editor?sslmode=disable"
+export JWT_SECRET="your-secure-random-secret-key-min-32-chars"
+export STATE_DIR="/var/latex-editor/repos"
+export PORT="8080"
+
+./server
+```
+
+## Security Features
+
+- **UUID v7**: Time-sortable UUIDs for better database performance and security
+- **Bcrypt**: Password hashing with cost factor 12 (2024 recommended)
+- **JWT Authentication**: Secure token-based authentication with 7-day expiration
+- **Environment-based Secrets**: JWT secret must be set via environment variable in production
+- **Password Validation**: Minimum 8 characters required
+- **Repository Isolation**: Each project stored in isolated Git repository by UUID
 
 ## API Endpoints
 

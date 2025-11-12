@@ -140,7 +140,7 @@ func (r *mutationResolver) Register(ctx context.Context, email string, password 
 	}
 
 	// TODO: Insert user into database
-	userID := uuid.New().String()
+	userID := uuid.NewV7().String()
 	_ = hashedPassword
 
 	// Generate token
@@ -161,7 +161,7 @@ func (r *mutationResolver) Register(ctx context.Context, email string, password 
 // Login is the resolver for the login field.
 func (r *mutationResolver) Login(ctx context.Context, email string, password string) (*AuthPayload, error) {
 	// TODO: Query user from database and verify password
-	userID := uuid.New().String()
+	userID := uuid.NewV7().String()
 	_ = password
 
 	// Generate token
@@ -187,7 +187,7 @@ func (r *mutationResolver) CreateProject(ctx context.Context, name string) (*Pro
 	}
 
 	// Create project
-	projectID := uuid.New().String()
+	projectID := uuid.NewV7().String()
 	projectPath := r.getProjectPath(projectID)
 
 	// Initialize git repo

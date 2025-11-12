@@ -2,15 +2,27 @@ package auth
 
 import (
 	"errors"
+	"os"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
 
+const (
+	// BcryptCost is the cost factor for bcrypt hashing
+	// 12 provides a good balance between security and performance in 2024
+	// Each increment doubles the time required to hash
+	BcryptCost = 12
+
+	// MinPasswordLength is the minimum required password length
+	MinPasswordLength = 8
+)
+
 var (
-	ErrInvalidToken = errors.New("invalid token")
-	jwtSecret       = []byte("your-secret-key-change-in-production") // TODO: Use env var
+	ErrInvalidToken      = errors.New("invalid token")
+	ErrPasswordTooShort  = errors.New("password must be at least 8 characters")
+	ErrJWTSecretRequired = errors.New("JWT_SECRET environment variable is required")
 )
 
 type Claims struct {
@@ -19,9 +31,25 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
-// HashPassword hashes a password using bcrypt
+// getJWTSecret retrieves the JWT secret from environment variable
+func getJWTSecret() ([]byte, error) {
+	secret := os.Getenv("JWT_SECRET")
+	if secret == "" {
+		// Fallback for development only - should never be used in production
+		if os.Getenv("GO_ENV") == "development" {
+			return []byte("dev-secret-change-in-production"), nil
+		}
+		return nil, ErrJWTSecretRequired
+	}
+	return []byte(secret), nil
+}
+
+// HashPassword hashes a password using bcrypt with recommended cost factor
 func HashPassword(password string) (string, error) {
-	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if len(password) < MinPasswordLength {
+		return "", ErrPasswordTooShort
+	}
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), BcryptCost)
 	return string(bytes), err
 }
 
@@ -33,6 +61,11 @@ func CheckPasswordHash(password, hash string) bool {
 
 // GenerateToken generates a JWT token for a user
 func GenerateToken(userID, email string) (string, error) {
+	jwtSecret, err := getJWTSecret()
+	if err != nil {
+		return "", err
+	}
+
 	claims := &Claims{
 		UserID: userID,
 		Email:  email,
@@ -48,6 +81,11 @@ func GenerateToken(userID, email string) (string, error) {
 
 // ValidateToken validates a JWT token and returns the claims
 func ValidateToken(tokenString string) (*Claims, error) {
+	jwtSecret, err := getJWTSecret()
+	if err != nil {
+		return nil, err
+	}
+
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
 		return jwtSecret, nil
 	})
