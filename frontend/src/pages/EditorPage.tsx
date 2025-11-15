@@ -159,6 +159,18 @@ export default function EditorPage() {
     },
     [currentFile, files],
   ); // Dependencies for useCallback
+
+  const memoizedOnSave = useCallback(() => {
+    if (currentFile) {
+      saveFile(id!, currentFile.path, currentFile.content);
+    }
+  }, [id, currentFile, saveFile]);
+
+  const memoizedOnDeleteFile = useCallback(
+    (path: string) => deleteFile(id!, path),
+    [id, deleteFile],
+  );
+
   return (
     <div className="h-screen flex flex-col">
       <Navbar
@@ -175,10 +187,7 @@ export default function EditorPage() {
             currentFile={currentFile?.path || null}
             onFileSelect={handleFileSelect}
             onNewFile={handleNewFile}
-            onDeleteFile={useCallback(
-              (path) => deleteFile(id!, path),
-              [id, deleteFile],
-            )}
+            onDeleteFile={memoizedOnDeleteFile}
           />
         </div>
 
@@ -206,11 +215,7 @@ export default function EditorPage() {
               <Editor
                 value={currentFile.content}
                 onChange={handleEditorChange}
-                onSave={useCallback(() => {
-                  if (currentFile) {
-                    saveFile(id!, currentFile.path, currentFile.content);
-                  }
-                }, [id, currentFile, saveFile])}
+                onSave={memoizedOnSave}
               />
             ) : (
               <PDFViewer pdfData={pdfData} />
