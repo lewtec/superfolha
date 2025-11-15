@@ -1,0 +1,28 @@
+@import "tailwindcss";
+body {
+    margin: 0;
+    font-family:
+        -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
+        "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
+        sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+.cm-editor {
+    height: 100%;
+}
+
+.editor-container {
+    height: calc(100vh - 64px);
+}
+
+.file-tree {
+    height: calc(100vh - 64px);
+    overflow-y: auto;
+}
+
+.pdf-viewer {
+    height: 100%;
+    overflow-y: auto;
+}

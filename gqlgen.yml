@@ -1,0 +1,34 @@
+# Where are all the schema files located? globs are supported eg  src/**/*.graphqls
+schema:
+  - internal/server/schema.graphql
+
+# Where should the generated server code go?
+exec:
+  filename: internal/server/generated.go
+  package: server
+
+# Where should any generated models go?
+model:
+  filename: internal/server/models.go
+  package: server
+
+# Where should the resolver implementations go?
+resolver:
+  layout: follow-schema
+  dir: internal/server
+  package: server
+  filename_template: "{name}.resolvers.go"
+
+# gqlgen will search for any type names in the schema in these go packages
+# if they match it will use them, otherwise it will generate them.
+autobind:
+  - "github.com/lewtec/superfolha/internal/server"
+
+# This section declares type mapping between the GraphQL and go type systems
+models:
+  ID:
+    model:
+      - github.com/99designs/gqlgen/graphql.ID
+  Time:
+    model:
+      - github.com/lewtec/superfolha/internal/server.Time

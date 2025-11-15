@@ -1,0 +1,41 @@
+{
+  "commands": [
+    "\\documentclass{}",
+    "\\usepackage{}",
+    "\\begin{}",
+    "\\end{}",
+    "\\section{}",
+    "\\subsection{}",
+    "\\subsubsection{}",
+    "\\paragraph{}",
+    "\\textbf{}",
+    "\\textit{}",
+    "\\underline{}",
+    "\\emph{}",
+    "\\title{}",
+    "\\author{}",
+    "\\date{}",
+    "\\maketitle",
+    "\\tableofcontents",
+    "\\newpage",
+    "\\clearpage",
+    "\\label{}",
+    "\\ref{}",
+    "\\cite{}",
+    "\\footnote{}",
+    "\\item",
+    "\\includegraphics{}",
+    "\\caption{}"
+  ],
+  "environments": [
+    "document",
+    "equation",
+    "align",
+    "itemize",
+    "enumerate",
+    "figure",
+    "table",
+    "center",
+    "abstract"
+  ]
+}
