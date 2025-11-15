@@ -17,6 +17,24 @@ interface File {
 
 export default function EditorPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate(); // Moved up
+
+  // Query hooks must be called unconditionally
+  const { project, ...projectQueryData } = useGetProjectQuery({ id: id! });
+  const { files: fetchedFiles, ...filesQueryData } = useGetFilesQuery({
+    projectId: id!,
+  });
+
+  // Conditional return based on loading state - MUST be after all hooks are called
+  if (projectQueryData.loading || filesQueryData.loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <span className="loading loading-spinner loading-lg"></span>
+      </div>
+    );
+  }
+
+  // All other hooks and state declarations can follow
   const [files, setFiles] = useState<File[]>([]);
   const [currentFile, setCurrentFile] = useState<File | null>(null);
   const [view, setView] = useState<"code" | "pdf">("code");
@@ -24,11 +42,6 @@ export default function EditorPage() {
   const [logs, setLogs] = useState("");
   const [compileSuccess, setCompileSuccess] = useState(false);
   const [compiling, setCompiling] = useState(false);
-
-  const { project, ...projectQueryData } = useGetProjectQuery({ id: id! });
-  const { files: fetchedFiles, ...filesQueryData } = useGetFilesQuery({
-    projectId: id!,
-  });
 
   const { saveFile, isInFlight: isSavingFile } = useSaveFileMutation({
     onCompleted: (response, errors) => {
@@ -146,15 +159,6 @@ export default function EditorPage() {
     },
     [currentFile, files],
   ); // Dependencies for useCallback
-
-  if (projectQueryData.loading || filesQueryData.loading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <span className="loading loading-spinner loading-lg"></span>
-      </div>
-    );
-  }
-
   return (
     <div className="h-screen flex flex-col">
       <Navbar
