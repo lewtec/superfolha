@@ -146,6 +146,58 @@ func CommitChanges(repoPath, author, message string) (*Commit, error) {
 
 
 
+	// Check if there are any changes to commit
+
+	status, err := w.Status()
+
+	if err != nil {
+
+		return nil, fmt.Errorf("failed to get worktree status: %w", err)
+
+	}
+
+
+
+	// If there are no changes, return the last commit (noop)
+
+	if status.IsClean() {
+
+		ref, err := r.Head()
+
+		if err != nil {
+
+			return nil, fmt.Errorf("failed to get HEAD reference: %w", err)
+
+		}
+
+
+
+		obj, err := r.CommitObject(ref.Hash())
+
+		if err != nil {
+
+			return nil, fmt.Errorf("failed to get last commit object: %w", err)
+
+		}
+
+
+
+		return &Commit{
+
+			Hash:    obj.Hash.String(),
+
+			Message: obj.Message,
+
+			Author:  obj.Author.String(),
+
+			Date:    obj.Author.When,
+
+		}, nil
+
+	}
+
+
+
 	// Create commit
 
 	commitHash, err := w.Commit(message, &git.CommitOptions{
