@@ -1,0 +1,25 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "packageRules": [
+    {
+      "description": "Group Go updates across Dockerfile and mise.toml",
+      "matchDatasources": ["docker", "golang-version"],
+      "matchPackageNames": ["golang", "go"],
+      "groupName": "Go version"
+    }
+  ],
+  "regexManagers": [
+    {
+      "description": "Update Go version in mise.toml",
+      "fileMatch": ["^mise\\.toml$"],
+      "matchStrings": [
+        "go\\s*=\\s*\"(?<currentValue>.*?)\""
+      ],
+      "datasourceTemplate": "golang-version",
+      "depNameTemplate": "go"
+    }
+  ]
+}
