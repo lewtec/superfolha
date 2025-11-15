@@ -41,6 +41,7 @@ function latexCompletions(context: CompletionContext) {
 export default function Editor({ value, onChange, onSave }: EditorProps) {
   const editorRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
+  const isUpdatingInternally = useRef(false); // New ref to track internal updates
 
   const onChangeRef = useRef(onChange);
   const onSaveRef = useRef(onSave);
@@ -51,6 +52,11 @@ export default function Editor({ value, onChange, onSave }: EditorProps) {
   }, [onChange, onSave]);
 
   const debouncedOnSave = useDebounce(onSaveRef.current, 10000); // 10 seconds debounce
+  const debouncedOnSaveRef = useRef(debouncedOnSave); // New ref for debouncedOnSave
+
+  useEffect(() => {
+    debouncedOnSaveRef.current = debouncedOnSave; // Keep ref updated
+  }, [debouncedOnSave]);
 
   useEffect(() => {
     if (!editorRef.current) return
@@ -63,8 +69,9 @@ export default function Editor({ value, onChange, onSave }: EditorProps) {
         autocompletion({ override: [latexCompletions] }),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
+            isUpdatingInternally.current = true; // Mark as internal update
             onChangeRef.current(update.state.doc.toString())
-            debouncedOnSave() // Trigger debounced save on document change
+            debouncedOnSaveRef.current() // Access via ref
           }
         }),
         EditorView.domEventHandlers({
@@ -90,11 +97,11 @@ export default function Editor({ value, onChange, onSave }: EditorProps) {
     return () => {
       view.destroy()
     }
-  }, [debouncedOnSave]) // Removed onChange from dependencies, debouncedOnSave is stable
+  }, []) // Empty dependency array for true one-time initialization
 
   // Update editor when value changes externally
   useEffect(() => {
-    if (viewRef.current) {
+    if (viewRef.current && !isUpdatingInternally.current) { // Only update if not an internal change
       const currentValue = viewRef.current.state.doc.toString()
       if (currentValue !== value) {
         const { selection } = viewRef.current.state; // Preserve cursor position
@@ -109,6 +116,7 @@ export default function Editor({ value, onChange, onSave }: EditorProps) {
         });
       }
     }
+    isUpdatingInternally.current = false; // Reset flag after potential external update
   }, [value])
 
   return <div ref={editorRef} className="h-full" />
