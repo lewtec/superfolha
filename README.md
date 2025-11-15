@@ -1,4 +1,4 @@
-# LaTeX Editor Web
+# Superfolha
 
 A complete web-based LaTeX editor with Git version control, real-time compilation, and collaborative features.
 
@@ -102,7 +102,7 @@ cd frontend && npm run build && cd ..
 go build -o server cmd/server/main.go
 
 # Run
-./server --db="postgres://..." --state-dir=/var/latex-editor
+./server --db="postgres://..." --state-dir=/var/superfolha
 ```
 
 ## Docker
@@ -112,7 +112,7 @@ mise run docker
 
 docker run -v /data:/data -p 8080:8080 \
   -e DATABASE_URL="postgres://..." \
-  latex-editor
+  superfolha
 ```
 
 ## Configuration
@@ -136,7 +136,7 @@ docker run -v /data:/data -p 8080:8080 \
 ```bash
 export DATABASE_URL="postgres://user:pass@localhost/latex_editor?sslmode=disable"
 export JWT_SECRET="your-secure-random-secret-key-min-32-chars"
-export STATE_DIR="/var/latex-editor/repos"
+export STATE_DIR="/var/superfolha/repos"
 export PORT="8080"
 
 ./server

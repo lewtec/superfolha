@@ -21,8 +21,8 @@ var (
 
 var rootCmd = &cobra.Command{
 	Use:   "server",
-	Short: "LaTeX Editor Server",
-	Long:  `A web-based LaTeX editor with Git version control and collaborative features.`,
+	Short: "Superfolha Server",
+	Long:  `Superfolha - A web-based LaTeX editor with Git version control and collaborative features.`,
 	Run:   runServer,
 }
 

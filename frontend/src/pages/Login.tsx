@@ -37,7 +37,7 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-base-200">
       <div className="card w-96 bg-base-100 shadow-xl">
         <div className="card-body">
-          <h2 className="card-title text-2xl font-bold text-center">LaTeX Editor</h2>
+          <h2 className="card-title text-2xl font-bold text-center">Superfolha</h2>
           <p className="text-center text-base-content/70 mb-4">Sign in to your account</p>
 
           {error && (

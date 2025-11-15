@@ -1,5 +1,5 @@
 ```markdown
-# LaTeX Editor Web - Especificação Técnica
+# Superfolha - Especificação Técnica
 
 Construa um editor LaTeX web completo seguindo esta especificação.
 
@@ -29,7 +29,7 @@ Construa um editor LaTeX web completo seguindo esta especificação.
 ## Configuração CLI
 
 ```bash
-./server --state-dir=/var/latex-editor --db="postgres://..."
+./server --state-dir=/var/superfolha --db="postgres://..."
 ```
 
 Argumentos via cobra, suportam variáveis de ambiente:
@@ -424,8 +424,8 @@ cd frontend && npm run build
 cd backend && go build -o server cmd/server/main.go
 
 # Docker
-docker build -t latex-editor .
-docker run -v /data:/data -p 8080:8080 latex-editor \
+docker build -t superfolha .
+docker run -v /data:/data -p 8080:8080 superfolha \
   --state-dir=/data/repos \
   --db="postgres://user:pass@host/db"
 ```

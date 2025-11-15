@@ -48,7 +48,7 @@ depends = ["gen:*"]
 [tasks.docker]
 description = "Build Docker image"
 depends = ["build"]
-run = "docker build -t latex-editor ."
+run = "docker build -t superfolha ."
 
 [tasks.test]
 description = "Run tests"
