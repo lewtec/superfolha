@@ -34,7 +34,7 @@ run = "echo 'Build complete! Binary: ./server'"
 run = "sqlc generate"
 
 [tasks."gen:graphql"]
-run = "gqlgen generate"
+run = "go run github.com/99designs/gqlgen generate"
 
 [tasks.gen]
 depends = ["gen"]
