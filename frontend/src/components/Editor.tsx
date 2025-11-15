@@ -42,7 +42,15 @@ export default function Editor({ value, onChange, onSave }: EditorProps) {
   const editorRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
 
-  const debouncedOnSave = useDebounce(onSave, 10000); // 10 seconds debounce
+  const onChangeRef = useRef(onChange);
+  const onSaveRef = useRef(onSave);
+
+  useEffect(() => {
+    onChangeRef.current = onChange;
+    onSaveRef.current = onSave;
+  }, [onChange, onSave]);
+
+  const debouncedOnSave = useDebounce(onSaveRef.current, 10000); // 10 seconds debounce
 
   useEffect(() => {
     if (!editorRef.current) return
@@ -55,7 +63,7 @@ export default function Editor({ value, onChange, onSave }: EditorProps) {
         autocompletion({ override: [latexCompletions] }),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
-            onChange(update.state.doc.toString())
+            onChangeRef.current(update.state.doc.toString())
             debouncedOnSave() // Trigger debounced save on document change
           }
         }),
@@ -63,7 +71,7 @@ export default function Editor({ value, onChange, onSave }: EditorProps) {
           keydown: (e) => {
             if (e.ctrlKey && e.key === 's') {
               e.preventDefault()
-              onSave() // Immediate save on Ctrl+S
+              onSaveRef.current() // Immediate save on Ctrl+S
               return true
             }
             return false
@@ -82,20 +90,23 @@ export default function Editor({ value, onChange, onSave }: EditorProps) {
     return () => {
       view.destroy()
     }
-  }, [debouncedOnSave, onChange]) // Added debouncedOnSave and onChange to dependencies
+  }, [debouncedOnSave]) // Removed onChange from dependencies, debouncedOnSave is stable
 
   // Update editor when value changes externally
   useEffect(() => {
     if (viewRef.current) {
       const currentValue = viewRef.current.state.doc.toString()
       if (currentValue !== value) {
+        const { selection } = viewRef.current.state; // Preserve cursor position
         viewRef.current.dispatch({
           changes: {
             from: 0,
             to: currentValue.length,
             insert: value,
           },
-        })
+          selection, // Restore cursor position
+          scrollIntoView: true,
+        });
       }
     }
   }, [value])

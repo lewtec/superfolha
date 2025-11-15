@@ -1,33 +1,34 @@
-import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import Editor from '../components/Editor'
-import FileTree from '../components/FileTree'
-import PDFViewer from '../components/PDFViewer'
-import Navbar from '../components/Navbar'
-import LogsPanel from '../components/LogsPanel'
-import { useGetProjectQuery } from '../hooks/useGetProjectQuery';
-import { useGetFilesQuery } from '../hooks/useGetFilesQuery';
-import { useSaveFileMutation } from '../hooks/useSaveFileMutation';
-import { useDeleteFileMutation } from '../hooks/useDeleteFileMutation';
+import { useState, useEffect, useCallback } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import Editor from "../components/Editor";
+import FileTree from "../components/FileTree";
+import PDFViewer from "../components/PDFViewer";
+import Navbar from "../components/Navbar";
+import LogsPanel from "../components/LogsPanel";
+import { useGetProjectQuery } from "../hooks/useGetProjectQuery";
+import { useGetFilesQuery } from "../hooks/useGetFilesQuery";
+import { useSaveFileMutation } from "../hooks/useSaveFileMutation";
+import { useDeleteFileMutation } from "../hooks/useDeleteFileMutation";
 
 interface File {
-  path: string
-  content: string
+  path: string;
+  content: string;
 }
 
 export default function EditorPage() {
-  const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
-  const [files, setFiles] = useState<File[]>([])
-  const [currentFile, setCurrentFile] = useState<File | null>(null)
-  const [view, setView] = useState<'code' | 'pdf'>('code')
-  const [pdfData, setPdfData] = useState<string | null>(null)
-  const [logs, setLogs] = useState('')
-  const [compileSuccess, setCompileSuccess] = useState(false)
-  const [compiling, setCompiling] = useState(false)
+  const { id } = useParams<{ id: string }>();
+  const [files, setFiles] = useState<File[]>([]);
+  const [currentFile, setCurrentFile] = useState<File | null>(null);
+  const [view, setView] = useState<"code" | "pdf">("code");
+  const [pdfData, setPdfData] = useState<string | null>(null);
+  const [logs, setLogs] = useState("");
+  const [compileSuccess, setCompileSuccess] = useState(false);
+  const [compiling, setCompiling] = useState(false);
 
   const { project, ...projectQueryData } = useGetProjectQuery({ id: id! });
-  const { files: fetchedFiles, ...filesQueryData } = useGetFilesQuery({ projectId: id! });
+  const { files: fetchedFiles, ...filesQueryData } = useGetFilesQuery({
+    projectId: id!,
+  });
 
   const { saveFile, isInFlight: isSavingFile } = useSaveFileMutation({
     onCompleted: (response, errors) => {
@@ -37,7 +38,7 @@ export default function EditorPage() {
       }
     },
     onError: (err) => {
-      alert('Failed to save file');
+      alert("Failed to save file");
       console.error(err);
     },
   });
@@ -48,7 +49,7 @@ export default function EditorPage() {
         alert(errors[0].message);
         return;
       }
-      const newFiles = files.filter(f => f.path !== currentFile?.path); // Use currentFile?.path here
+      const newFiles = files.filter((f) => f.path !== currentFile?.path); // Use currentFile?.path here
       setFiles(newFiles);
       if (currentFile?.path && newFiles.length > 0) {
         setCurrentFile(newFiles[0]);
@@ -57,7 +58,7 @@ export default function EditorPage() {
       }
     },
     onError: (err) => {
-      alert('Failed to delete file');
+      alert("Failed to delete file");
       console.error(err);
     },
   });
@@ -72,83 +73,92 @@ export default function EditorPage() {
   }, [fetchedFiles]);
 
   const compile = async () => {
-    setCompiling(true)
+    setCompiling(true);
     try {
       // Create tarball from files
-      const formData = new FormData()
-      const tarball = await createTarball(files)
-      formData.append('tarball', new Blob([tarball]), 'project.tar.gz')
+      const formData = new FormData();
+      const tarball = await createTarball(files);
+      formData.append("tarball", new Blob([tarball]), "project.tar.gz");
 
-      const response = await fetch('/api/compile', {
-        method: 'POST',
+      const response = await fetch("/api/compile", {
+        method: "POST",
         body: formData,
-      })
+      });
 
-      const result = await response.json()
-      setPdfData(result.pdf)
-      setLogs(result.logs)
-      setCompileSuccess(result.success)
+      const result = await response.json();
+      setPdfData(result.pdf);
+      setLogs(result.logs);
+      setCompileSuccess(result.success);
 
       if (result.success) {
-        setView('pdf')
+        setView("pdf");
       }
     } catch (err) {
-      alert('Compilation failed')
+      alert("Compilation failed");
     } finally {
-      setCompiling(false)
+      setCompiling(false);
     }
-  }
+  };
 
   const createTarball = async (files: File[]): Promise<Uint8Array> => {
     // Simple tarball creation - in production use a proper library
-    const encoder = new TextEncoder()
-    const parts: Uint8Array[] = []
+    const encoder = new TextEncoder();
+    const parts: Uint8Array[] = [];
 
     for (const file of files) {
-      const content = encoder.encode(file.content)
-      parts.push(content)
+      const content = encoder.encode(file.content);
+      parts.push(content);
     }
 
     // This is a simplified version - proper implementation would create actual tar.gz
-    return new Uint8Array(parts.flatMap(p => Array.from(p)))
-  }
+    return new Uint8Array(parts.flatMap((p) => Array.from(p)));
+  };
 
   const handleFileSelect = (path: string) => {
-    const file = files.find(f => f.path === path)
+    const file = files.find((f) => f.path === path);
     if (file) {
-      setCurrentFile(file)
-      setView('code')
+      setCurrentFile(file);
+      setView("code");
     }
-  }
+  };
 
   const handleNewFile = () => {
-    const filename = prompt('Enter file name (e.g., chapter1.tex):')
-    if (!filename) return
+    const filename = prompt("Enter file name (e.g., chapter1.tex):");
+    if (!filename) return;
 
-    const newFile: File = { path: filename, content: '' }
-    setFiles([...files, newFile])
-    setCurrentFile(newFile)
-  }
+    const newFile: File = { path: filename, content: "" };
+    setFiles([...files, newFile]);
+    setCurrentFile(newFile);
+  };
 
-  const handleEditorChange = (value: string) => {
-    if (currentFile) {
-      setCurrentFile({ ...currentFile, content: value })
-      setFiles(files.map(f => f.path === currentFile.path ? { ...currentFile, content: value } : f))
-    }
-  }
+  const handleEditorChange = useCallback(
+    (value: string) => {
+      if (currentFile) {
+        setCurrentFile({ ...currentFile, content: value });
+        setFiles(
+          files.map((f) =>
+            f.path === currentFile.path
+              ? { ...currentFile, content: value }
+              : f,
+          ),
+        );
+      }
+    },
+    [currentFile, files],
+  ); // Dependencies for useCallback
 
   if (projectQueryData.loading || filesQueryData.loading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <span className="loading loading-spinner loading-lg"></span>
       </div>
-    )
+    );
   }
 
   return (
     <div className="h-screen flex flex-col">
       <Navbar
-        projectName={project?.name || 'Loading...'}
+        projectName={project?.name || "Loading..."}
         onCompile={compile}
         compiling={compiling}
       />
@@ -161,7 +171,10 @@ export default function EditorPage() {
             currentFile={currentFile?.path || null}
             onFileSelect={handleFileSelect}
             onNewFile={handleNewFile}
-            onDeleteFile={(path) => deleteFile(id!, path)}
+            onDeleteFile={useCallback(
+              (path) => deleteFile(id!, path),
+              [id, deleteFile],
+            )}
           />
         </div>
 
@@ -170,14 +183,14 @@ export default function EditorPage() {
           {/* Toolbar */}
           <div className="tabs tabs-boxed bg-base-200 p-2">
             <a
-              className={`tab ${view === 'code' ? 'tab-active' : ''}`}
-              onClick={() => setView('code')}
+              className={`tab ${view === "code" ? "tab-active" : ""}`}
+              onClick={() => setView("code")}
             >
               Code
             </a>
             <a
-              className={`tab ${view === 'pdf' ? 'tab-active' : ''}`}
-              onClick={() => setView('pdf')}
+              className={`tab ${view === "pdf" ? "tab-active" : ""}`}
+              onClick={() => setView("pdf")}
             >
               PDF
             </a>
@@ -185,11 +198,15 @@ export default function EditorPage() {
 
           {/* Editor/PDF View */}
           <div className="flex-1 overflow-hidden">
-            {view === 'code' && currentFile ? (
+            {view === "code" && currentFile ? (
               <Editor
                 value={currentFile.content}
                 onChange={handleEditorChange}
-                onSave={() => saveFile(id!, currentFile.path, currentFile.content)}
+                onSave={useCallback(() => {
+                  if (currentFile) {
+                    saveFile(id!, currentFile.path, currentFile.content);
+                  }
+                }, [id, currentFile, saveFile])}
               />
             ) : (
               <PDFViewer pdfData={pdfData} />
@@ -201,5 +218,5 @@ export default function EditorPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }
