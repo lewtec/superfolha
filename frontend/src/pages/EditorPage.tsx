@@ -254,12 +254,6 @@ export default function EditorPage() {
 
   return (
     <div className="h-screen flex flex-col">
-      <Navbar
-        projectName={project?.name || 'Loading...'}
-        onCompile={compile}
-        compiling={compiling}
-      />
-
       <div className="flex flex-1 overflow-hidden">
         {/* File Tree Sidebar */}
         <div className="w-64 border-r border-base-300">

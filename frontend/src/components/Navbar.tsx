@@ -7,15 +7,12 @@ interface NavbarProps {
 }
 
 export default function Navbar({ projectName, onCompile, compiling }: NavbarProps) {
-  const navigate = useNavigate()
+  // const navigate = useNavigate() // navigate is not used anymore
 
   return (
     <div className="navbar bg-base-100 shadow-md">
       <div className="flex-1">
-        <button className="btn btn-ghost normal-case text-xl" onClick={() => navigate('/projects')}>
-          LaTeX Editor
-        </button>
-        <span className="text-base-content/70 ml-4">/ {projectName}</span>
+        <span className="text-base-content/70 ml-4">Project: {projectName}</span>
       </div>
       <div className="flex-none gap-2">
         <button

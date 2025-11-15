@@ -152,18 +152,6 @@ export default function Projects() {
 
   return (
     <div className="min-h-screen bg-base-200">
-      {/* Navbar */}
-      <div className="navbar bg-base-100 shadow-md">
-        <div className="flex-1">
-          <a className="btn btn-ghost normal-case text-xl">LaTeX Editor</a>
-        </div>
-        <div className="flex-none">
-          <button className="btn btn-ghost" onClick={logout}>
-            Logout
-          </button>
-        </div>
-      </div>
-
       {/* Content */}
       <div className="container mx-auto p-8">
         <div className="flex justify-between items-center mb-6">

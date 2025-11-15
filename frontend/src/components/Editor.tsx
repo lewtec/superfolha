@@ -1,9 +1,10 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useCallback } from 'react' // Added useCallback
 import { EditorView, basicSetup } from 'codemirror'
 import { EditorState } from '@codemirror/state'
 import { StreamLanguage } from '@codemirror/language'
 import { stex } from '@codemirror/legacy-modes/mode/stex'
 import { autocompletion, CompletionContext } from '@codemirror/autocomplete'
+import { useDebounce } from '../hooks/useDebounce' // Import useDebounce hook
 
 interface EditorProps {
   value: string
@@ -41,6 +42,8 @@ export default function Editor({ value, onChange, onSave }: EditorProps) {
   const editorRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
 
+  const debouncedOnSave = useDebounce(onSave, 10000); // 10 seconds debounce
+
   useEffect(() => {
     if (!editorRef.current) return
 
@@ -53,13 +56,14 @@ export default function Editor({ value, onChange, onSave }: EditorProps) {
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
             onChange(update.state.doc.toString())
+            debouncedOnSave() // Trigger debounced save on document change
           }
         }),
         EditorView.domEventHandlers({
           keydown: (e) => {
             if (e.ctrlKey && e.key === 's') {
               e.preventDefault()
-              onSave()
+              onSave() // Immediate save on Ctrl+S
               return true
             }
             return false
@@ -78,7 +82,7 @@ export default function Editor({ value, onChange, onSave }: EditorProps) {
     return () => {
       view.destroy()
     }
-  }, [])
+  }, [debouncedOnSave, onChange]) // Added debouncedOnSave and onChange to dependencies
 
   // Update editor when value changes externally
   useEffect(() => {
