@@ -107,11 +107,7 @@ func (r *mutationResolver) CreateProject(ctx context.Context, name string) (*Pro
 		return nil, fmt.Errorf("failed to create project in db: %w", err)
 	}
 
-	// Initialize git repo
-	if err := git.InitRepo(projectPath); err != nil {
-		return nil, fmt.Errorf("failed to init git repo: %w", err)
-	}
-
+	
 	// Copy template files
 
 	templateDir := "simple"
