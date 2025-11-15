@@ -114,7 +114,7 @@ func (r *mutationResolver) CreateProject(ctx context.Context, name string) (*Pro
 
 	// Copy template files
 
-	templateDir := "templates/simple"
+	templateDir := "simple"
 
 	err = fs.WalkDir(templatesFS, templateDir, func(path string, d fs.DirEntry, err error) error {
 
