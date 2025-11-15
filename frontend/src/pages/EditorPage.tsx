@@ -5,15 +5,10 @@ import FileTree from '../components/FileTree'
 import PDFViewer from '../components/PDFViewer'
 import Navbar from '../components/Navbar'
 import LogsPanel from '../components/LogsPanel'
-import { useLazyLoadQuery, useMutation } from 'react-relay';
-import type { GetProjectQuery as GetProjectQueryType } from '../queries/__generated__/GetProjectQuery.graphql';
-import GetProjectQueryGraphql from '../queries/GetProjectQuery';
-import type { GetFilesQuery as GetFilesQueryType } from '../queries/__generated__/GetFilesQuery.graphql';
-import GetFilesQueryGraphql from '../queries/GetFilesQuery';
-import type { SaveFileMutation as SaveFileMutationType } from '../mutations/__generated__/SaveFileMutation.graphql';
-import SaveFileMutationGraphql from '../mutations/SaveFileMutation';
-import type { DeleteFileMutation as DeleteFileMutationType } from '../mutations/__generated__/DeleteFileMutation.graphql';
-import DeleteFileMutationGraphql from '../mutations/DeleteFileMutation';
+import { useGetProjectQuery } from '../hooks/useGetProjectQuery';
+import { useGetFilesQuery } from '../hooks/useGetFilesQuery';
+import { useSaveFileMutation } from '../hooks/useSaveFileMutation';
+import { useDeleteFileMutation } from '../hooks/useDeleteFileMutation';
 
 interface File {
   path: string
@@ -31,20 +26,41 @@ export default function EditorPage() {
   const [compileSuccess, setCompileSuccess] = useState(false)
   const [compiling, setCompiling] = useState(false)
 
-  const { project, ...projectQueryData } = useLazyLoadQuery<GetProjectQueryType>(
-    GetProjectQueryGraphql,
-    { id: id! },
-    { fetchPolicy: 'store-and-network' }
-  );
+  const { project, ...projectQueryData } = useGetProjectQuery({ id: id! });
+  const { files: fetchedFiles, ...filesQueryData } = useGetFilesQuery({ projectId: id! });
 
-  const { files: fetchedFiles, ...filesQueryData } = useLazyLoadQuery<GetFilesQueryType>(
-    GetFilesQueryGraphql,
-    { projectId: id! },
-    { fetchPolicy: 'store-and-network' }
-  );
+  const { saveFile, isInFlight: isSavingFile } = useSaveFileMutation({
+    onCompleted: (response, errors) => {
+      if (errors) {
+        alert(errors[0].message);
+        return;
+      }
+    },
+    onError: (err) => {
+      alert('Failed to save file');
+      console.error(err);
+    },
+  });
 
-  const [saveFileCommit, isSavingFile] = useMutation<SaveFileMutationType>(SaveFileMutationGraphql);
-  const [deleteFileCommit, isDeletingFile] = useMutation<DeleteFileMutationType>(DeleteFileMutationGraphql);
+  const { deleteFile, isInFlight: isDeletingFile } = useDeleteFileMutation({
+    onCompleted: (response, errors) => {
+      if (errors) {
+        alert(errors[0].message);
+        return;
+      }
+      const newFiles = files.filter(f => f.path !== currentFile?.path); // Use currentFile?.path here
+      setFiles(newFiles);
+      if (currentFile?.path && newFiles.length > 0) {
+        setCurrentFile(newFiles[0]);
+      } else if (newFiles.length === 0) {
+        setCurrentFile(null);
+      }
+    },
+    onError: (err) => {
+      alert('Failed to delete file');
+      console.error(err);
+    },
+  });
 
   useEffect(() => {
     if (fetchedFiles) {
@@ -54,29 +70,6 @@ export default function EditorPage() {
       }
     }
   }, [fetchedFiles]);
-
-  const saveFile = () => {
-    if (!currentFile) return;
-
-    saveFileCommit({
-      variables: {
-        projectId: id!,
-        path: currentFile.path,
-        content: currentFile.content,
-      },
-      onCompleted: (response, errors) => {
-        if (errors) {
-          alert(errors[0].message);
-          return;
-        }
-        // Relay automatically updates the store, no need to manually update files state
-      },
-      onError: (err) => {
-        alert('Failed to save file');
-        console.error(err);
-      },
-    });
-  };
 
   const compile = async () => {
     setCompiling(true)
@@ -137,34 +130,6 @@ export default function EditorPage() {
     setCurrentFile(newFile)
   }
 
-  const handleDeleteFile = (path: string) => {
-    if (!confirm(`Delete ${path}?`)) return;
-
-    deleteFileCommit({
-      variables: {
-        projectId: id!,
-        path,
-      },
-      onCompleted: (response, errors) => {
-        if (errors) {
-          alert(errors[0].message);
-          return;
-        }
-        const newFiles = files.filter(f => f.path !== path);
-        setFiles(newFiles);
-        if (currentFile?.path === path && newFiles.length > 0) {
-          setCurrentFile(newFiles[0]);
-        } else if (newFiles.length === 0) {
-          setCurrentFile(null);
-        }
-      },
-      onError: (err) => {
-        alert('Failed to delete file');
-        console.error(err);
-      },
-    });
-  };
-
   const handleEditorChange = (value: string) => {
     if (currentFile) {
       setCurrentFile({ ...currentFile, content: value })
@@ -196,7 +161,7 @@ export default function EditorPage() {
             currentFile={currentFile?.path || null}
             onFileSelect={handleFileSelect}
             onNewFile={handleNewFile}
-            onDeleteFile={handleDeleteFile}
+            onDeleteFile={(path) => deleteFile(id!, path)}
           />
         </div>
 
@@ -224,7 +189,7 @@ export default function EditorPage() {
               <Editor
                 value={currentFile.content}
                 onChange={handleEditorChange}
-                onSave={saveFile}
+                onSave={() => saveFile(id!, currentFile.path, currentFile.content)}
               />
             ) : (
               <PDFViewer pdfData={pdfData} />
