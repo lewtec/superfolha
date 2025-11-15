@@ -6,344 +6,79 @@ package server
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"time"
-
-	"github.com/google/uuid"
-	"github.com/lewtec/superfolha/internal/auth"
-	"github.com/lewtec/superfolha/internal/git"
 )
 
 // Register is the resolver for the register field.
 func (r *mutationResolver) Register(ctx context.Context, email string, password string) (*AuthPayload, error) {
-	// Hash password
-	hashedPassword, err := auth.HashPassword(password)
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO: Insert user into database
-	userID, err := uuid.NewV7()
-	if err != nil {
-		return nil, err
-	}
-	_ = hashedPassword
-
-	// Generate token
-	token, err := auth.GenerateToken(userID.String(), email)
-	if err != nil {
-		return nil, err
-	}
-
-	return &AuthPayload{
-		Token: token,
-		User: &User{
-			ID:    userID.String(),
-			Email: email,
-		},
-	}, nil
+	panic(fmt.Errorf("not implemented: Register - register"))
 }
 
 // Login is the resolver for the login field.
 func (r *mutationResolver) Login(ctx context.Context, email string, password string) (*AuthPayload, error) {
-	// TODO: Query user from database and verify password
-	userID, err := uuid.NewV7()
-	if err != nil {
-		return nil, err
-	}
-	_ = password
-
-	// Generate token
-	token, err := auth.GenerateToken(userID.String(), email)
-	if err != nil {
-		return nil, err
-	}
-
-	return &AuthPayload{
-		Token: token,
-		User: &User{
-			ID:    userID.String(),
-			Email: email,
-		},
-	}, nil
+	panic(fmt.Errorf("not implemented: Login - login"))
 }
 
 // CreateProject is the resolver for the createProject field.
 func (r *mutationResolver) CreateProject(ctx context.Context, name string) (*Project, error) {
-	user, ok := auth.GetUserFromContext(ctx)
-	if !ok {
-		return nil, errors.New("not authenticated")
-	}
-
-	// Create project
-	projectUUID, err := uuid.NewV7()
-	if err != nil {
-		return nil, err
-	}
-	projectID := projectUUID.String()
-	projectPath := r.getProjectPath(projectID)
-
-	// Initialize git repo
-	if err := git.InitRepo(projectPath); err != nil {
-		return nil, err
-	}
-
-	// Create main.tex template
-	template := `\documentclass{article}
-\usepackage[utf8]{inputenc}
-
-\title{Untitled}
-\author{}
-\date{}
-
-\begin{document}
-
-\maketitle
-
-\section{Introduction}
-
-Your content here.
-
-\end{document}
-`
-	if err := git.WriteFile(projectPath, "main.tex", template); err != nil {
-		return nil, err
-	}
-
-	// Initial commit
-	_, err = git.CommitChanges(projectPath, user.Email, "Initial commit")
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO: Insert into database
-
-	return &Project{
-		ID:        projectID,
-		Name:      name,
-		CreatedAt: Time{Time: time.Now()},
-		UpdatedAt: Time{Time: time.Now()},
-	}, nil
+	panic(fmt.Errorf("not implemented: CreateProject - createProject"))
 }
 
 // DeleteProject is the resolver for the deleteProject field.
 func (r *mutationResolver) DeleteProject(ctx context.Context, id string) (bool, error) {
-	user, ok := auth.GetUserFromContext(ctx)
-	if !ok {
-		return false, errors.New("not authenticated")
-	}
-
-	// TODO: Verify ownership and delete from database
-	_ = user
-	_ = id
-
-	return true, nil
+	panic(fmt.Errorf("not implemented: DeleteProject - deleteProject"))
 }
 
 // SaveFile is the resolver for the saveFile field.
 func (r *mutationResolver) SaveFile(ctx context.Context, projectID string, path string, content string) (*File, error) {
-	user, ok := auth.GetUserFromContext(ctx)
-	if !ok {
-		return nil, errors.New("not authenticated")
-	}
-
-	// TODO: Verify project ownership
-	_ = user
-
-	projectPath := r.getProjectPath(projectID)
-	if err := git.WriteFile(projectPath, path, content); err != nil {
-		return nil, err
-	}
-
-	return &File{
-		Path:    path,
-		Content: content,
-	},
-	nil
+	panic(fmt.Errorf("not implemented: SaveFile - saveFile"))
 }
 
 // DeleteFile is the resolver for the deleteFile field.
 func (r *mutationResolver) DeleteFile(ctx context.Context, projectID string, path string) (bool, error) {
-	user, ok := auth.GetUserFromContext(ctx)
-	if !ok {
-		return false, errors.New("not authenticated")
-	}
-
-	// TODO: Verify project ownership and delete file
-	_ = user
-	projectPath := r.getProjectPath(projectID)
-	if err := git.DeleteFile(projectPath, path); err != nil {
-		return false, err
-	}
-
-	return true, nil
+	panic(fmt.Errorf("not implemented: DeleteFile - deleteFile"))
 }
 
-// !!! WARNING !!!
-The code below was going to be deleted when updating resolvers. It has been copied here so you have
-one last chance to move it out of harms way if you want. There are two reasons this happens:
-  - When renaming or deleting a resolver the old code will be put in here. You can safely delete
-    it when you're done.
-  - You have helper methods in this file. Move them out to keep these resolver files clean.
-	func (r *mutationResolver) Commit(ctx context.Context, projectID string, message string) ( *Commit,  error){
-		panic(fmt.Errorf("not implemented: Commit - commit"))
-	}
+// Commit is the resolver for the commit field.
+func (r *mutationResolver) Commit(ctx context.Context, projectID string, message string) (*Commit, error) {
+	panic(fmt.Errorf("not implemented: Commit - commit"))
+}
 
 // Me is the resolver for the me field.
-	func (r *queryResolver) Me(ctx context.Context) ( *User,  error){
-		user, ok := auth.GetUserFromContext(ctx)
-	if !ok {
-		return nil, errors.New("not authenticated")
-	}
-
-	return &User{
-		ID:    user.UserID,
-		Email: user.Email,
-	}, nil
-	}
-
-// Projects is the resolver for the projects field.
-	func (r *queryResolver) Projects(ctx context.Context) ( []*Project,  error){
-		user, ok := auth.GetUserFromContext(ctx)
-	if !ok {
-		return nil, errors.New("not authenticated")
-	}
-
-	// TODO: Query from database
-	_ = user
-	return []*Project{}, nil
-	}
-
-// Project is the resolver for the project field.
-	func (r *queryResolver) Project(ctx context.Context, id string) ( *Project,  error){
-		user, ok := auth.GetUserFromContext(ctx)
-	if !ok {
-		return nil, errors.New("not authenticated")
-	}
-
-	// TODO: Query from database and verify ownership
-	_ = user
-	_ = id
-	return nil, errors.New("not implemented")
-	}
-
-// Files is the resolver for the files field.
-	func (r *queryResolver) Files(ctx context.Context, projectID string) ( []*File,  error){
-		user, ok := auth.GetUserFromContext(ctx)
-	if !ok {
-		return nil, errors.New("not authenticated")
-	}
-
-	// TODO: Verify project ownership
-	_ = user
-
-	projectPath := r.getProjectPath(projectID)
-	gitFiles, err := git.ListFiles(projectPath)
-	if err != nil {
-		return nil, err
-	}
-
-	files := make([]*File, len(gitFiles))
-	for i, f := range gitFiles {
-		files[i] = &File{
-			Path:    f.Path,
-			Content: f.Content,
-		}
-	}
-
-	return files, nil
-	}
-
-// File is the resolver for the file field.
-	func (r *queryResolver) File(ctx context.Context, projectID string, path string) ( *File,  error){
-		user, ok := auth.GetUserFromContext(ctx)
-	if !ok {
-		return nil, errors.New("not authenticated")
-	}
-
-	// TODO: Verify project ownership
-	_ = user
-
-	projectPath := r.getProjectPath(projectID)
-	content, err := git.ReadFile(projectPath, path)
-	if err != nil {
-		return nil, err
-	}
-
-	return &File{
-		Path:    path,
-		Content: content,
-	}, nil
-	}
-
-// History is the resolver for the history field.
-	func (r *queryResolver) History(ctx context.Context, projectID string) ( []*Commit,  error){
-		user, ok := auth.GetUserFromContext(ctx)
-	if !ok {
-		return nil, errors.New("not authenticated")
-	}
-
-	// TODO: Verify project ownership
-	_ = user
-
-	projectPath := r.getProjectPath(projectID)
-	gitCommits, err := git.GetHistory(projectPath)
-	if err != nil {
-		return nil, err
-	}
-
-	commits := make([]*Commit, len(gitCommits))
-	for i, c := range gitCommits {
-		commits[i] = &Commit{
-			Hash:    c.Hash,
-			Message: c.Message,
-			Author:  c.Author,
-			Date:    Time(c.Date),
-		}
-	}
-
-	return commits, nil
-	}
-
-
-
-// Mutation returns MutationResolver implementation.
-	func (r *Resolver) Mutation() MutationResolver { return &mutationResolver{r} }
-// Query returns QueryResolver implementation.
-	func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
-
-
-type mutationResolver struct { *Resolver }
-type queryResolver struct { *Resolver }
-
-
-
-    // !!! WARNING !!!
-    // The code below was going to be deleted when updating resolvers. It has been copied here so you have
-    // one last chance to move it out of harms way if you want. There are two reasons this happens:
-	//  - When renaming or deleting a resolver the old code will be put in here. You can safely delete
-	//    it when you're done.
-	//  - You have helper methods in this file. Move them out to keep these resolver files clean.
-	func (r *mutationResolver) CommitFn(ctx context.Context, projectID string, message string) (*Commit, error) {
-	user, ok := auth.GetUserFromContext(ctx)
-	if !ok {
-		return nil, errors.New("not authenticated")
-	}
-
-	// TODO: Verify project ownership
-
-	projectPath := r.getProjectPath(projectID)
-	gitCommit, err := git.CommitChanges(projectPath, user.Email, message)
-	if err != nil {
-		return nil, err
-	}
-
-	return &Commit{
-		Hash:    gitCommit.Hash,
-		Message: gitCommit.Message,
-		Author:  gitCommit.Author,
-		Date:    Time(gitCommit.Date),
-	}, nil
+func (r *queryResolver) Me(ctx context.Context) (*User, error) {
+	panic(fmt.Errorf("not implemented: Me - me"))
 }
 
+// Projects is the resolver for the projects field.
+func (r *queryResolver) Projects(ctx context.Context) ([]*Project, error) {
+	panic(fmt.Errorf("not implemented: Projects - projects"))
+}
+
+// Project is the resolver for the project field.
+func (r *queryResolver) Project(ctx context.Context, id string) (*Project, error) {
+	panic(fmt.Errorf("not implemented: Project - project"))
+}
+
+// Files is the resolver for the files field.
+func (r *queryResolver) Files(ctx context.Context, projectID string) ([]*File, error) {
+	panic(fmt.Errorf("not implemented: Files - files"))
+}
+
+// File is the resolver for the file field.
+func (r *queryResolver) File(ctx context.Context, projectID string, path string) (*File, error) {
+	panic(fmt.Errorf("not implemented: File - file"))
+}
+
+// History is the resolver for the history field.
+func (r *queryResolver) History(ctx context.Context, projectID string) ([]*Commit, error) {
+	panic(fmt.Errorf("not implemented: History - history"))
+}
+
+// Mutation returns MutationResolver implementation.
+func (r *Resolver) Mutation() MutationResolver { return &mutationResolver{r} }
+
+// Query returns QueryResolver implementation.
+func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
+
+type mutationResolver struct{ *Resolver }
+type queryResolver struct{ *Resolver }

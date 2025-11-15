@@ -12,8 +12,8 @@ import (
 type Time time.Time
 
 func (t Time) MarshalGQL(w io.Writer) {
-	time := time.Time(t)
-	w.Write([]byte(strconv.Quote(time.Format(time.RFC3339))))
+	tyme := time.Time(t)
+	w.Write([]byte(strconv.Quote(tyme.Format(time.RFC3339))))
 }
 
 func (t *Time) UnmarshalGQL(v interface{}) error {
