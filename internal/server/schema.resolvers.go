@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/lewtec/superfolha/internal/auth"
 	"github.com/lewtec/superfolha/internal/db"
+	"github.com/lewtec/superfolha/internal/git"
 )
 
 // Register is the resolver for the register field.
@@ -26,7 +27,8 @@ func (r *mutationResolver) Register(ctx context.Context, email string, password 
 	_ = hashedPassword
 
 	// Generate token
-	token, err := auth.GenerateToken(userID.String(), email)
+
+token, err := auth.GenerateToken(userID.String(), email)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +49,73 @@ func (r *mutationResolver) Login(ctx context.Context, email string, password str
 
 // CreateProject is the resolver for the createProject field.
 func (r *mutationResolver) CreateProject(ctx context.Context, name string) (*Project, error) {
-	panic(fmt.Errorf("not implemented: CreateProject - createProject"))
+	user, ok := auth.GetUserFromContext(ctx)
+	if !ok {
+		return nil, errors.New("not authenticated")
+	}
+
+	userID, err := uuid.Parse(user.UserID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user ID: %w", err)
+	}
+
+	projectUUID, err := uuid.NewV7()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate project ID: %w", err)
+	}
+	projectID := projectUUID.String()
+	projectPath := r.getProjectPath(projectID)
+
+	// Create project in database
+	q := db.New(r.DB)
+	dbProject, err := q.CreateProject(ctx, db.CreateProjectParams{
+		UserID:  pgtype.UUID{Bytes: userID, Valid: true},
+		Name:    name,
+		GitPath: projectPath,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create project in db: %w", err)
+	}
+
+	// Initialize git repo
+	if err := git.InitRepo(projectPath); err != nil {
+		return nil, fmt.Errorf("failed to init git repo: %w", err)
+	}
+
+	// Create main.tex template
+	template := `\documentclass{article}
+\usepackage[utf8]{inputenc}
+
+\title{Untitled}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+
+Your content here.
+
+\end{document}
+`
+	if err := git.WriteFile(projectPath, "main.tex", template); err != nil {
+		return nil, fmt.Errorf("failed to write template file: %w", err)
+	}
+
+	// Initial commit
+	_, err = git.CommitChanges(projectPath, user.Email, "Initial commit")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create initial commit: %w", err)
+	}
+
+	return &Project{
+		ID:        fmt.Sprintf("%x", dbProject.ID.Bytes),
+		Name:      dbProject.Name,
+		CreatedAt: dbProject.CreatedAt.Time,
+		UpdatedAt: dbProject.UpdatedAt.Time,
+	}, nil
 }
 
 // DeleteProject is the resolver for the deleteProject field.
