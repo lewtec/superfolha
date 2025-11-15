@@ -3,11 +3,10 @@ package server
 import (
 	"context"
 	"errors"
-	"fmt"
-	"io/fs" // new import
+	"fmt" // new import
 	"os"
-	"strings" // new import
 
+	// new import
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/lewtec/superfolha/internal/auth"
@@ -105,72 +104,6 @@ func (r *mutationResolver) CreateProject(ctx context.Context, name string) (*Pro
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create project in db: %w", err)
-	}
-
-	
-	// Copy template files
-
-	templateDir := "templates/simple"
-	
-	// Debug: List contents of templatesFS
-	fmt.Println("Contents of templatesFS:")
-	fs.WalkDir(templatesFS, ".", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			fmt.Printf("Error walking %s: %v\n", path, err)
-			return err
-		}
-		fmt.Println("- ", path)
-		return nil
-	})
-	fmt.Println("End of templatesFS contents.")
-	
-	err = fs.WalkDir(templatesFS, templateDir, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-
-			return err
-
-		}
-
-		if d.IsDir() {
-
-			return nil
-
-		}
-
-	
-
-		content, err := templatesFS.ReadFile(path) // Use templatesFS.ReadFile directly
-
-		if err != nil {
-
-			return fmt.Errorf("failed to read template file %s: %w", path, err)
-
-		}
-
-	
-
-		// Remove the "templates/simple/" prefix to get the relative path in the project
-
-		relativePath := strings.TrimPrefix(path, templateDir+"/")
-
-		if err := git.WriteFile(projectPath, relativePath, string(content)); err != nil {
-
-			return fmt.Errorf("failed to write template file %s: %w", relativePath, err)
-
-		}
-
-		return nil
-
-	})
-
-	if err != nil {
-
-		return nil, fmt.Errorf("failed to copy template files: %w", err)
-
-	}	// Initial commit
-	_, err = git.CommitChanges(projectPath, user.Email, "Initial commit")
-	if err != nil {
-		return nil, fmt.Errorf("failed to create initial commit: %w", err)
 	}
 
 	return &Project{

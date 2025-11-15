@@ -6,8 +6,10 @@ import (
 	"embed"
 	"errors"
 	"fmt"
+	"io/fs" // new import
 	"os"
 	"path/filepath"
+	"strings" // new import
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -74,9 +76,40 @@ func (r *Resolver) getAndCheckProject(ctx context.Context, projectID string) (*d
 	}
 
 	projectPath := r.getProjectPath(projectID)
+	// Check if repo exists, if not, initialize it and copy templates
 	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
 		if err := git.InitRepo(projectPath); err != nil {
-			return nil, "", nil, fmt.Errorf("failed to re-init git repo: %w", err)
+			return nil, "", nil, fmt.Errorf("failed to init git repo: %w", err)
+		}
+
+		// Copy template files
+		templateDir := "templates/simple"
+		err = fs.WalkDir(templatesFS, templateDir, func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if d.IsDir() {
+				return nil
+			}
+
+			                        content, err := templatesFS.ReadFile(path)
+			                        if err != nil {
+			                                return fmt.Errorf("failed to read template file %s: %w", path, err)
+			                        }
+			
+			                        relativePath := strings.TrimPrefix(path, templateDir+"/")
+			                        if err := git.WriteFile(projectPath, relativePath, string(content)); err != nil {
+			                                return fmt.Errorf("failed to write template file %s: %w", relativePath, err)
+			                        }
+			                        return nil
+			                })
+			                if err != nil {
+			                        return nil, "", nil, fmt.Errorf("failed to copy template files: %w", err)
+			                }
+		// Initial commit
+		_, err = git.CommitChanges(projectPath, user.Email, "Initial commit")
+		if err != nil {
+			return nil, "", nil, fmt.Errorf("failed to create initial commit: %w", err)
 		}
 	}
 
