@@ -1,55 +1,36 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import { useLoginMutation } from '../hooks/useLoginMutation';
 
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
+
+  const { login, isInFlight } = useLoginMutation({
+    onCompleted: (response, errors) => {
+      if (errors) {
+        setError(errors[0].message);
+        return;
+      }
+      if (response.login?.token) {
+        localStorage.setItem('token', response.login.token);
+        navigate('/projects');
+      } else {
+        setError('Login failed: No token received.');
+      }
+    },
+    onError: (err) => {
+      setError('Failed to login. Please try again.');
+      console.error(err);
+    },
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    setLoading(true)
-
-    try {
-      const response = await fetch('/api/graphql', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          query: `
-            mutation Login($email: String!, $password: String!) {
-              login(email: $email, password: $password) {
-                token
-                user {
-                  id
-                  email
-                }
-              }
-            }
-          `,
-          variables: { email, password },
-        }),
-      })
-
-      const data = await response.json()
-
-      if (data.errors) {
-        setError(data.errors[0].message)
-        return
-      }
-
-      const { token } = data.data.login
-      localStorage.setItem('token', token)
-      navigate('/projects')
-    } catch (err) {
-      setError('Failed to login. Please try again.')
-    } finally {
-      setLoading(false)
-    }
+    login(email, password);
   }
 
   return (
@@ -97,10 +78,10 @@ export default function Login() {
             <div className="form-control mt-6">
               <button
                 type="submit"
-                className={`btn btn-primary ${loading ? 'loading' : ''}`}
-                disabled={loading}
+                className={`btn btn-primary ${isInFlight ? 'loading' : ''}`}
+                disabled={isInFlight}
               >
-                {loading ? 'Signing in...' : 'Sign In'}
+                {isInFlight ? 'Signing in...' : 'Sign In'}
               </button>
             </div>
           </form>

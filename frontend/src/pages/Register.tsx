@@ -1,13 +1,32 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import { useRegisterMutation } from '../hooks/useRegisterMutation';
 
 export default function Register() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
+
+  const { register, isInFlight } = useRegisterMutation({
+    onCompleted: (response, errors) => {
+      if (errors) {
+        setError(errors[0].message);
+        return;
+      }
+      if (response.register?.token) {
+        localStorage.setItem('token', response.register.token);
+        navigate('/projects');
+      } else {
+        setError('Registration failed: No token received.');
+      }
+    },
+    onError: (err) => {
+      setError('Failed to register. Please try again.');
+      console.error(err);
+    },
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -23,45 +42,7 @@ export default function Register() {
       return
     }
 
-    setLoading(true)
-
-    try {
-      const response = await fetch('/api/graphql', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          query: `
-            mutation Register($email: String!, $password: String!) {
-              register(email: $email, password: $password) {
-                token
-                user {
-                  id
-                  email
-                }
-              }
-            }
-          `,
-          variables: { email, password },
-        }),
-      })
-
-      const data = await response.json()
-
-      if (data.errors) {
-        setError(data.errors[0].message)
-        return
-      }
-
-      const { token } = data.data.register
-      localStorage.setItem('token', token)
-      navigate('/projects')
-    } catch (err) {
-      setError('Failed to register. Please try again.')
-    } finally {
-      setLoading(false)
-    }
+    register(email, password);
   }
 
   return (
@@ -123,10 +104,10 @@ export default function Register() {
             <div className="form-control mt-6">
               <button
                 type="submit"
-                className={`btn btn-primary ${loading ? 'loading' : ''}`}
-                disabled={loading}
+                className={`btn btn-primary ${isInFlight ? 'loading' : ''}`}
+                disabled={isInFlight}
               >
-                {loading ? 'Creating account...' : 'Sign Up'}
+                {isInFlight ? 'Creating account...' : 'Sign Up'}
               </button>
             </div>
           </form>

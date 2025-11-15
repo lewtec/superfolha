@@ -1,5 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useProjectsQuery } from '../hooks/useProjectsQuery';
+import { useCreateProjectMutation } from '../hooks/useCreateProjectMutation';
+import { useDeleteProjectMutation } from '../hooks/useDeleteProjectMutation';
 
 interface Project {
   id: string
@@ -9,146 +12,69 @@ interface Project {
 }
 
 export default function Projects() {
-  const [projects, setProjects] = useState<Project[]>([])
-  const [loading, setLoading] = useState(true)
+  const navigate = useNavigate()
   const [newProjectName, setNewProjectName] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [error, setError] = useState('')
-  const navigate = useNavigate()
 
-  useEffect(() => {
-    loadProjects()
-  }, [])
+  const { projects, ...queryData } = useProjectsQuery();
 
-  const loadProjects = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/graphql', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token && { 'Authorization': `Bearer ${token}` })
-        },
-        body: JSON.stringify({
-          query: `
-            query {
-              projects {
-                id
-                name
-                createdAt
-                updatedAt
-              }
-            }
-          `,
-        }),
-      })
-
-      const data = await response.json()
-
-      if (data.errors) {
-        if (data.errors[0].message.includes('not authenticated')) {
-          localStorage.removeItem('token')
-          navigate('/login')
-          return
-        }
-        setError(data.errors[0].message)
-        return
+  const { createProject, isInFlight: isCreatingProject } = useCreateProjectMutation({
+    onCompleted: (response, errors) => {
+      if (errors) {
+        setError(errors[0].message);
+        return;
       }
+      const newProject = response.createProject;
+      if (newProject) {
+        setShowModal(false);
+        setNewProjectName('');
+        navigate(`/editor/${newProject.id}`);
+      }
+    },
+    onError: (err) => {
+      setError('Failed to create project');
+      console.error(err);
+    },
+  });
 
-      setProjects(data.data.projects || [])
-    } catch (err) {
-      setError('Failed to load projects')
-    } finally {
-      setLoading(false)
-    }
-  }
+  const { deleteProject, isInFlight: isDeletingProject } = useDeleteProjectMutation({
+    onCompleted: (response, errors) => {
+      if (errors) {
+        setError(errors[0].message);
+        return;
+      }
+    },
+    onError: (err) => {
+      setError('Failed to delete project');
+      console.error(err);
+    },
+    updater: (store) => {
+      const root = store.getRoot();
+      const projects = root.getLinkedRecords('projects');
+      if (projects) {
+        const newProjects = projects.filter(project => project.getValue('id') !== id);
+        root.setLinkedRecords(newProjects, 'projects');
+      }
+    },
+  });
 
-  const createProject = async () => {
+  const handleCreateProject = () => {
     if (!newProjectName.trim()) {
       setError('Project name is required')
       return
     }
+    setError('');
+    createProject(newProjectName);
+  };
 
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/graphql', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token && { 'Authorization': `Bearer ${token}` })
-        },
-        body: JSON.stringify({
-          query: `
-            mutation CreateProject($name: String!) {
-              createProject(name: $name) {
-                id
-                name
-                createdAt
-                updatedAt
-              }
-            }
-          `,
-          variables: { name: newProjectName },
-        }),
-      })
-
-      const data = await response.json()
-
-      if (data.errors) {
-        setError(data.errors[0].message)
-        return
-      }
-
-      const newProject = data.data.createProject
-      setProjects([newProject, ...projects])
-      setShowModal(false)
-      setNewProjectName('')
-      navigate(`/editor/${newProject.id}`)
-    } catch (err) {
-      setError('Failed to create project')
-    }
-  }
-
-  const deleteProject = async (id: string) => {
+  const handleDeleteProject = (id: string) => {
     if (!confirm('Are you sure you want to delete this project?')) {
       return
     }
-
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/graphql', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token && { 'Authorization': `Bearer ${token}` })
-        },
-        body: JSON.stringify({
-          query: `
-            mutation DeleteProject($id: ID!) {
-              deleteProject(id: $id)
-            }
-          `,
-          variables: { id },
-        }),
-      })
-
-      const data = await response.json()
-
-      if (data.errors) {
-        setError(data.errors[0].message)
-        return
-      }
-
-      setProjects(projects.filter(p => p.id !== id))
-    } catch (err) {
-      setError('Failed to delete project')
-    }
-  }
-
-  const logout = () => {
-    localStorage.removeItem('token')
-    navigate('/login')
-  }
+    setError('');
+    deleteProject(id);
+  };
 
   return (
     <div className="min-h-screen bg-base-200">
@@ -156,7 +82,7 @@ export default function Projects() {
       <div className="container mx-auto p-8">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold">My Projects</h1>
-          <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+          <button className="btn btn-primary" onClick={() => setShowModal(true)} disabled={isCreatingProject}>
             + New Project
           </button>
         </div>
@@ -167,20 +93,20 @@ export default function Projects() {
           </div>
         )}
 
-        {loading ? (
+        {queryData.loading ? (
           <div className="flex justify-center items-center h-64">
             <span className="loading loading-spinner loading-lg"></span>
           </div>
-        ) : projects.length === 0 ? (
+        ) : projects && projects.length === 0 ? (
           <div className="text-center py-16">
             <p className="text-lg text-base-content/70 mb-4">No projects yet</p>
-            <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+            <button className="btn btn-primary" onClick={() => setShowModal(true)} disabled={isCreatingProject}>
               Create your first project
             </button>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {projects.map((project) => (
+            {projects && projects.map((project) => (
               <div key={project.id} className="card bg-base-100 shadow-xl">
                 <div className="card-body">
                   <h2 className="card-title">{project.name}</h2>
@@ -196,7 +122,8 @@ export default function Projects() {
                     </button>
                     <button
                       className="btn btn-error btn-sm"
-                      onClick={() => deleteProject(project.id)}
+                      onClick={() => handleDeleteProject(project.id)}
+                      disabled={isDeletingProject}
                     >
                       Delete
                     </button>
@@ -223,7 +150,8 @@ export default function Projects() {
                 className="input input-bordered"
                 value={newProjectName}
                 onChange={(e) => setNewProjectName(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && createProject()}
+                onKeyPress={(e) => e.key === 'Enter' && handleCreateProject()}
+                disabled={isCreatingProject}
               />
             </div>
             <div className="modal-action">
@@ -233,7 +161,7 @@ export default function Projects() {
               }}>
                 Cancel
               </button>
-              <button className="btn btn-primary" onClick={createProject}>
+              <button className="btn btn-primary" onClick={handleCreateProject} disabled={isCreatingProject}>
                 Create
               </button>
             </div>

@@ -5,6 +5,15 @@ import FileTree from '../components/FileTree'
 import PDFViewer from '../components/PDFViewer'
 import Navbar from '../components/Navbar'
 import LogsPanel from '../components/LogsPanel'
+import { useLazyLoadQuery, useMutation } from 'react-relay';
+import type { GetProjectQuery as GetProjectQueryType } from '../queries/__generated__/GetProjectQuery.graphql';
+import GetProjectQueryGraphql from '../queries/GetProjectQuery';
+import type { GetFilesQuery as GetFilesQueryType } from '../queries/__generated__/GetFilesQuery.graphql';
+import GetFilesQueryGraphql from '../queries/GetFilesQuery';
+import type { SaveFileMutation as SaveFileMutationType } from '../mutations/__generated__/SaveFileMutation.graphql';
+import SaveFileMutationGraphql from '../mutations/SaveFileMutation';
+import type { DeleteFileMutation as DeleteFileMutationType } from '../mutations/__generated__/DeleteFileMutation.graphql';
+import DeleteFileMutationGraphql from '../mutations/DeleteFileMutation';
 
 interface File {
   path: string
@@ -14,7 +23,6 @@ interface File {
 export default function EditorPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const [project, setProject] = useState<any>(null)
   const [files, setFiles] = useState<File[]>([])
   const [currentFile, setCurrentFile] = useState<File | null>(null)
   const [view, setView] = useState<'code' | 'pdf'>('code')
@@ -22,124 +30,53 @@ export default function EditorPage() {
   const [logs, setLogs] = useState('')
   const [compileSuccess, setCompileSuccess] = useState(false)
   const [compiling, setCompiling] = useState(false)
-  const [loading, setLoading] = useState(true)
+
+  const { project, ...projectQueryData } = useLazyLoadQuery<GetProjectQueryType>(
+    GetProjectQueryGraphql,
+    { id: id! },
+    { fetchPolicy: 'store-and-network' }
+  );
+
+  const { files: fetchedFiles, ...filesQueryData } = useLazyLoadQuery<GetFilesQueryType>(
+    GetFilesQueryGraphql,
+    { projectId: id! },
+    { fetchPolicy: 'store-and-network' }
+  );
+
+  const [saveFileCommit, isSavingFile] = useMutation<SaveFileMutationType>(SaveFileMutationGraphql);
+  const [deleteFileCommit, isDeletingFile] = useMutation<DeleteFileMutationType>(DeleteFileMutationGraphql);
 
   useEffect(() => {
-    loadProject()
-    loadFiles()
-  }, [id])
-
-  const loadProject = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/graphql', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token && { Authorization: `Bearer ${token}` }),
-        },
-        body: JSON.stringify({
-          query: `
-            query GetProject($id: ID!) {
-              project(id: $id) {
-                id
-                name
-              }
-            }
-          `,
-          variables: { id },
-        }),
-      })
-
-      const data = await response.json()
-      if (data.errors) {
-        alert(data.errors[0].message)
-        navigate('/projects')
-        return
+    if (fetchedFiles) {
+      setFiles(fetchedFiles as File[]);
+      if (fetchedFiles.length > 0) {
+        setCurrentFile(fetchedFiles[0] as File);
       }
-
-      setProject(data.data.project)
-    } catch (err) {
-      console.error(err)
     }
-  }
+  }, [fetchedFiles]);
 
-  const loadFiles = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/graphql', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token && { Authorization: `Bearer ${token}` }),
-        },
-        body: JSON.stringify({
-          query: `
-            query GetFiles($projectId: ID!) {
-              files(projectId: $projectId) {
-                path
-                content
-              }
-            }
-          `,
-          variables: { projectId: id },
-        }),
-      })
+  const saveFile = () => {
+    if (!currentFile) return;
 
-      const data = await response.json()
-      if (data.errors) {
-        alert(data.errors[0].message)
-        return
-      }
-
-      const loadedFiles = data.data.files || []
-      setFiles(loadedFiles)
-      if (loadedFiles.length > 0) {
-        setCurrentFile(loadedFiles[0])
-      }
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const saveFile = async () => {
-    if (!currentFile) return
-
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/graphql', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token && { Authorization: `Bearer ${token}` }),
-        },
-        body: JSON.stringify({
-          query: `
-            mutation SaveFile($projectId: ID!, $path: String!, $content: String!) {
-              saveFile(projectId: $projectId, path: $path, content: $content) {
-                path
-                content
-              }
-            }
-          `,
-          variables: {
-            projectId: id,
-            path: currentFile.path,
-            content: currentFile.content,
-          },
-        }),
-      })
-
-      const data = await response.json()
-      if (data.errors) {
-        alert(data.errors[0].message)
-      }
-    } catch (err) {
-      alert('Failed to save file')
-    }
-  }
+    saveFileCommit({
+      variables: {
+        projectId: id!,
+        path: currentFile.path,
+        content: currentFile.content,
+      },
+      onCompleted: (response, errors) => {
+        if (errors) {
+          alert(errors[0].message);
+          return;
+        }
+        // Relay automatically updates the store, no need to manually update files state
+      },
+      onError: (err) => {
+        alert('Failed to save file');
+        console.error(err);
+      },
+    });
+  };
 
   const compile = async () => {
     setCompiling(true)
@@ -200,42 +137,33 @@ export default function EditorPage() {
     setCurrentFile(newFile)
   }
 
-  const handleDeleteFile = async (path: string) => {
-    if (!confirm(`Delete ${path}?`)) return
+  const handleDeleteFile = (path: string) => {
+    if (!confirm(`Delete ${path}?`)) return;
 
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/graphql', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token && { Authorization: `Bearer ${token}` }),
-        },
-        body: JSON.stringify({
-          query: `
-            mutation DeleteFile($projectId: ID!, $path: String!) {
-              deleteFile(projectId: $projectId, path: $path)
-            }
-          `,
-          variables: { projectId: id, path },
-        }),
-      })
-
-      const data = await response.json()
-      if (data.errors) {
-        alert(data.errors[0].message)
-        return
-      }
-
-      const newFiles = files.filter(f => f.path !== path)
-      setFiles(newFiles)
-      if (currentFile?.path === path && newFiles.length > 0) {
-        setCurrentFile(newFiles[0])
-      }
-    } catch (err) {
-      alert('Failed to delete file')
-    }
-  }
+    deleteFileCommit({
+      variables: {
+        projectId: id!,
+        path,
+      },
+      onCompleted: (response, errors) => {
+        if (errors) {
+          alert(errors[0].message);
+          return;
+        }
+        const newFiles = files.filter(f => f.path !== path);
+        setFiles(newFiles);
+        if (currentFile?.path === path && newFiles.length > 0) {
+          setCurrentFile(newFiles[0]);
+        } else if (newFiles.length === 0) {
+          setCurrentFile(null);
+        }
+      },
+      onError: (err) => {
+        alert('Failed to delete file');
+        console.error(err);
+      },
+    });
+  };
 
   const handleEditorChange = (value: string) => {
     if (currentFile) {
@@ -244,7 +172,7 @@ export default function EditorPage() {
     }
   }
 
-  if (loading) {
+  if (projectQueryData.loading || filesQueryData.loading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <span className="loading loading-spinner loading-lg"></span>
@@ -254,6 +182,12 @@ export default function EditorPage() {
 
   return (
     <div className="h-screen flex flex-col">
+      <Navbar
+        projectName={project?.name || 'Loading...'}
+        onCompile={compile}
+        compiling={compiling}
+      />
+
       <div className="flex flex-1 overflow-hidden">
         {/* File Tree Sidebar */}
         <div className="w-64 border-r border-base-300">
