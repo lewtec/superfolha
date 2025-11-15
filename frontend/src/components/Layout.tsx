@@ -27,10 +27,10 @@ export default function Layout({ children }: LayoutProps) {
   return (
     <div className="min-h-screen flex flex-col">
       <header className="navbar bg-base-100 shadow-md">
-        <div className="flex-1">
-          <a className="btn btn-ghost normal-case text-xl">superfolha</a>
+        <div className="navbar-start">
+          <a className="btn btn-ghost normal-case text-xl" onClick={() => navigate('/projects')}>superfolha</a>
         </div>
-        <div className="flex-none">
+        <div className="navbar-end">
           {localStorage.getItem('token') && (
             <button className="btn btn-ghost" onClick={logout}>
               Logout

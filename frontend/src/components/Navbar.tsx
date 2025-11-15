@@ -11,10 +11,10 @@ export default function Navbar({ projectName, onCompile, compiling }: NavbarProp
 
   return (
     <div className="navbar bg-base-100 shadow-md">
-      <div className="flex-1">
+      <div className="navbar-start">
         <span className="text-base-content/70 ml-4">Project: {projectName}</span>
       </div>
-      <div className="flex-none gap-2">
+      <div className="navbar-end gap-2">
         <button
           className={`btn btn-primary ${compiling ? 'loading' : ''}`}
           onClick={onCompile}
