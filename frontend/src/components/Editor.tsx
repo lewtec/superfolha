@@ -51,7 +51,7 @@ export default function Editor({ value, onChange, onSave }: EditorProps) {
     onSaveRef.current = onSave;
   }, [onChange, onSave]);
 
-  const debouncedOnSave = useDebounce(onSaveRef.current, 10000); // 10 seconds debounce
+  const debouncedOnSave = useDebounce(onSaveRef.current, 1000); // 1 second debounce
   const debouncedOnSaveRef = useRef(debouncedOnSave); // New ref for debouncedOnSave
 
   useEffect(() => {
