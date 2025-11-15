@@ -3,12 +3,13 @@ import { useParams, useNavigate } from "react-router-dom";
 import Editor from "../components/Editor";
 import FileTree from "../components/FileTree";
 import PDFViewer from "../components/PDFViewer";
-import Navbar from "../components/Navbar";
+import Navbar from "../components/Navbar"; // Re-added Navbar import
 import LogsPanel from "../components/LogsPanel";
 import { useGetProjectQuery } from "../hooks/useGetProjectQuery";
 import { useGetFilesQuery } from "../hooks/useGetFilesQuery";
 import { useSaveFileMutation } from "../hooks/useSaveFileMutation";
 import { useDeleteFileMutation } from "../hooks/useDeleteFileMutation";
+// import { EditorProvider } from "../contexts/EditorContext"; // Removed EditorProvider import
 
 interface File {
   path: string;
@@ -42,19 +43,9 @@ export default function EditorPage() {
   const [logs, setLogs] = useState("");
   const [compileSuccess, setCompileSuccess] = useState(false);
   const [compiling, setCompiling] = useState(false);
+  const [editorStatus, setEditorStatus] = useState<'clean' | 'dirty' | 'saving' | 'saved' | 'error'>('clean');
 
-  const { saveFile, isInFlight: isSavingFile } = useSaveFileMutation({
-    onCompleted: (response, errors) => {
-      if (errors) {
-        alert(errors[0].message);
-        return;
-      }
-    },
-    onError: (err) => {
-      alert("Failed to save file");
-      console.error(err);
-    },
-  });
+  const { saveFile, isInFlight: isSavingFile } = useSaveFileMutation(); // No config here anymore
 
   const { deleteFile, isInFlight: isDeletingFile } = useDeleteFileMutation({
     onCompleted: (response, errors) => {
@@ -155,14 +146,30 @@ export default function EditorPage() {
               : f,
           ),
         );
+        setEditorStatus('dirty'); // Mark as dirty
       }
     },
     [currentFile, files],
   ); // Dependencies for useCallback
 
-  const memoizedOnSave = useCallback(() => {
+  const memoizedOnSave = useCallback((content: string) => { // Accepts content now
     if (currentFile) {
-      saveFile(id!, currentFile.path, currentFile.content);
+      setEditorStatus('saving'); // Mark as saving
+      saveFile(id!, currentFile.path, content, { // Pass the received content and callbacks
+        onCompleted: (response, errors) => {
+          if (errors) {
+            setEditorStatus('error');
+            alert(errors[0].message);
+            return;
+          }
+          setEditorStatus('saved'); // Mark as saved
+        },
+        onError: (err) => {
+          setEditorStatus('error');
+          alert('Failed to save file');
+          console.error(err);
+        },
+      });
     }
   }, [id, currentFile, saveFile]);
 
@@ -177,6 +184,7 @@ export default function EditorPage() {
         projectName={project?.name || "Loading..."}
         onCompile={compile}
         compiling={compiling}
+        editorStatus={editorStatus} // Pass editorStatus
       />
 
       <div className="flex flex-1 overflow-hidden">
@@ -194,7 +202,7 @@ export default function EditorPage() {
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col">
           {/* Toolbar */}
-          <div className="tabs tabs-boxed bg-base-200 p-2">
+          <div className="tabs tabs-boxed bg-base-200 p-2 flex items-center"> {/* Added flex items-center */}
             <a
               className={`tab ${view === "code" ? "tab-active" : ""}`}
               onClick={() => setView("code")}
@@ -207,6 +215,20 @@ export default function EditorPage() {
             >
               PDF
             </a>
+            {/* Editor Status Indicator as Text */}
+            <span className={`ml-2 text-sm font-medium ${
+              editorStatus === 'clean' ? 'text-base-content/70' :
+              editorStatus === 'dirty' ? 'text-warning' :
+              editorStatus === 'saving' ? 'text-info' :
+              editorStatus === 'saved' ? 'text-success' :
+              'text-error'
+            }`}>
+              {editorStatus === 'clean' ? 'No changes' :
+              editorStatus === 'dirty' ? 'Unsaved changes' :
+              editorStatus === 'saving' ? 'Saving...' :
+              editorStatus === 'saved' ? 'Saved' :
+              'Error'}
+            </span>
           </div>
 
           {/* Editor/PDF View */}

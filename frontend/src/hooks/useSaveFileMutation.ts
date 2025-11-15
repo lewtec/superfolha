@@ -1,16 +1,28 @@
-import { useMutation } from 'react-relay';
-import type { SaveFileMutation as SaveFileMutationType } from '../mutations/__generated__/SaveFileMutation.graphql';
-import SaveFileMutationGraphql from '../mutations/SaveFileMutation';
+import { useMutation } from "react-relay";
+import type { SaveFileMutation as SaveFileMutationType } from "../mutations/__generated__/SaveFileMutation.graphql";
+import SaveFileMutationGraphql from "../mutations/SaveFileMutation";
 
-interface UseSaveFileMutationConfig {
-  onCompleted?: (response: SaveFileMutationType['response'], errors: ReadonlyArray<Error> | null) => void;
+interface SaveFileCallbacks {
+  onCompleted?: (
+    response: SaveFileMutationType["response"],
+    errors: ReadonlyArray<Error> | null,
+  ) => void;
   onError?: (error: Error) => void;
 }
 
-export function useSaveFileMutation(config?: UseSaveFileMutationConfig) {
-  const [commit, isInFlight] = useMutation<SaveFileMutationType>(SaveFileMutationGraphql);
+export function useSaveFileMutation() {
+  // Removed config from here
+  const [commit, isInFlight] = useMutation<SaveFileMutationType>(
+    SaveFileMutationGraphql,
+  );
 
-  const saveFile = (projectId: string, path: string, content: string) => {
+  const saveFile = (
+    projectId: string,
+    path: string,
+    content: string,
+    callbacks?: SaveFileCallbacks,
+  ) => {
+    // Added callbacks parameter
     commit({
       variables: {
         projectId,
@@ -18,10 +30,10 @@ export function useSaveFileMutation(config?: UseSaveFileMutationConfig) {
         content,
       },
       onCompleted: (response, errors) => {
-        config?.onCompleted?.(response, errors);
+        callbacks?.onCompleted?.(response, errors); // Use callbacks parameter
       },
       onError: (err) => {
-        config?.onError?.(err);
+        callbacks?.onError?.(err); // Use callbacks parameter
       },
     });
   };

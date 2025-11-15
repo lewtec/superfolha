@@ -9,7 +9,7 @@ import { useDebounce } from '../hooks/useDebounce' // Import useDebounce hook
 interface EditorProps {
   value: string
   onChange: (value: string) => void
-  onSave: () => void
+  onSave: (content: string) => void // Modified to accept content
 }
 
 const latexLanguage = StreamLanguage.define(stex)
@@ -69,16 +69,17 @@ export default function Editor({ value, onChange, onSave }: EditorProps) {
         autocompletion({ override: [latexCompletions] }),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
+            const newContent = update.state.doc.toString();
             isUpdatingInternally.current = true; // Mark as internal update
-            onChangeRef.current(update.state.doc.toString())
-            debouncedOnSaveRef.current() // Access via ref
+            onChangeRef.current(newContent);
+            debouncedOnSaveRef.current(newContent); // Pass content to debounced save
           }
         }),
         EditorView.domEventHandlers({
           keydown: (e) => {
             if (e.ctrlKey && e.key === 's') {
               e.preventDefault()
-              onSaveRef.current() // Immediate save on Ctrl+S
+              onSaveRef.current(viewRef.current?.state.doc.toString() || ''); // Pass current content to immediate save
               return true
             }
             return false
