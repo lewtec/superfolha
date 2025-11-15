@@ -1,0 +1,73 @@
+[tools]
+go = "1.21"
+node = "20"
+
+[tasks."install:frontend"]
+description = "Install frontend dependencies"
+dir = "frontend"
+run = "npm install"
+
+[tasks."install:backend"]
+description = "Install backend dependencies"
+run = "go get ./..."
+
+[tasks.install]
+description = "Install all dependencies"
+depends = ["install:*"]
+
+[tasks."build:frontend"]
+description = "Build frontend for production"
+run = "cd frontend && npm run build"
+
+[tasks."build:backend"]
+description = "Build backend binary"
+depends = ["build:frontend"]
+run = "go build -o server cmd/server"
+
+[tasks.build]
+description = "Build complete application"
+depends = ["build:*"]
+run = "echo 'Build complete! Binary: ./server'"
+
+[tasks."gen:sqlc"]
+run = "sqlc generate"
+
+[tasks."gen:graphql"]
+run = "gqlgen generate"
+
+[tasks.gen]
+depends = ["gen"]
+
+[tasks.docker]
+description = "Build Docker image"
+depends = ["build"]
+run = "docker build -t latex-editor ."
+
+[tasks.test]
+description = "Run tests"
+run = "go test ./..."
+
+[tasks."fmt:frontend"]
+dir = "frontend"
+run = "npm run format"
+
+[tasks."fmt:backend"]
+run = "go fmt ./..."
+
+[tasks.fmt]
+description = "Format code"
+depends = ["fmt:*"]
+
+[tasks."lint:frontend"]
+dir = "frontend"
+run = "npm run lint"
+
+[tasks."lint:backend"]
+run = "go vet ./..."
+
+[tasks.lint]
+description = "Lint code"
+depends = ["lint:*"]
+
+[tasks.ci]
+depends = ["lint", "fmt", "test"]
