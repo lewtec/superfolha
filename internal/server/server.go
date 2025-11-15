@@ -1,31 +1,55 @@
 package server
 
 import (
-	"database/sql"
+
 	"encoding/json"
+
 	"io"
+
 	"net/http"
 
+
+
 	"github.com/99designs/gqlgen/graphql/handler"
+
 	"github.com/99designs/gqlgen/graphql/playground"
+
 	"github.com/lewtec/superfolha/internal/auth"
+
 	"github.com/lewtec/superfolha/internal/compiler"
+
+	"github.com/lewtec/superfolha/internal/db"
+
 )
 
 
 
+
+
 type Server struct {
-	db       *sql.DB
+
+	db       db.DBTX
+
 	stateDir string
+
 	resolver *Resolver
+
 }
 
-func NewServer(db *sql.DB, stateDir string) *Server {
+
+
+func NewServer(db db.DBTX, stateDir string) *Server {
+
 	return &Server{
+
 		db:       db,
+
 		stateDir: stateDir,
+
 		resolver: NewResolver(db, stateDir),
+
 	}
+
 }
 
 func (s *Server) Handler() http.Handler {

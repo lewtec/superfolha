@@ -1,14 +1,14 @@
 package main
 
 import (
-	"database/sql"
+	"context"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"os/exec"
 
-	_ "github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lewtec/superfolha/internal/server"
 	"github.com/spf13/cobra"
 )
@@ -45,13 +45,13 @@ func runServer(cmd *cobra.Command, args []string) {
 	}
 
 	// Connect to database
-	db, err := sql.Open("postgres", dbURL)
+	dbpool, err := pgxpool.New(context.Background(), dbURL)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		log.Fatalf("Unable to connect to database: %v\n", err)
 	}
-	defer db.Close()
+	defer dbpool.Close()
 
-	if err := db.Ping(); err != nil {
+	if err := dbpool.Ping(context.Background()); err != nil {
 		log.Fatalf("Failed to ping database: %v", err)
 	}
 
@@ -70,7 +70,7 @@ func runServer(cmd *cobra.Command, args []string) {
 	}
 
 	// Create server
-	srv := server.NewServer(db, stateDir)
+	srv := server.NewServer(dbpool, stateDir)
 
 	// Start HTTP server
 	addr := fmt.Sprintf(":%s", port)

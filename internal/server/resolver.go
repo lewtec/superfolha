@@ -1,8 +1,8 @@
 package server
 
 import (
-	"database/sql"
 	"path/filepath"
+	"github.com/lewtec/superfolha/internal/db"
 )
 
 // This file will not be regenerated automatically.
@@ -10,11 +10,11 @@ import (
 // It serves as dependency injection for your app, add any dependencies you require here.
 
 type Resolver struct {
-	DB       *sql.DB
+	DB       db.DBTX
 	StateDir string
 }
 
-func NewResolver(db *sql.DB, stateDir string) *Resolver {
+func NewResolver(db db.DBTX, stateDir string) *Resolver {
 	return &Resolver{
 		DB:       db,
 		StateDir: stateDir,
