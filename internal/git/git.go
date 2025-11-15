@@ -1,183 +1,525 @@
 package git
 
 import (
+
 	"fmt"
+
+	"io" // new import
+
+	"io/fs"
+
 	"os"
-	"os/exec"
+
 	"path/filepath"
-	"strings"
+
 	"time"
+
+
+
+	"github.com/go-git/go-git/v5"
+
+	"github.com/go-git/go-git/v5/plumbing/object"
+
 )
 
+
+
 type Commit struct {
+
 	Hash    string
+
 	Message string
+
 	Author  string
+
 	Date    time.Time
+
 }
+
+
 
 type FileInfo struct {
+
 	Path    string
+
 	Content string
+
 }
+
+
 
 // InitRepo creates a new git repository
+
 func InitRepo(path string) error {
+
 	if err := os.MkdirAll(path, 0755); err != nil {
+
 		return fmt.Errorf("failed to create directory %s: %w", path, err)
+
 	}
 
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return fmt.Errorf("directory %s was not created", path)
+
+
+	_, err := git.PlainInit(path, false)
+
+	if err != nil {
+
+		return fmt.Errorf("failed to initialize git repository at %s: %w", path, err)
+
 	}
 
-	cmd := exec.Command("git", "init")
-	cmd.Dir = path
-	return cmd.Run()
+	return nil
+
 }
+
+
 
 // AddAll stages all changes
+
 func AddAll(repoPath string) error {
-	cmd := exec.Command("git", "add", ".")
-	cmd.Dir = repoPath
-	return cmd.Run()
+
+	r, err := git.PlainOpen(repoPath)
+
+	if err != nil {
+
+		return fmt.Errorf("failed to open repository at %s: %w", repoPath, err)
+
+	}
+
+
+
+	w, err := r.Worktree()
+
+	if err != nil {
+
+		return fmt.Errorf("failed to get worktree for repository at %s: %w", repoPath, err)
+
+	}
+
+
+
+	_, err = w.Add(".")
+
+	if err != nil {
+
+		return fmt.Errorf("failed to add all files to staging: %w", err)
+
+	}
+
+	return nil
+
 }
+
+
 
 // Commit creates a new commit
+
 func CommitChanges(repoPath, author, message string) (*Commit, error) {
-	// Configure git user for this repo if not set
-	exec.Command("git", "config", "user.name", author).Dir = repoPath
-	exec.Command("git", "config", "user.email", author).Dir = repoPath
+
+	r, err := git.PlainOpen(repoPath)
+
+	if err != nil {
+
+		return nil, fmt.Errorf("failed to open repository at %s: %w", repoPath, err)
+
+	}
+
+
+
+	w, err := r.Worktree()
+
+	if err != nil {
+
+		return nil, fmt.Errorf("failed to get worktree for repository at %s: %w", repoPath, err)
+
+	}
+
+
 
 	// Add all changes
+
 	if err := AddAll(repoPath); err != nil {
+
 		return nil, err
+
 	}
+
+
 
 	// Create commit
-	cmd := exec.Command("git", "commit", "-m", message)
-	cmd.Dir = repoPath
-	if err := cmd.Run(); err != nil {
-		return nil, err
+
+	commitHash, err := w.Commit(message, &git.CommitOptions{
+
+		Author: &object.Signature{
+
+			Name:  author,
+
+			Email: author, // Assuming author is also the email for simplicity
+
+			When:  time.Now(),
+
+		},
+
+	})
+
+	if err != nil {
+
+		return nil, fmt.Errorf("failed to commit changes: %w", err)
+
 	}
 
-	// Get the commit hash
-	hashCmd := exec.Command("git", "rev-parse", "HEAD")
-	hashCmd.Dir = repoPath
-	hashOutput, err := hashCmd.Output()
+
+
+	// Get the commit object
+
+	obj, err := r.CommitObject(commitHash)
+
 	if err != nil {
-		return nil, err
+
+		return nil, fmt.Errorf("failed to get commit object: %w", err)
+
 	}
+
+
 
 	return &Commit{
-		Hash:    strings.TrimSpace(string(hashOutput)),
-		Message: message,
-		Author:  author,
-		Date:    time.Now(),
+
+		Hash:    obj.Hash.String(),
+
+		Message: obj.Message,
+
+		Author:  obj.Author.String(), // This will include name and email
+
+		Date:    obj.Author.When,
+
 	}, nil
+
 }
+
+
 
 // GetHistory returns commit history
+
 func GetHistory(repoPath string) ([]*Commit, error) {
-	cmd := exec.Command("git", "log", "--pretty=format:%H|%s|%an|%at", "-n", "50")
-	cmd.Dir = repoPath
-	output, err := cmd.Output()
+
+	r, err := git.PlainOpen(repoPath)
+
 	if err != nil {
-		return []*Commit{}, nil // Return empty if no commits yet
+
+		return nil, fmt.Errorf("failed to open repository at %s: %w", repoPath, err)
+
 	}
 
-	lines := strings.Split(string(output), "\n")
-	commits := make([]*Commit, 0, len(lines))
 
-	for _, line := range lines {
-		if line == "" {
-			continue
-		}
-		parts := strings.SplitN(line, "|", 4)
-		if len(parts) != 4 {
-			continue
-		}
 
-		var timestamp int64
-		fmt.Sscanf(parts[3], "%d", &timestamp)
+	cIter, err := r.Log(&git.LogOptions{Order: git.LogOrderCommitterTime})
+
+	if err != nil {
+
+		return nil, fmt.Errorf("failed to get commit log: %w", err)
+
+	}
+
+
+
+	var commits []*Commit
+
+	err = cIter.ForEach(func(c *object.Commit) error {
 
 		commits = append(commits, &Commit{
-			Hash:    parts[0],
-			Message: parts[1],
-			Author:  parts[2],
-			Date:    time.Unix(timestamp, 0),
-		})
-	}
 
-	return commits, nil
-}
+			Hash:    c.Hash.String(),
 
-// ReadFile reads a file from the repository
-func ReadFile(repoPath, filePath string) (string, error) {
-	fullPath := filepath.Join(repoPath, filePath)
-	data, err := os.ReadFile(fullPath)
-	if err != nil {
-		return "", err
-	}
-	return string(data), nil
-}
+			Message: c.Message,
 
-// WriteFile writes a file to the repository
-func WriteFile(repoPath, filePath, content string) error {
-	fullPath := filepath.Join(repoPath, filePath)
+			Author:  c.Author.String(),
 
-	// Create directory if it doesn't exist
-	dir := filepath.Dir(fullPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return err
-	}
+			Date:    c.Author.When,
 
-	return os.WriteFile(fullPath, []byte(content), 0644)
-}
-
-// DeleteFile removes a file from the repository
-func DeleteFile(repoPath, filePath string) error {
-	fullPath := filepath.Join(repoPath, filePath)
-	return os.Remove(fullPath)
-}
-
-// ListFiles lists all files in the repository (excluding .git)
-func ListFiles(repoPath string) ([]*FileInfo, error) {
-	var files []*FileInfo
-
-	err := filepath.Walk(repoPath, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		// Skip .git directory
-		if info.IsDir() && info.Name() == ".git" {
-			return filepath.SkipDir
-		}
-
-		// Skip directories
-		if info.IsDir() {
-			return nil
-		}
-
-		// Get relative path
-		relPath, err := filepath.Rel(repoPath, path)
-		if err != nil {
-			return err
-		}
-
-		content, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-
-		files = append(files, &FileInfo{
-			Path:    relPath,
-			Content: string(content),
 		})
 
 		return nil
+
 	})
 
-	return files, err
+	if err != nil {
+
+		return nil, fmt.Errorf("failed to iterate commits: %w", err)
+
+	}
+
+
+
+	return commits, nil
+
+}
+
+
+
+// ReadFile reads a file from the repository
+
+func ReadFile(repoPath, filePath string) (string, error) {
+
+	r, err := git.PlainOpen(repoPath)
+
+	if err != nil {
+
+		return "", fmt.Errorf("failed to open repository at %s: %w", repoPath, err)
+
+	}
+
+
+
+	w, err := r.Worktree()
+
+	if err != nil {
+
+		return "", fmt.Errorf("failed to get worktree for repository at %s: %w", repoPath, err)
+
+	}
+
+
+
+	file, err := w.Filesystem.Open(filePath)
+
+	if err != nil {
+
+		return "", fmt.Errorf("failed to open file %s: %w", filePath, err)
+
+	}
+
+	defer file.Close()
+
+
+
+	content, err := io.ReadAll(file)
+
+	if err != nil {
+
+		return "", fmt.Errorf("failed to read file %s: %w", filePath, err)
+
+	}
+
+
+
+	return string(content), nil
+
+}
+
+
+
+// WriteFile writes a file to the repository
+
+func WriteFile(repoPath, filePath, content string) error {
+
+	fullPath := filepath.Join(repoPath, filePath)
+
+
+
+	// Create directory if it doesn't exist
+
+	dir := filepath.Dir(fullPath)
+
+	if err := os.MkdirAll(dir, 0755); err != nil {
+
+		return fmt.Errorf("failed to create directory %s: %w", dir, err)
+
+	}
+
+
+
+	return os.WriteFile(fullPath, []byte(content), 0644)
+
+}
+
+
+
+// DeleteFile removes a file from the repository
+
+func DeleteFile(repoPath, filePath string) error {
+
+	fullPath := filepath.Join(repoPath, filePath)
+
+	return os.Remove(fullPath)
+
+}
+
+
+
+// ListFiles lists all files in the repository (excluding .git)
+
+
+
+func ListFiles(repoPath string) ([]*FileInfo, error) {
+
+
+
+	// We are using filepath.WalkDir to list files on the filesystem, not the git index.
+
+
+
+	// We don't need to open the git repository here.
+
+
+
+
+
+
+
+	var files []*FileInfo
+
+
+
+	err := filepath.WalkDir(repoPath, func(path string, d fs.DirEntry, err error) error {
+
+
+
+		if err != nil {
+
+
+
+			return err
+
+
+
+		}
+
+
+
+
+
+
+
+		// Skip .git directory
+
+
+
+		if d.IsDir() && d.Name() == ".git" {
+
+
+
+			return fs.SkipDir
+
+
+
+		}
+
+
+
+
+
+
+
+		// Skip directories
+
+
+
+		if d.IsDir() {
+
+
+
+			return nil
+
+
+
+		}
+
+
+
+
+
+
+
+		// Get relative path
+
+
+
+		relPath, err := filepath.Rel(repoPath, path)
+
+
+
+		if err != nil {
+
+
+
+			return err
+
+
+
+		}
+
+
+
+
+
+
+
+		content, err := os.ReadFile(path)
+
+
+
+		if err != nil {
+
+
+
+			return err
+
+
+
+		}
+
+
+
+
+
+
+
+		files = append(files, &FileInfo{
+
+
+
+			Path:    relPath,
+
+
+
+			Content: string(content),
+
+
+
+		})
+
+
+
+
+
+
+
+		return nil
+
+
+
+	})
+
+
+
+	if err != nil {
+
+
+
+		return nil, fmt.Errorf("failed to walk directory %s: %w", repoPath, err)
+
+
+
+	}
+
+
+
+
+
+
+
+	return files, nil
+
+
+
 }

@@ -110,10 +110,21 @@ func (r *mutationResolver) CreateProject(ctx context.Context, name string) (*Pro
 	
 	// Copy template files
 
-	templateDir := "simple"
-
+	templateDir := "templates/simple"
+	
+	// Debug: List contents of templatesFS
+	fmt.Println("Contents of templatesFS:")
+	fs.WalkDir(templatesFS, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			fmt.Printf("Error walking %s: %v\n", path, err)
+			return err
+		}
+		fmt.Println("- ", path)
+		return nil
+	})
+	fmt.Println("End of templatesFS contents.")
+	
 	err = fs.WalkDir(templatesFS, templateDir, func(path string, d fs.DirEntry, err error) error {
-
 		if err != nil {
 
 			return err
