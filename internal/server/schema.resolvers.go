@@ -7,11 +7,38 @@ package server
 import (
 	"context"
 	"fmt"
+	"github.com/google/uuid"
+	"github.com/lewtec/superfolha/internal/auth"
 )
 
 // Register is the resolver for the register field.
 func (r *mutationResolver) Register(ctx context.Context, email string, password string) (*AuthPayload, error) {
-	panic(fmt.Errorf("not implemented: Register - register"))
+	// Hash password
+	hashedPassword, err := auth.HashPassword(password)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: Insert user into database
+	userID, err := uuid.NewV7()
+	if err != nil {
+		return nil, err
+	}
+	_ = hashedPassword
+
+	// Generate token
+	token, err := auth.GenerateToken(userID.String(), email)
+	if err != nil {
+		return nil, err
+	}
+
+	return &AuthPayload{
+		Token: token,
+		User: &User{
+			ID:    userID.String(),
+			Email: email,
+		},
+	}, nil
 }
 
 // Login is the resolver for the login field.
