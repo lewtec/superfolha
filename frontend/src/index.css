@@ -1,5 +1,13 @@
-@plugin tailwindcss;
-@plugin daisyui;
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+@plugin "daisyui";
+
+@config "./tailwind.config.js";
+@config {
+  daisyui: {
+    themes: ["light", "dark"];
+  }
+}
 body {
     margin: 0;
     font-family:
