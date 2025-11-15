@@ -31,7 +31,7 @@ func (r *mutationResolver) Register(ctx context.Context, email string, password 
 	}
 
 	// Generate token
-	token, err := auth.GenerateToken(fmt.Sprintf("%x", dbUser.ID.Bytes), email)
+	token, err := auth.GenerateToken(uuid.UUID(dbUser.ID.Bytes).String(), email)
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +39,7 @@ func (r *mutationResolver) Register(ctx context.Context, email string, password 
 	return &AuthPayload{
 		Token: token,
 		User: &User{
-			ID:    fmt.Sprintf("%x", dbUser.ID.Bytes),
+			ID:    uuid.UUID(dbUser.ID.Bytes).String(),
 			Email: dbUser.Email,
 		},
 	}, nil
@@ -60,7 +60,7 @@ func (r *mutationResolver) Login(ctx context.Context, email string, password str
 	}
 
 	// Generate token
-	token, err := auth.GenerateToken(fmt.Sprintf("%x", dbUser.ID.Bytes), dbUser.Email)
+	token, err := auth.GenerateToken(uuid.UUID(dbUser.ID.Bytes).String(), dbUser.Email)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +68,7 @@ func (r *mutationResolver) Login(ctx context.Context, email string, password str
 	return &AuthPayload{
 		Token: token,
 		User: &User{
-			ID:    fmt.Sprintf("%x", dbUser.ID.Bytes),
+			ID:    uuid.UUID(dbUser.ID.Bytes).String(),
 			Email: dbUser.Email,
 		},
 	}, nil
@@ -138,7 +138,7 @@ Your content here.
 	}
 
 	return &Project{
-		ID:        fmt.Sprintf("%x", dbProject.ID.Bytes),
+		ID:        uuid.UUID(dbProject.ID.Bytes).String(),
 		Name:      dbProject.Name,
 		CreatedAt: dbProject.CreatedAt.Time,
 		UpdatedAt: dbProject.UpdatedAt.Time,
@@ -147,41 +147,18 @@ Your content here.
 
 // DeleteProject is the resolver for the deleteProject field.
 func (r *mutationResolver) DeleteProject(ctx context.Context, id string) (bool, error) {
-	user, ok := auth.GetUserFromContext(ctx)
-	if !ok {
-		return false, errors.New("not authenticated")
-	}
-
-	projectUUID, err := uuid.Parse(id)
+	project, projectPath, _, err := r.getAndCheckProject(ctx, id)
 	if err != nil {
-		return false, fmt.Errorf("invalid project ID: %w", err)
-	}
-
-	pgProjectID := pgtype.UUID{Bytes: projectUUID, Valid: true}
-
-	// Verify ownership
-	q := db.New(r.DB)
-	project, err := q.GetProject(ctx, pgProjectID)
-	if err != nil {
-		return false, fmt.Errorf("project not found")
-	}
-
-	userUUID, err := uuid.Parse(user.UserID)
-	if err != nil {
-		return false, fmt.Errorf("invalid user ID: %w", err)
-	}
-
-	if project.UserID.Bytes != userUUID {
-		return false, fmt.Errorf("not authorized")
+		return false, err
 	}
 
 	// Delete project from database
-	if err := q.DeleteProject(ctx, pgProjectID); err != nil {
+	q := db.New(r.DB)
+	if err := q.DeleteProject(ctx, project.ID); err != nil {
 		return false, fmt.Errorf("failed to delete project from db: %w", err)
 	}
 
 	// Delete git repository
-	projectPath := r.getProjectPath(id)
 	if err := os.RemoveAll(projectPath); err != nil {
 		return false, fmt.Errorf("failed to delete git repository: %w", err)
 	}
@@ -191,36 +168,12 @@ func (r *mutationResolver) DeleteProject(ctx context.Context, id string) (bool, 
 
 // SaveFile is the resolver for the saveFile field.
 func (r *mutationResolver) SaveFile(ctx context.Context, projectID string, path string, content string) (*File, error) {
-	user, ok := auth.GetUserFromContext(ctx)
-	if !ok {
-		return nil, errors.New("not authenticated")
-	}
-
-	projectUUID, err := uuid.Parse(projectID)
+	_, projectPath, _, err := r.getAndCheckProject(ctx, projectID)
 	if err != nil {
-		return nil, fmt.Errorf("invalid project ID: %w", err)
-	}
-
-	pgProjectID := pgtype.UUID{Bytes: projectUUID, Valid: true}
-
-	// Verify ownership
-	q := db.New(r.DB)
-	project, err := q.GetProject(ctx, pgProjectID)
-	if err != nil {
-		return nil, fmt.Errorf("project not found")
-	}
-
-	userUUID, err := uuid.Parse(user.UserID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid user ID: %w", err)
-	}
-
-	if project.UserID.Bytes != userUUID {
-		return nil, fmt.Errorf("not authorized")
+		return nil, err
 	}
 
 	// Write file to git repository
-	projectPath := r.getProjectPath(projectID)
 	if err := git.WriteFile(projectPath, path, content); err != nil {
 		return nil, fmt.Errorf("failed to write file: %w", err)
 	}
@@ -233,36 +186,12 @@ func (r *mutationResolver) SaveFile(ctx context.Context, projectID string, path 
 
 // DeleteFile is the resolver for the deleteFile field.
 func (r *mutationResolver) DeleteFile(ctx context.Context, projectID string, path string) (bool, error) {
-	user, ok := auth.GetUserFromContext(ctx)
-	if !ok {
-		return false, errors.New("not authenticated")
-	}
-
-	projectUUID, err := uuid.Parse(projectID)
+	_, projectPath, _, err := r.getAndCheckProject(ctx, projectID)
 	if err != nil {
-		return false, fmt.Errorf("invalid project ID: %w", err)
-	}
-
-	pgProjectID := pgtype.UUID{Bytes: projectUUID, Valid: true}
-
-	// Verify ownership
-	q := db.New(r.DB)
-	project, err := q.GetProject(ctx, pgProjectID)
-	if err != nil {
-		return false, fmt.Errorf("project not found")
-	}
-
-	userUUID, err := uuid.Parse(user.UserID)
-	if err != nil {
-		return false, fmt.Errorf("invalid user ID: %w", err)
-	}
-
-	if project.UserID.Bytes != userUUID {
-		return false, fmt.Errorf("not authorized")
+		return false, err
 	}
 
 	// Delete file from git repository
-	projectPath := r.getProjectPath(projectID)
 	if err := git.DeleteFile(projectPath, path); err != nil {
 		return false, fmt.Errorf("failed to delete file: %w", err)
 	}
@@ -272,43 +201,20 @@ func (r *mutationResolver) DeleteFile(ctx context.Context, projectID string, pat
 
 // Commit is the resolver for the commit field.
 func (r *mutationResolver) Commit(ctx context.Context, projectID string, message string) (*Commit, error) {
-	user, ok := auth.GetUserFromContext(ctx)
-	if !ok {
-		return nil, errors.New("not authenticated")
-	}
-
-	projectUUID, err := uuid.Parse(projectID)
+	project, projectPath, user, err := r.getAndCheckProject(ctx, projectID)
 	if err != nil {
-		return nil, fmt.Errorf("invalid project ID: %w", err)
-	}
-
-	pgProjectID := pgtype.UUID{Bytes: projectUUID, Valid: true}
-
-	// Verify ownership
-	q := db.New(r.DB)
-	project, err := q.GetProject(ctx, pgProjectID)
-	if err != nil {
-		return nil, fmt.Errorf("project not found")
-	}
-
-	userUUID, err := uuid.Parse(user.UserID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid user ID: %w", err)
-	}
-
-	if project.UserID.Bytes != userUUID {
-		return nil, fmt.Errorf("not authorized")
+		return nil, err
 	}
 
 	// Commit changes
-	projectPath := r.getProjectPath(projectID)
 	commit, err := git.CommitChanges(projectPath, user.Email, message)
 	if err != nil {
 		return nil, fmt.Errorf("failed to commit changes: %w", err)
 	}
 
 	// Update project timestamp
-	if err := q.UpdateProjectTimestamp(ctx, pgProjectID); err != nil {
+	q := db.New(r.DB)
+	if err := q.UpdateProjectTimestamp(ctx, project.ID); err != nil {
 		// Log error but don't fail the operation
 		fmt.Printf("Warning: failed to update project timestamp: %v\n", err)
 	}
@@ -342,7 +248,7 @@ func (r *queryResolver) Me(ctx context.Context) (*User, error) {
 	}
 
 	return &User{
-		ID:    fmt.Sprintf("%x", dbUser.ID.Bytes),
+		ID:    uuid.UUID(dbUser.ID.Bytes).String(),
 		Email: dbUser.Email,
 	}, nil
 }
@@ -370,7 +276,7 @@ func (r *queryResolver) Projects(ctx context.Context) ([]*Project, error) {
 	projects := make([]*Project, len(dbProjects))
 	for i, p := range dbProjects {
 		projects[i] = &Project{
-			ID:        fmt.Sprintf("%x", p.ID.Bytes),
+			ID:        uuid.UUID(p.ID.Bytes).String(),
 			Name:      p.Name,
 			CreatedAt: p.CreatedAt.Time,
 			UpdatedAt: p.UpdatedAt.Time,
@@ -382,73 +288,27 @@ func (r *queryResolver) Projects(ctx context.Context) ([]*Project, error) {
 
 // Project is the resolver for the project field.
 func (r *queryResolver) Project(ctx context.Context, id string) (*Project, error) {
-	user, ok := auth.GetUserFromContext(ctx)
-	if !ok {
-		return nil, errors.New("not authenticated")
-	}
-
-	projectUUID, err := uuid.Parse(id)
+	project, _, _, err := r.getAndCheckProject(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("invalid project ID: %w", err)
-	}
-
-	pgProjectID := pgtype.UUID{Bytes: projectUUID, Valid: true}
-
-	q := db.New(r.DB)
-	dbProject, err := q.GetProject(ctx, pgProjectID)
-	if err != nil {
-		return nil, fmt.Errorf("project not found")
-	}
-
-	userUUID, err := uuid.Parse(user.UserID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid user ID: %w", err)
-	}
-
-	if dbProject.UserID.Bytes != userUUID {
-		return nil, fmt.Errorf("not authorized")
+		return nil, err
 	}
 
 	return &Project{
-		ID:        fmt.Sprintf("%x", dbProject.ID.Bytes),
-		Name:      dbProject.Name,
-		CreatedAt: dbProject.CreatedAt.Time,
-		UpdatedAt: dbProject.UpdatedAt.Time,
+		ID:        uuid.UUID(project.ID.Bytes).String(),
+		Name:      project.Name,
+		CreatedAt: project.CreatedAt.Time,
+		UpdatedAt: project.UpdatedAt.Time,
 	}, nil
 }
 
 // Files is the resolver for the files field.
 func (r *queryResolver) Files(ctx context.Context, projectID string) ([]*File, error) {
-	user, ok := auth.GetUserFromContext(ctx)
-	if !ok {
-		return nil, errors.New("not authenticated")
-	}
-
-	projectUUID, err := uuid.Parse(projectID)
+	_, projectPath, _, err := r.getAndCheckProject(ctx, projectID)
 	if err != nil {
-		return nil, fmt.Errorf("invalid project ID: %w", err)
-	}
-
-	pgProjectID := pgtype.UUID{Bytes: projectUUID, Valid: true}
-
-	// Verify ownership
-	q := db.New(r.DB)
-	project, err := q.GetProject(ctx, pgProjectID)
-	if err != nil {
-		return nil, fmt.Errorf("project not found")
-	}
-
-	userUUID, err := uuid.Parse(user.UserID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid user ID: %w", err)
-	}
-
-	if project.UserID.Bytes != userUUID {
-		return nil, fmt.Errorf("not authorized")
+		return nil, err
 	}
 
 	// Get files from git repository
-	projectPath := r.getProjectPath(projectID)
 	gitFiles, err := git.ListFiles(projectPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list files: %w", err)
@@ -467,36 +327,12 @@ func (r *queryResolver) Files(ctx context.Context, projectID string) ([]*File, e
 
 // File is the resolver for the file field.
 func (r *queryResolver) File(ctx context.Context, projectID string, path string) (*File, error) {
-	user, ok := auth.GetUserFromContext(ctx)
-	if !ok {
-		return nil, errors.New("not authenticated")
-	}
-
-	projectUUID, err := uuid.Parse(projectID)
+	_, projectPath, _, err := r.getAndCheckProject(ctx, projectID)
 	if err != nil {
-		return nil, fmt.Errorf("invalid project ID: %w", err)
-	}
-
-	pgProjectID := pgtype.UUID{Bytes: projectUUID, Valid: true}
-
-	// Verify ownership
-	q := db.New(r.DB)
-	project, err := q.GetProject(ctx, pgProjectID)
-	if err != nil {
-		return nil, fmt.Errorf("project not found")
-	}
-
-	userUUID, err := uuid.Parse(user.UserID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid user ID: %w", err)
-	}
-
-	if project.UserID.Bytes != userUUID {
-		return nil, fmt.Errorf("not authorized")
+		return nil, err
 	}
 
 	// Read file from git repository
-	projectPath := r.getProjectPath(projectID)
 	content, err := git.ReadFile(projectPath, path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file: %w", err)
@@ -510,36 +346,12 @@ func (r *queryResolver) File(ctx context.Context, projectID string, path string)
 
 // History is the resolver for the history field.
 func (r *queryResolver) History(ctx context.Context, projectID string) ([]*Commit, error) {
-	user, ok := auth.GetUserFromContext(ctx)
-	if !ok {
-		return nil, errors.New("not authenticated")
-	}
-
-	projectUUID, err := uuid.Parse(projectID)
+	_, projectPath, _, err := r.getAndCheckProject(ctx, projectID)
 	if err != nil {
-		return nil, fmt.Errorf("invalid project ID: %w", err)
-	}
-
-	pgProjectID := pgtype.UUID{Bytes: projectUUID, Valid: true}
-
-	// Verify ownership
-	q := db.New(r.DB)
-	project, err := q.GetProject(ctx, pgProjectID)
-	if err != nil {
-		return nil, fmt.Errorf("project not found")
-	}
-
-	userUUID, err := uuid.Parse(user.UserID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid user ID: %w", err)
-	}
-
-	if project.UserID.Bytes != userUUID {
-		return nil, fmt.Errorf("not authorized")
+		return nil, err
 	}
 
 	// Get commit history from git repository
-	projectPath := r.getProjectPath(projectID)
 	gitCommits, err := git.GetHistory(projectPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get history: %w", err)

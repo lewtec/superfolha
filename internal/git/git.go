@@ -24,7 +24,11 @@ type FileInfo struct {
 // InitRepo creates a new git repository
 func InitRepo(path string) error {
 	if err := os.MkdirAll(path, 0755); err != nil {
-		return err
+		return fmt.Errorf("failed to create directory %s: %w", path, err)
+	}
+
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return fmt.Errorf("directory %s was not created", path)
 	}
 
 	cmd := exec.Command("git", "init")
