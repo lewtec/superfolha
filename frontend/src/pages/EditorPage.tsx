@@ -1,12 +1,11 @@
 import { useSaveFileMutation } from "../hooks/useSaveFileMutation";
 import { useDeleteFileMutation } from "../hooks/useDeleteFileMutation";
-import { useCommitProjectMutation } from "../hooks/useCommitProjectMutation"; // New import
-import { useDebounce } from "../hooks/useDebounce"; // New import
+import { useCommitProjectMutation } from "../hooks/useCommitProjectMutation";
+import { useDebounce } from "../hooks/useDebounce";
 import { useNavigate, useParams } from "react-router-dom";
 import { useGetProjectQuery } from "../hooks/useGetProjectQuery";
 import { useGetFilesQuery } from "../hooks/useGetFilesQuery";
 import { useCallback, useEffect, useState } from "react";
-import Navbar from "../components/Navbar";
 import FileTree from "../components/FileTree";
 import Editor from "../components/Editor";
 import PDFViewer from "../components/PDFViewer";
@@ -210,14 +209,26 @@ export default function EditorPage() {
     }
   }, [id]);
 
+  const getStatusBadge = () => {
+    switch (editorStatus) {
+      case "saving":
+        return <span className="badge badge-warning gap-2">Saving...</span>;
+      case "saved":
+        return <span className="badge badge-success gap-2">Saved</span>;
+      case "committed":
+      case "clean":
+        return <span className="badge badge-info gap-2">Committed</span>;
+      case "dirty":
+        return <span className="badge badge-error gap-2">Unsaved</span>;
+      case "error":
+        return <span className="badge badge-error gap-2">Error</span>;
+      default:
+        return <span className="badge badge-info gap-2">Committed</span>;
+    }
+  };
+
   return (
     <div className="h-screen flex flex-col">
-      <Navbar
-        projectName={project?.name || "Loading..."}
-        onCompile={compile}
-        compiling={compiling}
-      />
-
       <div className="flex flex-1 overflow-hidden">
         {/* File Tree Sidebar */}
         <div className="w-64 border-r border-base-300">
@@ -233,19 +244,39 @@ export default function EditorPage() {
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col">
           {/* Toolbar */}
-          <div className="tabs tabs-boxed bg-base-200 p-2">
-            <a
-              className={`tab ${view === "code" ? "tab-active" : ""}`}
-              onClick={() => setView("code")}
-            >
-              Code
-            </a>
-            <a
-              className={`tab ${view === "pdf" ? "tab-active" : ""}`}
-              onClick={() => setView("pdf")}
-            >
-              PDF
-            </a>
+          <div className="flex items-center justify-between bg-base-200 p-2 gap-4">
+            <div className="tabs tabs-boxed">
+              <a
+                className={`tab ${view === "code" ? "tab-active" : ""}`}
+                onClick={() => setView("code")}
+              >
+                Code
+              </a>
+              <a
+                className={`tab ${view === "pdf" ? "tab-active" : ""}`}
+                onClick={() => setView("pdf")}
+              >
+                PDF
+              </a>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {getStatusBadge()}
+              <button
+                className={`btn btn-sm ${compiling ? "btn-disabled" : "btn-primary"}`}
+                onClick={compile}
+                disabled={compiling}
+              >
+                {compiling ? (
+                  <>
+                    <span className="loading loading-spinner loading-xs"></span>
+                    Compiling...
+                  </>
+                ) : (
+                  "Compile"
+                )}
+              </button>
+            </div>
           </div>
 
           {/* Editor/PDF View */}
