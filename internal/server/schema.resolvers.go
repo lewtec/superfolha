@@ -4,12 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs" // new import
+	"os"
+	"strings" // new import
+
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/lewtec/superfolha/internal/auth"
 	"github.com/lewtec/superfolha/internal/db"
 	"github.com/lewtec/superfolha/internal/git"
-	"os"
 )
 
 // Register is the resolver for the register field.
@@ -109,29 +112,55 @@ func (r *mutationResolver) CreateProject(ctx context.Context, name string) (*Pro
 		return nil, fmt.Errorf("failed to init git repo: %w", err)
 	}
 
-	// Create main.tex template
-	template := `\documentclass{article}
-\usepackage[utf8]{inputenc}
+	// Copy template files
 
-\title{Untitled}
-\author{}
-\date{}
+	templateDir := "templates/simple"
 
-\begin{document}
+	err = fs.WalkDir(templatesFS, templateDir, func(path string, d fs.DirEntry, err error) error {
 
-\maketitle
+		if err != nil {
 
-\section{Introduction}
+			return err
 
-Your content here.
+		}
 
-\end{document}
-`
-	if err := git.WriteFile(projectPath, "main.tex", template); err != nil {
-		return nil, fmt.Errorf("failed to write template file: %w", err)
-	}
+		if d.IsDir() {
 
-	// Initial commit
+			return nil
+
+		}
+
+	
+
+		content, err := templatesFS.ReadFile(path) // Use templatesFS.ReadFile directly
+
+		if err != nil {
+
+			return fmt.Errorf("failed to read template file %s: %w", path, err)
+
+		}
+
+	
+
+		// Remove the "templates/simple/" prefix to get the relative path in the project
+
+		relativePath := strings.TrimPrefix(path, templateDir+"/")
+
+		if err := git.WriteFile(projectPath, relativePath, string(content)); err != nil {
+
+			return fmt.Errorf("failed to write template file %s: %w", relativePath, err)
+
+		}
+
+		return nil
+
+	})
+
+	if err != nil {
+
+		return nil, fmt.Errorf("failed to copy template files: %w", err)
+
+	}	// Initial commit
 	_, err = git.CommitChanges(projectPath, user.Email, "Initial commit")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create initial commit: %w", err)

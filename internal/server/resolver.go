@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"context"
+	"embed"
 	"errors"
 	"fmt"
 	"os"
@@ -14,6 +15,9 @@ import (
 	"github.com/lewtec/superfolha/internal/db"
 	"github.com/lewtec/superfolha/internal/git"
 )
+
+//go:embed templates
+var templatesFS embed.FS
 
 // This file will not be regenerated automatically.
 //
