@@ -2,11 +2,8 @@ package server
 
 import (
 	"database/sql"
-	"embed"
 	"encoding/json"
 	"io"
-	"io/fs"
-	"log"
 	"net/http"
 
 	"github.com/99designs/gqlgen/graphql/handler"
@@ -15,8 +12,7 @@ import (
 	"github.com/lewtec/superfolha/internal/compiler"
 )
 
-//go:embed all:../../web/dist
-var webFiles embed.FS
+
 
 type Server struct {
 	db       *sql.DB
@@ -45,28 +41,8 @@ func (s *Server) Handler() http.Handler {
 	// Compile endpoint
 	mux.HandleFunc("/api/compile", s.handleCompile)
 
-	// Serve SPA
-	webFS, err := fs.Sub(webFiles, "web/dist")
-	if err != nil {
-		log.Printf("Warning: Failed to load embedded web files: %v", err)
-		webFS = nil
-	}
-
-	if webFS != nil {
-		fileServer := http.FileServer(http.FS(webFS))
-		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			// Serve index.html for non-API routes
-			if r.URL.Path == "/" || !fileExists(webFS, r.URL.Path[1:]) {
-				r.URL.Path = "/"
-			}
-			fileServer.ServeHTTP(w, r)
-		})
-	} else {
-		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("LaTeX Editor API Server - Frontend not embedded"))
-		})
-	}
+	// Serve Web App
+	mux.Handle("/", GetWebApp())
 
 	return mux
 }
@@ -111,7 +87,4 @@ func (s *Server) handleCompile(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(result)
 }
 
-func fileExists(fsys fs.FS, path string) bool {
-	_, err := fs.Stat(fsys, path)
-	return err == nil
-}
+

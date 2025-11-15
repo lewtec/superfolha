@@ -97,7 +97,11 @@ func findMainTexFile(dir string) (string, error) {
 // Compile compiles a LaTeX project from a tarball
 func Compile(tarballData []byte) (*CompileResult, error) {
 	// Create temporary directory
-	compileID := uuid.NewV7().String()
+	compileUUID, err := uuid.NewV7()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate compile ID: %w", err)
+	}
+	compileID := compileUUID.String()
 	tmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("compile-%s", compileID))
 	if err := os.MkdirAll(tmpDir, 0755); err != nil {
 		return nil, err

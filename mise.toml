@@ -1,6 +1,6 @@
 [tools]
 "github:sqlc-dev/sqlc" = "1.30.0"
-go = "1.21"
+go = "1.25.4"
 node = "20"
 
 [env]
@@ -40,7 +40,7 @@ run = "sqlc generate"
 run = "go run github.com/99designs/gqlgen generate"
 
 [tasks.gen]
-depends = ["gen"]
+depends = ["gen:*"]
 
 [tasks.docker]
 description = "Build Docker image"
