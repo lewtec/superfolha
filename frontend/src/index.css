@@ -1,6 +1,5 @@
-@plugin tailwind;
+@plugin tailwindcss;
 @plugin daisyui;
-
 body {
     margin: 0;
     font-family:
