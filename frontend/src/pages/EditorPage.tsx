@@ -10,10 +10,16 @@ import FileTree from "../components/FileTree";
 import Editor from "../components/Editor";
 import PDFViewer from "../components/PDFViewer";
 import LogsPanel from "../components/LogsPanel";
+import BinaryFileViewer from "../components/BinaryFileViewer"; // Import BinaryFileViewer
+import { isBinaryContent } from "../utils/fileUtils"; // Import isBinaryContent
 
 interface File {
   path: string;
-  content: string;
+  content: string | null; // Content can be null now
+  isDirty: boolean;
+  isBinary: boolean; // Added isBinary property
+  size: number; // Added size property
+  isTooBig: boolean; // Added isTooBig property
 }
 
 export default function EditorPage() {
@@ -73,11 +79,28 @@ export default function EditorPage() {
 
   useEffect(() => {
     if (fetchedFiles) {
-      setFiles(fetchedFiles as File[]);
-      if (fetchedFiles.length > 0) {
-        setCurrentFile(fetchedFiles[0] as File);
+      const initialFiles: File[] = (fetchedFiles as any[]).map(file => { // Use any[] for fetchedFiles to access new fields
+        let isBinary = false;
+        if (file.content === null) {
+          // If content is null, it's either too big or binary (as per backend logic)
+          isBinary = file.isTooBig;
+        } else {
+          // If content is present, use client-side heuristic
+          isBinary = isBinaryContent(file.content, file.path);
+        }
+
+        return {
+          ...file,
+          isDirty: false, // Initialize isDirty to false
+          isBinary: isBinary,
+          size: file.size, // Map size from GraphQL response
+          isTooBig: file.isTooBig, // Map isTooBig from GraphQL response
+        };
+      });
+      setFiles(initialFiles);
+      if (initialFiles.length > 0) {
+        setCurrentFile(initialFiles[0]);
       } else {
-        // If no files are fetched, ensure currentFile is null
         setCurrentFile(null);
       }
     }
@@ -86,7 +109,9 @@ export default function EditorPage() {
   // Commit on page close
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      if (editorStatus === "dirty" || editorStatus === "saving") {
+      // Check if any file is dirty
+      const anyDirty = files.some(file => file.isDirty);
+      if (anyDirty) {
         event.preventDefault();
         event.returnValue = "";
 
@@ -106,7 +131,7 @@ export default function EditorPage() {
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
     };
-  }, [editorStatus, commitProject, id]);
+  }, [files, commitProject, id]); // Added files to dependency array
 
   // Trigger auto-commit when status changes to 'saved'
   useEffect(() => {
@@ -128,6 +153,13 @@ export default function EditorPage() {
               return;
             }
             setEditorStatus("saved");
+            // Update the isDirty status of the saved file
+            setFiles(prevFiles =>
+              prevFiles.map(file =>
+                file.path === currentFile.path ? { ...file, content, isDirty: false } : file
+              )
+            );
+            setCurrentFile(prev => prev ? { ...prev, content, isDirty: false } : null);
           },
           onError: (err) => {
             setEditorStatus("error");
@@ -150,7 +182,8 @@ export default function EditorPage() {
           }
           setFiles((prev) => prev.filter((f) => f.path !== path));
           if (currentFile?.path === path) {
-            setCurrentFile(files[0] || null);
+            // Try to select the first file if the current one was deleted
+            setCurrentFile(files.filter((f) => f.path !== path)[0] || null);
           }
         },
         onError: (err) => {
@@ -175,17 +208,71 @@ export default function EditorPage() {
   const handleNewFile = useCallback(() => {
     const fileName = prompt("Enter file name:");
     if (fileName) {
-      const newFile: File = { path: fileName, content: "" };
+      const newFile: File = { path: fileName, content: "", isDirty: true }; // New files are dirty
       setFiles((prev) => [...prev, newFile]);
       setCurrentFile(newFile);
     }
   }, []);
 
-  const handleEditorChange = useCallback((content: string) => {
-    if (currentFile) {
-      setCurrentFile({ ...currentFile, content });
-      setEditorStatus("dirty");
+  const handleLoadFile = useCallback((fileName: string, content: string | null) => {
+    let isBinary = false;
+    let size = 0;
+    let isTooBig = false;
+
+    if (content !== null) {
+      isBinary = isBinaryContent(content, fileName);
+      size = content.length;
+      // For client-side loaded files, we assume they are not "too big" if content is provided
+      // The backend determines "isTooBig" for fetched files.
+      isTooBig = false;
+    } else {
+      // If content is null, we can't determine binary status or size client-side.
+      // We might assume it's binary or too big if it came from a context that implies it.
+      // For now, we'll default to not binary and size 0 if content is null.
+      // This might need refinement based on how `handleLoadFile` is called for null content.
+      isBinary = false;
+      size = 0;
+      isTooBig = false;
     }
+
+    setFiles((prev) => {
+      const existingFileIndex = prev.findIndex(file => file.path === fileName);
+      if (existingFileIndex > -1) {
+        const updatedFiles = [...prev];
+        updatedFiles[existingFileIndex] = {
+          ...updatedFiles[existingFileIndex],
+          content: content !== null ? content : updatedFiles[existingFileIndex].content,
+          isDirty: true,
+          isBinary,
+          size,
+          isTooBig,
+        };
+        return updatedFiles;
+      }
+      const newFile: File = { path: fileName, content: content !== null ? content : null, isDirty: true, isBinary, size, isTooBig };
+      return [...prev, newFile];
+    });
+    setCurrentFile(prev => {
+      if (prev && prev.path === fileName) {
+        return { ...prev, content: content !== null ? content : prev.content, isDirty: true, isBinary, size, isTooBig };
+      }
+      const loadedFile = files.find(file => file.path === fileName);
+      return loadedFile || null;
+    });
+
+    if (content !== null && !isBinary) {
+      memoizedOnSave(content);
+    }
+  }, [files, memoizedOnSave]);
+
+  const handleEditorChange = useCallback((content: string) => {
+    setFiles(prevFiles =>
+      prevFiles.map(file =>
+        file.path === currentFile?.path ? { ...file, content, isDirty: true } : file
+      )
+    );
+    setCurrentFile(prev => prev ? { ...prev, content, isDirty: true } : null);
+    setEditorStatus("dirty");
   }, [currentFile]);
 
   const compile = useCallback(async () => {
@@ -210,6 +297,13 @@ export default function EditorPage() {
   }, [id]);
 
   const getStatusBadge = () => {
+    // Check if any file is dirty
+    const anyDirty = files.some(file => file.isDirty);
+
+    if (anyDirty) {
+      return <span className="badge badge-error gap-2">Unsaved</span>;
+    }
+
     switch (editorStatus) {
       case "saving":
         return <span className="badge badge-warning gap-2">Saving...</span>;
@@ -218,8 +312,6 @@ export default function EditorPage() {
       case "committed":
       case "clean":
         return <span className="badge badge-info gap-2">Committed</span>;
-      case "dirty":
-        return <span className="badge badge-error gap-2">Unsaved</span>;
       case "error":
         return <span className="badge badge-error gap-2">Error</span>;
       default:
@@ -238,6 +330,8 @@ export default function EditorPage() {
             onFileSelect={handleFileSelect}
             onNewFile={handleNewFile}
             onDeleteFile={memoizedOnDeleteFile}
+            onLoadFile={handleLoadFile}
+            projectId={id!} // Pass projectId here
           />
         </div>
 
@@ -281,8 +375,14 @@ export default function EditorPage() {
 
           {/* Editor/PDF View */}
           <div className="flex-1 overflow-hidden">
-            {view === "code" && currentFile ? (
+            {currentFile && currentFile.isBinary ? (
+              <BinaryFileViewer
+                fileName={currentFile.path}
+                projectId={id!} // Pass projectId here
+              />
+            ) : view === "code" && currentFile ? (
               <Editor
+                key={currentFile.path} // Add key prop here
                 value={currentFile.content}
                 onChange={handleEditorChange}
                 onSave={memoizedOnSave}

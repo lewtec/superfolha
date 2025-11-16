@@ -6,44 +6,64 @@ import (
 	"embed"
 	"errors"
 	"fmt"
-	"io/fs" // new import
+	"io/fs"
+	"log"
+	"net/http" // Added net/http import for DetectContentType
 	"os"
-	"path/filepath"
-	"strings" // new import
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/lewtec/superfolha/internal/auth"
 	"github.com/lewtec/superfolha/internal/db"
-	"github.com/lewtec/superfolha/internal/git"
+	"github.com/lewtec/superfolha/internal/project" // Import project package
 )
 
 //go:embed templates
 var templatesFS embed.FS
+
+// MaxGraphQLFileSize defines the maximum file size (in bytes) for content to be returned directly via GraphQL.
+const MaxGraphQLFileSize = 1024 * 1024 * 5 // 5 MB
+
+// HasBinary checks if the file content appears to be binary using http.DetectContentType.
+func HasBinary(content []byte, filename string) bool {
+	// http.DetectContentType sniffs the first 512 bytes.
+	// If the content is shorter, it sniffs the entire content.
+	contentType := http.DetectContentType(content)
+
+	// Log the detected content type for debugging
+	log.Printf("HasBinary: File %s detected content type: %s", filename, contentType)
+
+	// If the content type starts with "text/", it's considered text.
+	// Otherwise, it's considered binary.
+	// application/octet-stream is the default for unknown binary types.
+	if strings.HasPrefix(contentType, "text/") {
+		return false
+	}
+
+	return true
+}
 
 // This file will not be regenerated automatically.
 //
 // It serves as dependency injection for your app, add any dependencies you require here.
 
 type Resolver struct {
-	DB       db.DBTX
-	StateDir string
+	DB             db.DBTX
+	StateDir       string
+	projectService *project.Service // Added projectService
 }
 
-func NewResolver(db db.DBTX, stateDir string) *Resolver {
+func NewResolver(db db.DBTX, stateDir string, projectService *project.Service) *Resolver {
 	return &Resolver{
-		DB:       db,
-		StateDir: stateDir,
+		DB:             db,
+		StateDir:       stateDir,
+		projectService: projectService, // Initialize projectService
 	}
 }
 
 func (r *Resolver) getProjectPath(projectID string) string {
-	absPath, err := filepath.Abs(filepath.Join(r.StateDir, "repos", projectID))
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: failed to get absolute path: %v\n", err)
-		return filepath.Join(r.StateDir, "repos", projectID)
-	}
-	return absPath
+	return r.projectService.GetProjectPath(projectID)
 }
 
 func (r *Resolver) getAndCheckProject(ctx context.Context, projectID string) (*db.Project, string, *auth.UserContext, error) {
@@ -75,10 +95,10 @@ func (r *Resolver) getAndCheckProject(ctx context.Context, projectID string) (*d
 		return nil, "", nil, fmt.Errorf("not authorized")
 	}
 
-	projectPath := r.getProjectPath(projectID)
+	projectPath := r.projectService.GetProjectPath(projectID)
 	// Check if repo exists, if not, initialize it and copy templates
 	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
-		if err := git.InitRepo(projectPath); err != nil {
+		if err := r.projectService.InitProjectRepo(projectID); err != nil {
 			return nil, "", nil, fmt.Errorf("failed to init git repo: %w", err)
 		}
 
@@ -92,22 +112,22 @@ func (r *Resolver) getAndCheckProject(ctx context.Context, projectID string) (*d
 				return nil
 			}
 
-			                        content, err := templatesFS.ReadFile(path)
-			                        if err != nil {
-			                                return fmt.Errorf("failed to read template file %s: %w", path, err)
-			                        }
-			
-			                        relativePath := strings.TrimPrefix(path, templateDir+"/")
-			                        if err := git.WriteFile(projectPath, relativePath, string(content)); err != nil {
-			                                return fmt.Errorf("failed to write template file %s: %w", relativePath, err)
-			                        }
-			                        return nil
-			                })
-			                if err != nil {
-			                        return nil, "", nil, fmt.Errorf("failed to copy template files: %w", err)
-			                }
+			content, err := templatesFS.ReadFile(path)
+			if err != nil {
+				return fmt.Errorf("failed to read template file %s: %w", path, err)
+			}
+
+			relativePath := strings.TrimPrefix(path, templateDir+"/")
+			if err := r.projectService.SaveFile(projectID, relativePath, string(content)); err != nil {
+				return fmt.Errorf("failed to write template file %s: %w", relativePath, err)
+			}
+			return nil
+		})
+		if err != nil {
+			return nil, "", nil, fmt.Errorf("failed to copy template files: %w", err)
+		}
 		// Initial commit
-		_, err = git.CommitChanges(projectPath, user.Email, "Initial commit")
+		_, err = r.projectService.CommitChanges(projectID, user.Email, "Initial commit")
 		if err != nil {
 			return nil, "", nil, fmt.Errorf("failed to create initial commit: %w", err)
 		}

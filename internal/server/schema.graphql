@@ -14,7 +14,9 @@ type Project {
 
 type File {
   path: String!
-  content: String!
+  content: String
+  size: Int!
+  isTooBig: Boolean!
 }
 
 type Commit {
