@@ -8,8 +8,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io" // Added io import
-	"log" // Added log import
+	"io"
+	"log"
 	"os"
 
 	"github.com/google/uuid"
@@ -151,9 +151,16 @@ func (r *mutationResolver) SaveFile(ctx context.Context, projectID string, path 
 		return nil, fmt.Errorf("failed to write file: %w", err)
 	}
 
+	// Return the file with content, size, and isTooBig.
+	// For SaveFile, we assume the saved content is not too big and not binary for direct return.
+	// The actual size and binary status would be determined by a subsequent fetch.
+	// Here, we're just reflecting the saved state.
+	contentPtr := &content // Convert string to *string
 	return &File{
-		Path:    path,
-		Content: content,
+		Path:     path,
+		Content:  contentPtr,
+		Size:     len(content),                                                          // Approximate size for the saved content
+		IsTooBig: len(content) > MaxGraphQLFileSize || HasBinary([]byte(content), path), // Heuristic for saved content
 	}, nil
 }
 

@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"fmt" // Added fmt import
 	"io"
 	"log"
 	"net/http"

@@ -19,8 +19,10 @@ type Commit struct {
 }
 
 type File struct {
-	Path    string `json:"path"`
-	Content string `json:"content"`
+	Path     string  `json:"path"`
+	Content  *string `json:"content,omitempty"`
+	Size     int     `json:"size"`
+	IsTooBig bool    `json:"isTooBig"`
 }
 
 type Mutation struct {

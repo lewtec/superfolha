@@ -60,8 +60,10 @@ type ComplexityRoot struct {
 	}
 
 	File struct {
-		Content func(childComplexity int) int
-		Path    func(childComplexity int) int
+		Content  func(childComplexity int) int
+		IsTooBig func(childComplexity int) int
+		Path     func(childComplexity int) int
+		Size     func(childComplexity int) int
 	}
 
 	Mutation struct {
@@ -182,12 +184,26 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.File.Content(childComplexity), true
 
+	case "File.isTooBig":
+		if e.complexity.File.IsTooBig == nil {
+			break
+		}
+
+		return e.complexity.File.IsTooBig(childComplexity), true
+
 	case "File.path":
 		if e.complexity.File.Path == nil {
 			break
 		}
 
 		return e.complexity.File.Path(childComplexity), true
+
+	case "File.size":
+		if e.complexity.File.Size == nil {
+			break
+		}
+
+		return e.complexity.File.Size(childComplexity), true
 
 	case "Mutation.commit":
 		if e.complexity.Mutation.Commit == nil {
@@ -1116,14 +1132,11 @@ func (ec *executionContext) _File_content(ctx context.Context, field graphql.Col
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.(*string)
 	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_File_content(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -1134,6 +1147,94 @@ func (ec *executionContext) fieldContext_File_content(ctx context.Context, field
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _File_size(ctx context.Context, field graphql.CollectedField, obj *File) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_File_size(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Size, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_File_size(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "File",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _File_isTooBig(ctx context.Context, field graphql.CollectedField, obj *File) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_File_isTooBig(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.IsTooBig, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_File_isTooBig(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "File",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
 		},
 	}
 	return fc, nil
@@ -1424,6 +1525,10 @@ func (ec *executionContext) fieldContext_Mutation_saveFile(ctx context.Context, 
 				return ec.fieldContext_File_path(ctx, field)
 			case "content":
 				return ec.fieldContext_File_content(ctx, field)
+			case "size":
+				return ec.fieldContext_File_size(ctx, field)
+			case "isTooBig":
+				return ec.fieldContext_File_isTooBig(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type File", field.Name)
 		},
@@ -1944,6 +2049,10 @@ func (ec *executionContext) fieldContext_Query_files(ctx context.Context, field 
 				return ec.fieldContext_File_path(ctx, field)
 			case "content":
 				return ec.fieldContext_File_content(ctx, field)
+			case "size":
+				return ec.fieldContext_File_size(ctx, field)
+			case "isTooBig":
+				return ec.fieldContext_File_isTooBig(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type File", field.Name)
 		},
@@ -2002,6 +2111,10 @@ func (ec *executionContext) fieldContext_Query_file(ctx context.Context, field g
 				return ec.fieldContext_File_path(ctx, field)
 			case "content":
 				return ec.fieldContext_File_content(ctx, field)
+			case "size":
+				return ec.fieldContext_File_size(ctx, field)
+			case "isTooBig":
+				return ec.fieldContext_File_isTooBig(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type File", field.Name)
 		},
@@ -4199,6 +4312,13 @@ func (ec *executionContext) _File(ctx context.Context, sel ast.SelectionSet, obj
 			}
 		case "content":
 			out.Values[i] = ec._File_content(ctx, field, obj)
+		case "size":
+			out.Values[i] = ec._File_size(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "isTooBig":
+			out.Values[i] = ec._File_isTooBig(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -5065,6 +5185,21 @@ func (ec *executionContext) unmarshalNID2string(ctx context.Context, v interface
 
 func (ec *executionContext) marshalNID2string(ctx context.Context, sel ast.SelectionSet, v string) graphql.Marshaler {
 	res := graphql.MarshalID(v)
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+	}
+	return res
+}
+
+func (ec *executionContext) unmarshalNInt2int(ctx context.Context, v interface{}) (int, error) {
+	res, err := graphql.UnmarshalInt(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNInt2int(ctx context.Context, sel ast.SelectionSet, v int) graphql.Marshaler {
+	res := graphql.MarshalInt(v)
 	if res == graphql.Null {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
