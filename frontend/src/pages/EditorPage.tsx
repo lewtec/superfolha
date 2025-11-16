@@ -195,6 +195,36 @@ export default function EditorPage() {
     }
   }, []);
 
+  const handleLoadFile = useCallback((fileName: string, content: string | null) => {
+    setFiles((prev) => {
+      // Check if a file with the same name already exists
+      const existingFileIndex = prev.findIndex(file => file.path === fileName);
+      if (existingFileIndex > -1) {
+        // Replace existing file
+        const updatedFiles = [...prev];
+        updatedFiles[existingFileIndex] = { ...updatedFiles[existingFileIndex], content: content !== null ? content : updatedFiles[existingFileIndex].content, isDirty: true };
+        return updatedFiles;
+      }
+      // Add new file
+      const newFile: File = { path: fileName, content: content !== null ? content : "", isDirty: true };
+      return [...prev, newFile];
+    });
+    setCurrentFile(prev => {
+      // If the current file is the one being loaded, update its content and dirty status
+      if (prev && prev.path === fileName) {
+        return { ...prev, content: content !== null ? content : prev.content, isDirty: true };
+      }
+      // Otherwise, find the newly loaded file in the updated files array
+      const loadedFile = files.find(file => file.path === fileName);
+      return loadedFile || null;
+    });
+
+    // Automatically save the loaded file if it's a text file
+    if (content !== null) {
+      memoizedOnSave(content);
+    }
+  }, [files, memoizedOnSave]);
+
   const handleEditorChange = useCallback((content: string) => {
     setFiles(prevFiles =>
       prevFiles.map(file =>
@@ -260,6 +290,8 @@ export default function EditorPage() {
             onFileSelect={handleFileSelect}
             onNewFile={handleNewFile}
             onDeleteFile={memoizedOnDeleteFile}
+            onLoadFile={handleLoadFile}
+            projectId={id!} // Pass projectId here
           />
         </div>
 
