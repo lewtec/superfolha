@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<6f64644c3137906801c58d5d00883084>>
+ * @generated SignedSource<<7a3d0b747b3256dcabdb1abec6615fe7>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -16,7 +16,7 @@ export type SaveFileMutation$variables = {
 };
 export type SaveFileMutation$data = {
   readonly saveFile: {
-    readonly content: string;
+    readonly content: string | null | undefined;
     readonly path: string;
   };
 };

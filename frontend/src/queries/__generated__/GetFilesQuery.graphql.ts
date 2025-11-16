@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<4a9e63778a0632086ceb88f0eb26c251>>
+ * @generated SignedSource<<fe912e0234d249c2e82989029be22b91>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -14,8 +14,10 @@ export type GetFilesQuery$variables = {
 };
 export type GetFilesQuery$data = {
   readonly files: ReadonlyArray<{
-    readonly content: string;
+    readonly content: string | null | undefined;
+    readonly isTooBig: boolean;
     readonly path: string;
+    readonly size: number;
   }>;
 };
 export type GetFilesQuery = {
@@ -59,6 +61,20 @@ v1 = [
         "kind": "ScalarField",
         "name": "content",
         "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
+        "kind": "ScalarField",
+        "name": "size",
+        "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
+        "kind": "ScalarField",
+        "name": "isTooBig",
+        "storageKey": null
       }
     ],
     "storageKey": null
@@ -82,16 +98,16 @@ return {
     "selections": (v1/*: any*/)
   },
   "params": {
-    "cacheID": "96ea4988e7d9afe15eb6faf36761cb1e",
+    "cacheID": "bfebf232c0a5530ea43cefd3cad42c22",
     "id": null,
     "metadata": {},
     "name": "GetFilesQuery",
     "operationKind": "query",
-    "text": "query GetFilesQuery(\n  $projectId: ID!\n) {\n  files(projectId: $projectId) {\n    path\n    content\n  }\n}\n"
+    "text": "query GetFilesQuery(\n  $projectId: ID!\n) {\n  files(projectId: $projectId) {\n    path\n    content\n    size\n    isTooBig\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "5b27a552d660f68ed08aa0bbd13dde8d";
+(node as any).hash = "3c4aad4ac9c4405b933114850aef45d9";
 
 export default node;
