@@ -1,4 +1,3 @@
--- migrate:up
 CREATE TABLE projects (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
   user_id UUID REFERENCES users(id) ON DELETE CASCADE,
@@ -9,6 +8,3 @@ CREATE TABLE projects (
 );
 
 CREATE INDEX idx_projects_user_id ON projects(user_id);
-
--- migrate:down
-DROP TABLE projects;

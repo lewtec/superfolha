@@ -1,5 +1,3 @@
--- migrate:up
-
 -- Create UUID v7 generation function
 -- UUID v7 is time-sortable and improves index performance
 CREATE OR REPLACE FUNCTION uuid_generate_v7()
@@ -32,6 +30,3 @@ END
 $$
 LANGUAGE PLPGSQL
 VOLATILE;
-
--- migrate:down
-DROP FUNCTION IF EXISTS uuid_generate_v7();

@@ -83,11 +83,7 @@ mise run lint                # Lint code
 ### Manual Setup
 
 ```bash
-# Run migrations (optional, server does this on boot)
-mise run migrate
-# or: dbmate up
-
-# Run server
+# Run server (migrations run automatically on startup)
 go run cmd/server/main.go --db="$DATABASE_URL" --state-dir=./data
 ```
 
