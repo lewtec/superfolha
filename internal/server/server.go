@@ -184,7 +184,7 @@ func (s *Server) handleUploadFile(w http.ResponseWriter, r *http.Request) {
 
 	filePath := header.Filename // Use original filename as path for now
 
-	projectPath := path.Join(s.stateDir, projectIdStr)
+	projectPath := path.Join(s.stateDir, "repos", projectIdStr)
 	fullFilePath := path.Join(projectPath, filePath)
 
 	// Ensure the directory exists
