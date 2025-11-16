@@ -196,15 +196,13 @@ export default function EditorPage() {
   }, []);
 
   const handleEditorChange = useCallback((content: string) => {
-    if (currentFile) {
-      setFiles(prevFiles =>
-        prevFiles.map(file =>
-          file.path === currentFile.path ? { ...file, content, isDirty: true } : file
-        )
-      );
-      setCurrentFile(prev => prev ? { ...prev, content, isDirty: true } : null);
-      setEditorStatus("dirty");
-    }
+    setFiles(prevFiles =>
+      prevFiles.map(file =>
+        file.path === currentFile?.path ? { ...file, content, isDirty: true } : file
+      )
+    );
+    setCurrentFile(prev => prev ? { ...prev, content, isDirty: true } : null);
+    setEditorStatus("dirty");
   }, [currentFile]);
 
   const compile = useCallback(async () => {
@@ -307,6 +305,7 @@ export default function EditorPage() {
           <div className="flex-1 overflow-hidden">
             {view === "code" && currentFile ? (
               <Editor
+                key={currentFile.path} // Add key prop here
                 value={currentFile.content}
                 onChange={handleEditorChange}
                 onSave={memoizedOnSave}

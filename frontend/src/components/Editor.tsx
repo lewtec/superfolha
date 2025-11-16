@@ -102,8 +102,8 @@ export default function Editor({ value, onChange, onSave }: EditorProps) {
 
   // Update editor when value changes externally
   useEffect(() => {
-    if (viewRef.current && !isUpdatingInternally.current) { // Only update if not an internal change
-      const currentValue = viewRef.current.state.doc.toString()
+    if (viewRef.current && !isUpdatingInternally.current) {
+      const currentValue = viewRef.current.state.doc.toString();
       if (currentValue !== value) {
         const { selection } = viewRef.current.state; // Preserve cursor position
         viewRef.current.dispatch({
