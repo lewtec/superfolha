@@ -21,6 +21,7 @@ type File {
     content: String
     size: Int!
     isTooBig: Boolean!
+    isBinary: Boolean!
 }
 
 type Commit {

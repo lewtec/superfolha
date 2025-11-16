@@ -10,6 +10,7 @@ export default graphql`
         content
         size
         isTooBig
+        isBinary
       }
       history {
         hash

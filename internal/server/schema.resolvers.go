@@ -156,11 +156,13 @@ func (r *mutationResolver) SaveFile(ctx context.Context, projectID string, path 
 	// The actual size and binary status would be determined by a subsequent fetch.
 	// Here, we're just reflecting the saved state.
 	contentPtr := &content // Convert string to *string
+	isBinary := HasBinary([]byte(content), path)
 	return &File{
 		Path:     path,
 		Content:  contentPtr,
-		Size:     len(content),                                                          // Approximate size for the saved content
-		IsTooBig: len(content) > MaxGraphQLFileSize || HasBinary([]byte(content), path), // Heuristic for saved content
+		Size:     len(content), // Approximate size for the saved content
+		IsTooBig: len(content) > MaxGraphQLFileSize,
+		IsBinary: isBinary,
 	}, nil
 }
 
@@ -218,11 +220,23 @@ func (r *projectResolver) Files(ctx context.Context, obj *Project) ([]*File, err
 	files := make([]*File, len(gitFiles))
 	for i, f := range gitFiles {
 		isTooBig := f.Size > MaxGraphQLFileSize
+
+		fileReader, _, err := r.projectService.ReadFile(obj.ID, f.Path)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read file for binary check: %w", err)
+		}
+		defer fileReader.Close()
+
+		var buf [512]byte
+		n, _ := io.ReadFull(fileReader, buf[:])
+		isBinary := HasBinary(buf[:n], f.Path)
+
 		files[i] = &File{
 			Path:     f.Path,
 			Content:  nil, // Content is not provided in this listing
 			Size:     int(f.Size),
 			IsTooBig: isTooBig,
+			IsBinary: isBinary,
 		}
 	}
 
@@ -267,7 +281,8 @@ func (r *projectResolver) File(ctx context.Context, obj *Project, path string) (
 		Path:     path,
 		Content:  content,
 		Size:     int(fileSize),
-		IsTooBig: isTooBig || isBinary, // Consider binary files as "too big" for direct content display
+		IsTooBig: isTooBig,
+		IsBinary: isBinary,
 	}, nil
 }
 

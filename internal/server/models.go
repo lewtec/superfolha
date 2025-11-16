@@ -23,6 +23,7 @@ type File struct {
 	Content  *string `json:"content,omitempty"`
 	Size     int     `json:"size"`
 	IsTooBig bool    `json:"isTooBig"`
+	IsBinary bool    `json:"isBinary"`
 }
 
 type Mutation struct {

@@ -94,12 +94,10 @@ export default function EditorPage() {
   useEffect(() => {
     if (fetchedFiles) {
       const initialFiles: File[] = (fetchedFiles as any[]).map(file => { // Use any[] for fetchedFiles to access new fields
-        let isBinary = file.isTooBig;
-
         return {
           ...file,
           isDirty: false, // Initialize isDirty to false
-          isBinary: isBinary,
+          isBinary: file.isBinary,
           size: file.size, // Map size from GraphQL response
           isTooBig: file.isTooBig, // Map isTooBig from GraphQL response
         };
