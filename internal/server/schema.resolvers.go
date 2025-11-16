@@ -207,6 +207,21 @@ func (r *mutationResolver) Commit(ctx context.Context, projectID string, message
 	}, nil
 }
 
+// Files is the resolver for the files field.
+func (r *projectResolver) Files(ctx context.Context, obj *Project) ([]*File, error) {
+	panic(fmt.Errorf("not implemented: Files - files"))
+}
+
+// File is the resolver for the file field.
+func (r *projectResolver) File(ctx context.Context, obj *Project, path string) (*File, error) {
+	panic(fmt.Errorf("not implemented: File - file"))
+}
+
+// History is the resolver for the history field.
+func (r *projectResolver) History(ctx context.Context, obj *Project) ([]*Commit, error) {
+	panic(fmt.Errorf("not implemented: History - history"))
+}
+
 // Me is the resolver for the me field.
 func (r *queryResolver) Me(ctx context.Context) (*User, error) {
 	user, ok := auth.GetUserFromContext(ctx)
@@ -281,7 +296,25 @@ func (r *queryResolver) Project(ctx context.Context, id string) (*Project, error
 	}, nil
 }
 
-// Files is the resolver for the files field.
+// Mutation returns MutationResolver implementation.
+func (r *Resolver) Mutation() MutationResolver { return &mutationResolver{r} }
+
+// Project returns ProjectResolver implementation.
+func (r *Resolver) Project() ProjectResolver { return &projectResolver{r} }
+
+// Query returns QueryResolver implementation.
+func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
+
+type mutationResolver struct{ *Resolver }
+type projectResolver struct{ *Resolver }
+type queryResolver struct{ *Resolver }
+
+// !!! WARNING !!!
+// The code below was going to be deleted when updating resolvers. It has been copied here so you have
+// one last chance to move it out of harms way if you want. There are two reasons this happens:
+//   - When renaming or deleting a resolver the old code will be put in here. You can safely delete
+//     it when you're done.
+//   - You have helper methods in this file. Move them out to keep these resolver files clean.
 func (r *queryResolver) Files(ctx context.Context, projectID string) ([]*File, error) {
 	_, _, _, err := r.getAndCheckProject(ctx, projectID)
 	if err != nil {
@@ -307,8 +340,6 @@ func (r *queryResolver) Files(ctx context.Context, projectID string) ([]*File, e
 
 	return files, nil
 }
-
-// File is the resolver for the file field.
 func (r *queryResolver) File(ctx context.Context, projectID string, path string) (*File, error) {
 	_, _, _, err := r.getAndCheckProject(ctx, projectID)
 	if err != nil {
@@ -354,8 +385,6 @@ func (r *queryResolver) File(ctx context.Context, projectID string, path string)
 		IsTooBig: isTooBig || isBinary, // Consider binary files as "too big" for direct content display
 	}, nil
 }
-
-// History is the resolver for the history field.
 func (r *queryResolver) History(ctx context.Context, projectID string) ([]*Commit, error) {
 	_, _, _, err := r.getAndCheckProject(ctx, projectID)
 	if err != nil {
@@ -380,12 +409,3 @@ func (r *queryResolver) History(ctx context.Context, projectID string) ([]*Commi
 
 	return commits, nil
 }
-
-// Mutation returns MutationResolver implementation.
-func (r *Resolver) Mutation() MutationResolver { return &mutationResolver{r} }
-
-// Query returns QueryResolver implementation.
-func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
-
-type mutationResolver struct{ *Resolver }
-type queryResolver struct{ *Resolver }

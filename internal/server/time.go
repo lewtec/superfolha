@@ -44,3 +44,10 @@ func UnmarshalTime(v interface{}) (time.Time, error) {
 	}
 	return time.Parse(time.RFC3339, str)
 }
+
+type Project struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
