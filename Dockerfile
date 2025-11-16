@@ -1,3 +1,21 @@
+# Stage 1: Build Go binary
+FROM golang:1.25-bookworm AS builder
+
+WORKDIR /build
+
+# Copy go mod files
+COPY go.mod go.sum ./
+
+# Download dependencies
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Build the binary
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o server ./cmd/server
+
+# Stage 2: Final image with texlive
 FROM texlive/texlive:latest
 
 # Install dependencies
@@ -9,8 +27,8 @@ RUN apt-get update && apt-get install -y \
 # Create app directory
 WORKDIR /app
 
-# Copy backend binary (to be built before docker build)
-COPY server /app/server
+# Copy binary from builder stage
+COPY --from=builder /build/server /app/server
 
 # Expose port
 EXPOSE 8080
@@ -22,5 +40,5 @@ ENV PORT=8080
 # Create data directory
 RUN mkdir -p /data/repos
 
-# Run the server
+# Set entrypoint
 ENTRYPOINT ["/app/server"]

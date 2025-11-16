@@ -11,6 +11,10 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lewtec/superfolha/internal/project"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/stdlib"
+	"github.com/lewtec/superfolha/internal/db"
 	"github.com/lewtec/superfolha/internal/server"
 	"github.com/spf13/cobra"
 )
@@ -23,8 +27,8 @@ var (
 
 var rootCmd = &cobra.Command{
 	Use:   "server",
-	Short: "LaTeX Editor Server",
-	Long:  `A web-based LaTeX editor with Git version control and collaborative features.`,
+	Short: "Superfolha Server",
+	Long:  `Superfolha - A web-based LaTeX editor with Git version control and collaborative features.`,
 	Run:   runServer,
 }
 
@@ -59,9 +63,10 @@ func runServer(cmd *cobra.Command, args []string) {
 
 	log.Println("Connected to database")
 
-	// Run migrations with dbmate
+	// Run migrations with golang-migrate
 	log.Println("Running database migrations...")
-	if err := runMigrations(dbURL); err != nil {
+	sqlDB := stdlib.OpenDBFromPool(dbpool)
+	if err := db.RunMigrations(sqlDB); err != nil {
 		log.Printf("Warning: Failed to run migrations: %v", err)
 		log.Println("Continuing anyway...")
 	}
@@ -89,20 +94,6 @@ func runServer(cmd *cobra.Command, args []string) {
 	if err := http.ListenAndServe(addr, srv.Handler()); err != nil {
 		log.Fatalf("Server failed: %v", err)
 	}
-}
-
-func runMigrations(dbURL string) error {
-	// Check if dbmate is installed
-	if _, err := exec.LookPath("dbmate"); err != nil {
-		log.Println("dbmate not found, skipping migrations")
-		return nil
-	}
-
-	cmd := exec.Command("dbmate", "up")
-	cmd.Env = append(os.Environ(), fmt.Sprintf("DATABASE_URL=%s", dbURL))
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
 }
 
 func main() {
