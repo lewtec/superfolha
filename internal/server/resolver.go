@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath" // Added filepath import
 	"strings"
 
 	"github.com/google/uuid"

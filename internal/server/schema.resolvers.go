@@ -8,6 +8,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io" // Added io import
+	"log" // Added log import
 	"os"
 
 	"github.com/google/uuid"

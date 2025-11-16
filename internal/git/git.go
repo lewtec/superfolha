@@ -422,7 +422,7 @@ func ReadFile(repoPath, filePath string) (io.ReadCloser, int64, error) {
 
 
 
-	file, err := w.Filesystem.Open(filePath)
+		file, err := w.Filesystem.Open(filePath)
 
 
 
@@ -430,7 +430,6 @@ func ReadFile(repoPath, filePath string) (io.ReadCloser, int64, error) {
 
 
 
-	if err != nil {
 
 
 
@@ -438,7 +437,8 @@ func ReadFile(repoPath, filePath string) (io.ReadCloser, int64, error) {
 
 
 
-		if os.IsNotExist(err) {
+
+		if err != nil {
 
 
 
@@ -446,7 +446,71 @@ func ReadFile(repoPath, filePath string) (io.ReadCloser, int64, error) {
 
 
 
-			return nil, 0, ErrGitFileNotFound
+
+
+
+
+
+
+
+
+			if os.IsNotExist(err) {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+				return nil, 0, ErrGitFileNotFound
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+			}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+			return nil, 0, fmt.Errorf("failed to open file %s: %w", filePath, err)
+
+
+
+
+
+
+
+
 
 
 
@@ -462,7 +526,135 @@ func ReadFile(repoPath, filePath string) (io.ReadCloser, int64, error) {
 
 
 
-		return nil, 0, fmt.Errorf("failed to open file %s: %w", filePath, err)
+
+
+
+
+
+
+
+
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+		fileInfo, err := w.Filesystem.Stat(filePath) // Use w.Filesystem.Stat
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+		if err != nil {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+			file.Close() // Ensure file is closed on error
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+			return nil, 0, fmt.Errorf("failed to get file info for %s: %w", filePath, err)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+		}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+		return file, fileInfo.Size(), nil
+
+
+
+
+
+
+
+
 
 
 
@@ -471,78 +663,6 @@ func ReadFile(repoPath, filePath string) (io.ReadCloser, int64, error) {
 
 
 	}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-	fileInfo, err := file.Stat()
-
-
-
-
-
-
-
-	if err != nil {
-
-
-
-
-
-
-
-		file.Close() // Ensure file is closed on error
-
-
-
-
-
-
-
-		return nil, 0, fmt.Errorf("failed to get file info for %s: %w", filePath, err)
-
-
-
-
-
-
-
-	}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-	return file, fileInfo.Size(), nil
-
-
-
-
-
-
-
-}
 
 
 
