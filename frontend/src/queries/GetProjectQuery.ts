@@ -7,6 +7,7 @@ export default graphql`
       name
       files {
         path
+        content
         size
         isTooBig
       }

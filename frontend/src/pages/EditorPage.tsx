@@ -1,3 +1,4 @@
+import { useGetFileContent } from "../hooks/useGetFileContentQuery";
 import { useSaveFileMutation } from "../hooks/useSaveFileMutation";
 import { useDeleteFileMutation } from "../hooks/useDeleteFileMutation";
 import { useCommitProjectMutation } from "../hooks/useCommitProjectMutation";
@@ -28,6 +29,7 @@ export default function EditorPage() {
   // All hooks must be called unconditionally before any returns
   const { project, ...projectQueryData } = useGetProjectQuery({ id: id! });
   const fetchedFiles = project?.files;
+  const { getFileContent } = useGetFileContent();
 
   const [files, setFiles] = useState<File[]>([]);
   const [currentFile, setCurrentFile] = useState<File | null>(null);
@@ -74,17 +76,25 @@ export default function EditorPage() {
     );
   }
 
+  const handleFileSelect = useCallback(async (path: string) => {
+    const file = files.find((f) => f.path === path);
+    if (file) {
+      if (file.content == null && !file.isBinary) {
+        const response = await getFileContent({ id: id!, path });
+        const content = response?.project?.file?.content;
+        const updatedFile = { ...file, content };
+        setFiles(files.map(f => f.path === path ? updatedFile : f));
+        setCurrentFile(updatedFile);
+      } else {
+        setCurrentFile(file);
+      }
+    }
+  }, [files, getFileContent, id]);
+
   useEffect(() => {
     if (fetchedFiles) {
       const initialFiles: File[] = (fetchedFiles as any[]).map(file => { // Use any[] for fetchedFiles to access new fields
-        let isBinary = false;
-        if (file.content === null) {
-          // If content is null, it's either too big or binary (as per backend logic)
-          isBinary = file.isTooBig;
-        } else {
-          // If content is present, use client-side heuristic
-          isBinary = isBinaryContent(file.content, file.path);
-        }
+        let isBinary = file.isTooBig;
 
         return {
           ...file,
@@ -96,7 +106,7 @@ export default function EditorPage() {
       });
       setFiles(initialFiles);
       if (initialFiles.length > 0) {
-        setCurrentFile(initialFiles[0]);
+        handleFileSelect(initialFiles[0].path)
       } else {
         setCurrentFile(null);
       }
@@ -192,15 +202,7 @@ export default function EditorPage() {
     [id, deleteFile, currentFile, files],
   );
 
-  const handleFileSelect = useCallback((path: string) => {
-    setFiles((prevFiles) => {
-      const file = prevFiles.find((f) => f.path === path);
-      if (file) {
-        setCurrentFile(file);
-      }
-      return prevFiles;
-    });
-  }, []);
+
 
   const handleNewFile = useCallback(() => {
     const fileName = prompt("Enter file name:");

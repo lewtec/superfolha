@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<d6f797f11557d02364b5c27652444159>>
+ * @generated SignedSource<<3e71b58b0655c03e8503d481ae805474>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -15,6 +15,7 @@ export type GetProjectQuery$variables = {
 export type GetProjectQuery$data = {
   readonly project: {
     readonly files: ReadonlyArray<{
+      readonly content: string | null | undefined;
       readonly isTooBig: boolean;
       readonly path: string;
       readonly size: number;
@@ -84,6 +85,13 @@ v1 = [
             "args": null,
             "kind": "ScalarField",
             "name": "path",
+            "storageKey": null
+          },
+          {
+            "alias": null,
+            "args": null,
+            "kind": "ScalarField",
+            "name": "content",
             "storageKey": null
           },
           {
@@ -164,16 +172,16 @@ return {
     "selections": (v1/*: any*/)
   },
   "params": {
-    "cacheID": "cae1caaa3fbc6deb7f6d178499b999c2",
+    "cacheID": "047dad5e0d7d659a90c2e20a69090e10",
     "id": null,
     "metadata": {},
     "name": "GetProjectQuery",
     "operationKind": "query",
-    "text": "query GetProjectQuery(\n  $id: ID!\n) {\n  project(id: $id) {\n    id\n    name\n    files {\n      path\n      size\n      isTooBig\n    }\n    history {\n      hash\n      message\n      author\n      date\n    }\n  }\n}\n"
+    "text": "query GetProjectQuery(\n  $id: ID!\n) {\n  project(id: $id) {\n    id\n    name\n    files {\n      path\n      content\n      size\n      isTooBig\n    }\n    history {\n      hash\n      message\n      author\n      date\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "744d00e271d0c0e149784e9974e3decd";
+(node as any).hash = "21450e786cf568d81833e46a998b4c6d";
 
 export default node;
