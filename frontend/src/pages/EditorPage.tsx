@@ -343,7 +343,7 @@ export default function EditorPage() {
             {currentFile && currentFile.isBinary ? (
               <BinaryFileViewer
                 fileName={currentFile.path}
-                fileContent={currentFile.content}
+                projectId={id!} // Pass projectId here
               />
             ) : view === "code" && currentFile ? (
               <Editor
