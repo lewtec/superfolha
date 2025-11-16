@@ -14,7 +14,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/lewtec/superfolha/internal/auth"
 	"github.com/lewtec/superfolha/internal/db"
-	"github.com/lewtec/superfolha/internal/git"
 )
 
 // Register is the resolver for the register field.
@@ -96,7 +95,7 @@ func (r *mutationResolver) CreateProject(ctx context.Context, name string) (*Pro
 		return nil, fmt.Errorf("failed to generate project ID: %w", err)
 	}
 	projectID := projectUUID.String()
-	projectPath := r.getProjectPath(projectID)
+	projectPath := r.projectService.GetProjectPath(projectID) // Use projectService
 
 	// Create project in database
 	q := db.New(r.DB)
@@ -140,13 +139,13 @@ func (r *mutationResolver) DeleteProject(ctx context.Context, id string) (bool, 
 
 // SaveFile is the resolver for the saveFile field.
 func (r *mutationResolver) SaveFile(ctx context.Context, projectID string, path string, content string) (*File, error) {
-	_, projectPath, _, err := r.getAndCheckProject(ctx, projectID)
+	_, _, _, err := r.getAndCheckProject(ctx, projectID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Write file to git repository
-	if err := git.WriteFile(projectPath, path, content); err != nil {
+	if err := r.projectService.SaveFile(projectID, path, content); err != nil {
 		return nil, fmt.Errorf("failed to write file: %w", err)
 	}
 
@@ -158,13 +157,13 @@ func (r *mutationResolver) SaveFile(ctx context.Context, projectID string, path 
 
 // DeleteFile is the resolver for the deleteFile field.
 func (r *mutationResolver) DeleteFile(ctx context.Context, projectID string, path string) (bool, error) {
-	_, projectPath, _, err := r.getAndCheckProject(ctx, projectID)
+	_, _, _, err := r.getAndCheckProject(ctx, projectID)
 	if err != nil {
 		return false, err
 	}
 
 	// Delete file from git repository
-	if err := git.DeleteFile(projectPath, path); err != nil {
+	if err := r.projectService.DeleteFile(projectID, path); err != nil {
 		return false, fmt.Errorf("failed to delete file: %w", err)
 	}
 
@@ -173,13 +172,13 @@ func (r *mutationResolver) DeleteFile(ctx context.Context, projectID string, pat
 
 // Commit is the resolver for the commit field.
 func (r *mutationResolver) Commit(ctx context.Context, projectID string, message string) (*Commit, error) {
-	project, projectPath, user, err := r.getAndCheckProject(ctx, projectID)
+	project, _, user, err := r.getAndCheckProject(ctx, projectID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Commit changes
-	commit, err := git.CommitChanges(projectPath, user.Email, message)
+	commit, err := r.projectService.CommitChanges(projectID, user.Email, message)
 	if err != nil {
 		return nil, fmt.Errorf("failed to commit changes: %w", err)
 	}
@@ -275,13 +274,13 @@ func (r *queryResolver) Project(ctx context.Context, id string) (*Project, error
 
 // Files is the resolver for the files field.
 func (r *queryResolver) Files(ctx context.Context, projectID string) ([]*File, error) {
-	_, projectPath, _, err := r.getAndCheckProject(ctx, projectID)
+	_, _, _, err := r.getAndCheckProject(ctx, projectID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get files from git repository
-	gitFiles, err := git.ListFiles(projectPath)
+	gitFiles, err := r.projectService.ListFiles(projectID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list files: %w", err)
 	}
@@ -299,13 +298,13 @@ func (r *queryResolver) Files(ctx context.Context, projectID string) ([]*File, e
 
 // File is the resolver for the file field.
 func (r *queryResolver) File(ctx context.Context, projectID string, path string) (*File, error) {
-	_, projectPath, _, err := r.getAndCheckProject(ctx, projectID)
+	_, _, _, err := r.getAndCheckProject(ctx, projectID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Read file from git repository
-	content, err := git.ReadFile(projectPath, path)
+	content, err := r.projectService.ReadFile(projectID, path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file: %w", err)
 	}
@@ -318,13 +317,13 @@ func (r *queryResolver) File(ctx context.Context, projectID string, path string)
 
 // History is the resolver for the history field.
 func (r *queryResolver) History(ctx context.Context, projectID string) ([]*Commit, error) {
-	_, projectPath, _, err := r.getAndCheckProject(ctx, projectID)
+	_, _, _, err := r.getAndCheckProject(ctx, projectID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get commit history from git repository
-	gitCommits, err := git.GetHistory(projectPath)
+	gitCommits, err := r.projectService.GetHistory(projectID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get history: %w", err)
 	}

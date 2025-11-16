@@ -10,6 +10,7 @@ import (
 	"path/filepath" // Added import for filepath
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/lewtec/superfolha/internal/project"
 	"github.com/lewtec/superfolha/internal/server"
 	"github.com/spf13/cobra"
 )
@@ -77,7 +78,8 @@ func runServer(cmd *cobra.Command, args []string) {
 	}
 
 	// Create server
-	srv := server.NewServer(dbpool, stateDir)
+	projectService := project.NewService(stateDir)
+	srv := server.NewServer(dbpool, stateDir, projectService)
 
 	// Start HTTP server
 	addr := fmt.Sprintf(":%s", port)

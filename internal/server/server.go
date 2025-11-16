@@ -2,146 +2,98 @@ package server
 
 import (
 	"encoding/json"
-	"log"
-
 	"io"
-
+	"log"
 	"net/http"
 
 	"github.com/99designs/gqlgen/graphql/handler"
-
 	"github.com/99designs/gqlgen/graphql/playground"
-
 	"github.com/lewtec/superfolha/internal/auth"
-
 	"github.com/lewtec/superfolha/internal/compiler"
-
 	"github.com/lewtec/superfolha/internal/db"
-
-	"github.com/lewtec/superfolha/internal/git" // Import git package
-
-	"os"
-
-	"path"
+	"github.com/lewtec/superfolha/internal/project" // Import project package
 )
 
 type Server struct {
-	db db.DBTX
-
-	stateDir string
-
-	resolver *Resolver
+	db             db.DBTX
+	stateDir       string
+	resolver       *Resolver
+	projectService *project.Service // Added projectService
 }
 
-func NewServer(db db.DBTX, stateDir string) *Server {
-
+func NewServer(db db.DBTX, stateDir string, projectService *project.Service) *Server {
 	return &Server{
-
-		db: db,
-
-		stateDir: stateDir,
-
-		resolver: NewResolver(db, stateDir),
+		db:             db,
+		stateDir:       stateDir,
+		resolver:       NewResolver(db, stateDir, projectService), // Pass projectService here
+		projectService: projectService,
 	}
-
 }
 
 func (s *Server) Handler() http.Handler {
-
 	mux := http.NewServeMux()
 
 	// GraphQL endpoint
-
 	srv := handler.NewDefaultServer(NewExecutableSchema(Config{Resolvers: s.resolver}))
-
 	mux.Handle("/api/graphql", auth.Middleware(srv))
 
 	// GraphQL Playground (for development)
-
 	mux.Handle("/playground", playground.Handler("GraphQL playground", "/api/graphql"))
 
 	// Compile endpoint
-
 	mux.HandleFunc("/api/compile", s.handleCompile)
 
 	// Upload file endpoint
-
 	mux.HandleFunc("/api/projects/{projectId}/upload-file", s.handleUploadFile)
 
 	// Serve Web App
-
 	mux.Handle("/", GetWebApp())
 
 	return mux
-
 }
 
 func (s *Server) handleCompile(w http.ResponseWriter, r *http.Request) {
-
 	if r.Method != http.MethodPost {
-
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(map[string]string{"message": "Method not allowed"})
 		return
-
 	}
 
 	// Parse multipart form
-
 	err := r.ParseMultipartForm(32 << 20) // 32 MB max
-
 	if err != nil {
-
-		http.Error(w, "Failed to parse form", http.StatusBadRequest)
-
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"message": "Failed to parse form"})
 		return
-
 	}
 
 	// Get tarball file
-
 	file, _, err := r.FormFile("tarball")
-
 	if err != nil {
-
-		http.Error(w, "Missing tarball file", http.StatusBadRequest)
-
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"message": "Missing tarball file"})
 		return
-
 	}
-
 	defer file.Close()
 
 	// Read tarball data
-
 	tarballData, err := io.ReadAll(file)
-
 	if err != nil {
-
-		http.Error(w, "Failed to read tarball", http.StatusBadRequest)
-
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"message": "Failed to read tarball"})
 		return
-
 	}
 
 	// Compile
-
 	result, err := compiler.Compile(tarballData)
-
 	if err != nil {
-
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
 		return
-
 	}
 
 	// Return JSON response
-
-	w.Header().Set("Content-Type", "application/json")
-
 	json.NewEncoder(w).Encode(result)
-
 }
 
 func (s *Server) handleUploadFile(w http.ResponseWriter, r *http.Request) {
@@ -184,35 +136,19 @@ func (s *Server) handleUploadFile(w http.ResponseWriter, r *http.Request) {
 
 	filePath := header.Filename // Use original filename as path for now
 
-	projectPath := path.Join(s.stateDir, "repos", projectIdStr)
-	fullFilePath := path.Join(projectPath, filePath)
-
-	// Ensure the directory exists
-	err = os.MkdirAll(path.Dir(fullFilePath), 0755)
+	// Use ProjectService to save the file
+	err = s.projectService.SaveFile(projectIdStr, filePath, string(fileContent))
 	if err != nil {
+		log.Printf("Error saving file %s to project %s: %v", filePath, projectIdStr, err)
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"message": "Failed to create directory"})
+		json.NewEncoder(w).Encode(map[string]string{"message": "Failed to save uploaded file"})
 		return
 	}
 
-	err = os.WriteFile(fullFilePath, fileContent, 0644)
+	// Use ProjectService to commit the change
+	_, err = s.projectService.CommitChanges(projectIdStr, "System", "Uploaded file: "+filePath) // Use a placeholder author
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"message": "Failed to write file"})
-		return
-	}
-
-	// Add and commit the change
-	err = git.AddAll(projectPath)
-	if err != nil {
-		log.Printf("Error staging file in project %s: %v", projectIdStr, err) // Added logging
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"message": "Failed to stage uploaded file"})
-		return
-	}
-
-	_, err = git.CommitChanges(projectPath, "System", "Uploaded file: "+filePath) // Use a placeholder author
-	if err != nil {
+		log.Printf("Error committing file %s to project %s: %v", filePath, projectIdStr, err)
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"message": "Failed to commit uploaded file"})
 		return
