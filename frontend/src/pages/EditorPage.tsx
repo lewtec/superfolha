@@ -4,7 +4,6 @@ import { useCommitProjectMutation } from "../hooks/useCommitProjectMutation";
 import { useDebounce } from "../hooks/useDebounce";
 import { useNavigate, useParams } from "react-router-dom";
 import { useGetProjectQuery } from "../hooks/useGetProjectQuery";
-import { useGetFilesQuery } from "../hooks/useGetFilesQuery";
 import { useCallback, useEffect, useState } from "react";
 import FileTree from "../components/FileTree";
 import Editor from "../components/Editor";
@@ -28,9 +27,7 @@ export default function EditorPage() {
 
   // All hooks must be called unconditionally before any returns
   const { project, ...projectQueryData } = useGetProjectQuery({ id: id! });
-  const { files: fetchedFiles, ...filesQueryData } = useGetFilesQuery({
-    projectId: id!,
-  });
+  const fetchedFiles = project?.files;
 
   const [files, setFiles] = useState<File[]>([]);
   const [currentFile, setCurrentFile] = useState<File | null>(null);
@@ -69,7 +66,7 @@ export default function EditorPage() {
   }, 10000);
 
   // Conditional return based on loading state - MUST be after all hooks are called
-  if (projectQueryData.loading || filesQueryData.loading) {
+  if (projectQueryData.loading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <span className="loading loading-spinner loading-lg"></span>

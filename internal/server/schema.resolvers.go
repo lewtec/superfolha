@@ -209,17 +209,87 @@ func (r *mutationResolver) Commit(ctx context.Context, projectID string, message
 
 // Files is the resolver for the files field.
 func (r *projectResolver) Files(ctx context.Context, obj *Project) ([]*File, error) {
-	panic(fmt.Errorf("not implemented: Files - files"))
+	// Get files from git repository
+	gitFiles, err := r.projectService.ListFiles(obj.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list files: %w", err)
+	}
+
+	files := make([]*File, len(gitFiles))
+	for i, f := range gitFiles {
+		isTooBig := f.Size > MaxGraphQLFileSize
+		files[i] = &File{
+			Path:     f.Path,
+			Content:  nil, // Content is not provided in this listing
+			Size:     int(f.Size),
+			IsTooBig: isTooBig,
+		}
+	}
+
+	return files, nil
 }
 
 // File is the resolver for the file field.
 func (r *projectResolver) File(ctx context.Context, obj *Project, path string) (*File, error) {
-	panic(fmt.Errorf("not implemented: File - file"))
+	// Read file from git repository
+	fileReader, fileSize, err := r.projectService.ReadFile(obj.ID, path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file: %w", err)
+	}
+	defer fileReader.Close() // Ensure the file reader is closed
+
+	isTooBig := fileSize > MaxGraphQLFileSize
+	var content *string // Use pointer to string for nullable content
+
+	// Read a small buffer to detect content type for binary check
+	var buf [512]byte
+	n, _ := io.ReadFull(fileReader, buf[:])
+	isBinary := HasBinary(buf[:n], path)
+
+	// Reset the reader to the beginning for full content reading if needed
+	if seeker, ok := fileReader.(io.ReadSeeker); ok {
+		seeker.Seek(0, io.SeekStart)
+	} else {
+		// This case should ideally not be hit for os.File
+		log.Printf("Warning: fileReader is not seekable for %s in GraphQL resolver", path)
+	}
+
+	if !isTooBig && !isBinary {
+		contentBytes, err := io.ReadAll(fileReader)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read file content: %w", err)
+		}
+		c := string(contentBytes)
+		content = &c
+	}
+
+	return &File{
+		Path:     path,
+		Content:  content,
+		Size:     int(fileSize),
+		IsTooBig: isTooBig || isBinary, // Consider binary files as "too big" for direct content display
+	}, nil
 }
 
 // History is the resolver for the history field.
 func (r *projectResolver) History(ctx context.Context, obj *Project) ([]*Commit, error) {
-	panic(fmt.Errorf("not implemented: History - history"))
+	// Get commit history from git repository
+	gitCommits, err := r.projectService.GetHistory(obj.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get history: %w", err)
+	}
+
+	commits := make([]*Commit, len(gitCommits))
+	for i, c := range gitCommits {
+		commits[i] = &Commit{
+			Hash:    c.Hash,
+			Message: c.Message,
+			Author:  c.Author,
+			Date:    c.Date,
+		}
+	}
+
+	return commits, nil
 }
 
 // Me is the resolver for the me field.
@@ -308,104 +378,3 @@ func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
 type mutationResolver struct{ *Resolver }
 type projectResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
-
-// !!! WARNING !!!
-// The code below was going to be deleted when updating resolvers. It has been copied here so you have
-// one last chance to move it out of harms way if you want. There are two reasons this happens:
-//   - When renaming or deleting a resolver the old code will be put in here. You can safely delete
-//     it when you're done.
-//   - You have helper methods in this file. Move them out to keep these resolver files clean.
-func (r *queryResolver) Files(ctx context.Context, projectID string) ([]*File, error) {
-	_, _, _, err := r.getAndCheckProject(ctx, projectID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Get files from git repository
-	gitFiles, err := r.projectService.ListFiles(projectID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list files: %w", err)
-	}
-
-	files := make([]*File, len(gitFiles))
-	for i, f := range gitFiles {
-		isTooBig := f.Size > MaxGraphQLFileSize
-		files[i] = &File{
-			Path:     f.Path,
-			Content:  nil, // Content is not provided in this listing
-			Size:     int(f.Size),
-			IsTooBig: isTooBig,
-		}
-	}
-
-	return files, nil
-}
-func (r *queryResolver) File(ctx context.Context, projectID string, path string) (*File, error) {
-	_, _, _, err := r.getAndCheckProject(ctx, projectID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Read file from git repository
-	fileReader, fileSize, err := r.projectService.ReadFile(projectID, path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read file: %w", err)
-	}
-	defer fileReader.Close() // Ensure the file reader is closed
-
-	isTooBig := fileSize > MaxGraphQLFileSize
-	var content *string // Use pointer to string for nullable content
-
-	// Read a small buffer to detect content type for binary check
-	var buf [512]byte
-	n, _ := io.ReadFull(fileReader, buf[:])
-	isBinary := HasBinary(buf[:n], path)
-
-	// Reset the reader to the beginning for full content reading if needed
-	if seeker, ok := fileReader.(io.ReadSeeker); ok {
-		seeker.Seek(0, io.SeekStart)
-	} else {
-		// This case should ideally not be hit for os.File
-		log.Printf("Warning: fileReader is not seekable for %s in GraphQL resolver", path)
-	}
-
-	if !isTooBig && !isBinary {
-		contentBytes, err := io.ReadAll(fileReader)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read file content: %w", err)
-		}
-		c := string(contentBytes)
-		content = &c
-	}
-
-	return &File{
-		Path:     path,
-		Content:  content,
-		Size:     int(fileSize),
-		IsTooBig: isTooBig || isBinary, // Consider binary files as "too big" for direct content display
-	}, nil
-}
-func (r *queryResolver) History(ctx context.Context, projectID string) ([]*Commit, error) {
-	_, _, _, err := r.getAndCheckProject(ctx, projectID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Get commit history from git repository
-	gitCommits, err := r.projectService.GetHistory(projectID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get history: %w", err)
-	}
-
-	commits := make([]*Commit, len(gitCommits))
-	for i, c := range gitCommits {
-		commits[i] = &Commit{
-			Hash:    c.Hash,
-			Message: c.Message,
-			Author:  c.Author,
-			Date:    c.Date,
-		}
-	}
-
-	return commits, nil
-}
