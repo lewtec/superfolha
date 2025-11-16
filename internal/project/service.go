@@ -1,11 +1,16 @@
 package project
 
 import (
+	"errors" // Import the errors package
 	"fmt"
+	"io" // Import the io package
 	"path/filepath"
 
 	igit "github.com/lewtec/superfolha/internal/git" // Reusing existing git types and functions
 )
+
+// ErrFileNotFound is returned when a requested file does not exist in the project.
+var ErrFileNotFound = errors.New("file not found")
 
 // Service provides project-related operations, encapsulating Git interactions.
 type Service struct {
@@ -65,12 +70,28 @@ func (s *Service) CommitChanges(projectId, author, message string) (*igit.Commit
 }
 
 // ReadFile reads a file from a project's repository.
-func (s *Service) ReadFile(projectId, filePath string) (string, error) {
+func (s *Service) ReadFile(projectId, filePath string) (io.ReadCloser, int64, error) {
 	pr, err := s.repoManager.GetRepo(projectId)
 	if err != nil {
-		return "", err
+		return nil, 0, err
 	}
-	return pr.ReadFile(filePath)
+	reader, size, err := pr.ReadFile(filePath)
+	if err != nil {
+		if errors.Is(err, igit.ErrGitFileNotFound) {
+			return nil, 0, ErrFileNotFound
+		}
+		return nil, 0, err
+	}
+	return reader, size, nil
+}
+
+// DecodeFilePath decodes a URL-encoded file path.
+func DecodeFilePath(encodedPath string) (string, error) {
+	// filepath.FromSlash returns only one value (the string result), not two.
+	// The error handling for filepath.FromSlash is incorrect.
+	decodedPath := filepath.FromSlash(encodedPath)
+	// No error is returned by filepath.FromSlash, so no error check needed here.
+	return decodedPath, nil
 }
 
 // ListFiles lists all files in a project's repository.

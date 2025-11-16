@@ -287,9 +287,12 @@ func (r *queryResolver) Files(ctx context.Context, projectID string) ([]*File, e
 
 	files := make([]*File, len(gitFiles))
 	for i, f := range gitFiles {
+		isTooBig := f.Size > MaxGraphQLFileSize
 		files[i] = &File{
-			Path:    f.Path,
-			Content: f.Content,
+			Path:     f.Path,
+			Content:  nil, // Content is not provided in this listing
+			Size:     int(f.Size),
+			IsTooBig: isTooBig,
 		}
 	}
 
@@ -304,14 +307,42 @@ func (r *queryResolver) File(ctx context.Context, projectID string, path string)
 	}
 
 	// Read file from git repository
-	content, err := r.projectService.ReadFile(projectID, path)
+	fileReader, fileSize, err := r.projectService.ReadFile(projectID, path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file: %w", err)
 	}
+	defer fileReader.Close() // Ensure the file reader is closed
+
+	isTooBig := fileSize > MaxGraphQLFileSize
+	var content *string // Use pointer to string for nullable content
+
+	// Read a small buffer to detect content type for binary check
+	var buf [512]byte
+	n, _ := io.ReadFull(fileReader, buf[:])
+	isBinary := HasBinary(buf[:n], path)
+
+	// Reset the reader to the beginning for full content reading if needed
+	if seeker, ok := fileReader.(io.ReadSeeker); ok {
+		seeker.Seek(0, io.SeekStart)
+	} else {
+		// This case should ideally not be hit for os.File
+		log.Printf("Warning: fileReader is not seekable for %s in GraphQL resolver", path)
+	}
+
+	if !isTooBig && !isBinary {
+		contentBytes, err := io.ReadAll(fileReader)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read file content: %w", err)
+		}
+		c := string(contentBytes)
+		content = &c
+	}
 
 	return &File{
-		Path:    path,
-		Content: content,
+		Path:     path,
+		Content:  content,
+		Size:     int(fileSize),
+		IsTooBig: isTooBig || isBinary, // Consider binary files as "too big" for direct content display
 	}, nil
 }
 

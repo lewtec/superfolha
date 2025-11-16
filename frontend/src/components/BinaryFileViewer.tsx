@@ -8,7 +8,15 @@ interface BinaryFileViewerProps {
 
 export default function BinaryFileViewer({ fileName, projectId }: BinaryFileViewerProps) {
   const handleDownload = () => {
-    const downloadUrl = `/api/projects/${projectId}/files/${fileName}/download`;
+    // Encode the fileName to handle slashes in the path correctly
+    const encodedFileName = encodeURIComponent(fileName);
+    const downloadUrl = `/api/projects/${projectId}/download/${encodedFileName}`;
+
+    console.log("Attempting to download from URL:", downloadUrl); // Debugging log
+
+    // Inform the user about the backend dependency
+    alert("Download initiated. Please ensure the backend route " + downloadUrl + " is correctly implemented to serve the file.");
+
     const a = document.createElement('a');
     a.href = downloadUrl;
     a.download = fileName; // Suggests the filename for download

@@ -40,9 +40,15 @@ type Commit struct {
 
 type FileInfo struct {
 
-	Path    string
 
-	Content string
+
+	Path string
+
+
+
+	Size int64
+
+
 
 }
 
@@ -308,53 +314,233 @@ func GetHistory(repoPath string) ([]*Commit, error) {
 
 
 
+// ErrGitFileNotFound is returned when a requested file does not exist in the git repository.
+
+
+
+var ErrGitFileNotFound = fmt.Errorf("file not found in git repository")
+
+
+
+
+
+
+
 // ReadFile reads a file from the repository
 
-func ReadFile(repoPath, filePath string) (string, error) {
+
+
+
+
+
+
+func ReadFile(repoPath, filePath string) (io.ReadCloser, int64, error) {
+
+
+
+
+
+
 
 	r, err := git.PlainOpen(repoPath)
 
+
+
+
+
+
+
 	if err != nil {
 
-		return "", fmt.Errorf("failed to open repository at %s: %w", repoPath, err)
+
+
+
+
+
+
+		return nil, 0, fmt.Errorf("failed to open repository at %s: %w", repoPath, err)
+
+
+
+
+
+
 
 	}
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
 	w, err := r.Worktree()
 
+
+
+
+
+
+
 	if err != nil {
 
-		return "", fmt.Errorf("failed to get worktree for repository at %s: %w", repoPath, err)
+
+
+
+
+
+
+		return nil, 0, fmt.Errorf("failed to get worktree for repository at %s: %w", repoPath, err)
+
+
+
+
+
+
 
 	}
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
 	file, err := w.Filesystem.Open(filePath)
 
-	if err != nil {
-
-		return "", fmt.Errorf("failed to open file %s: %w", filePath, err)
-
-	}
-
-	defer file.Close()
 
 
 
-	content, err := io.ReadAll(file)
+
+
 
 	if err != nil {
 
-		return "", fmt.Errorf("failed to read file %s: %w", filePath, err)
+
+
+
+
+
+
+		if os.IsNotExist(err) {
+
+
+
+
+
+
+
+			return nil, 0, ErrGitFileNotFound
+
+
+
+
+
+
+
+		}
+
+
+
+
+
+
+
+		return nil, 0, fmt.Errorf("failed to open file %s: %w", filePath, err)
+
+
+
+
+
+
 
 	}
 
 
 
-	return string(content), nil
+
+
+
+
+
+
+
+
+
+
+
+
+	fileInfo, err := file.Stat()
+
+
+
+
+
+
+
+	if err != nil {
+
+
+
+
+
+
+
+		file.Close() // Ensure file is closed on error
+
+
+
+
+
+
+
+		return nil, 0, fmt.Errorf("failed to get file info for %s: %w", filePath, err)
+
+
+
+
+
+
+
+	}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	return file, fileInfo.Size(), nil
+
+
+
+
+
+
 
 }
 
@@ -406,6 +592,10 @@ func ListFiles(repoPath string) ([]*FileInfo, error) {
 
 
 
+
+
+
+
 	// We are using filepath.WalkDir to list files on the filesystem, not the git index.
 
 
@@ -419,6 +609,10 @@ func ListFiles(repoPath string) ([]*FileInfo, error) {
 
 
 	var files []*FileInfo
+
+
+
+
 
 
 
@@ -506,7 +700,7 @@ func ListFiles(repoPath string) ([]*FileInfo, error) {
 
 
 
-		content, err := os.ReadFile(path)
+		info, err := d.Info()
 
 
 
@@ -530,11 +724,11 @@ func ListFiles(repoPath string) ([]*FileInfo, error) {
 
 
 
-			Path:    relPath,
+			Path: relPath,
 
 
 
-			Content: string(content),
+			Size: info.Size(),
 
 
 
@@ -551,6 +745,10 @@ func ListFiles(repoPath string) ([]*FileInfo, error) {
 
 
 	})
+
+
+
+
 
 
 

@@ -2,6 +2,7 @@ package project
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sync"
@@ -125,7 +126,7 @@ func (pr *ProjectRepository) DeleteFile(filePath string) error {
 }
 
 // ReadFile reads a file from the repository.
-func (pr *ProjectRepository) ReadFile(filePath string) (string, error) {
+func (pr *ProjectRepository) ReadFile(filePath string) (io.ReadCloser, int64, error) {
 	pr.Lock()
 	defer pr.Unlock()
 

@@ -20,9 +20,56 @@ import (
 //go:embed templates
 var templatesFS embed.FS
 
+// MaxGraphQLFileSize defines the maximum file size (in bytes) for content to be returned directly via GraphQL.
+const MaxGraphQLFileSize = 1024 * 1024 * 5 // 5 MB
+
+// File extensions typically associated with binary files that shouldn't be read as text
+var binaryExtensions = map[string]bool{
+	".pdf": true, ".png": true, ".jpg": true, ".jpeg": true, ".gif": true, ".bmp": true,
+	".zip": true, ".tar": true, ".gz": true, ".rar": true, ".7z": true, ".exe": true,
+	".dll": true, ".bin": true, ".mp3": true, ".wav": true, ".ogg": true, ".mp4": true,
+	".avi": true, ".mkv": true, ".mov": true, ".woff": true, ".tif": true, ".tiff": true,
+	".ico": true,
+}
+
+// HasBinary checks if the file content appears to be binary based on content sniff and extension.
+func HasBinary(content []byte, filename string) bool {
+	// Check by extension first for common binary types
+	ext := strings.ToLower(filepath.Ext(filename))
+	if binaryExtensions[ext] {
+		return true
+	}
+
+	// Sniff the content for binary data (null bytes or high density of non-printable chars)
+	// Only check the first 512 bytes for performance
+	sampleSize := len(content)
+	if sampleSize > 512 {
+		sampleSize = 512
+	}
+
+	nonPrintableCount := 0
+	for i := 0; i < sampleSize; i++ {
+		// Null byte indicates binary
+		if content[i] == 0 {
+			return true
+		}
+		// Count non-printable ASCII characters (excluding common whitespace)
+		if content[i] < 32 && content[i] != 9 && content[i] != 10 && content[i] != 13 {
+			nonPrintableCount++
+		}
+	}
+	// If more than 10% of the sample are non-printable, consider it binary
+	if sampleSize > 0 && float64(nonPrintableCount)/float64(sampleSize) > 0.1 {
+		return true
+	}
+
+	return false
+}
+
 // This file will not be regenerated automatically.
 //
 // It serves as dependency injection for your app, add any dependencies you require here.
+
 
 type Resolver struct {
 	DB             db.DBTX
