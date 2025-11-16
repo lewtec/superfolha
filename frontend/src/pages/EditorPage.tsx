@@ -1,10 +1,10 @@
+import { useGetFileContent } from "../hooks/useGetFileContentQuery";
 import { useSaveFileMutation } from "../hooks/useSaveFileMutation";
 import { useDeleteFileMutation } from "../hooks/useDeleteFileMutation";
 import { useCommitProjectMutation } from "../hooks/useCommitProjectMutation";
 import { useDebounce } from "../hooks/useDebounce";
 import { useNavigate, useParams } from "react-router-dom";
 import { useGetProjectQuery } from "../hooks/useGetProjectQuery";
-import { useGetFilesQuery } from "../hooks/useGetFilesQuery";
 import { useCallback, useEffect, useState } from "react";
 import FileTree from "../components/FileTree";
 import Editor from "../components/Editor";
@@ -28,9 +28,8 @@ export default function EditorPage() {
 
   // All hooks must be called unconditionally before any returns
   const { project, ...projectQueryData } = useGetProjectQuery({ id: id! });
-  const { files: fetchedFiles, ...filesQueryData } = useGetFilesQuery({
-    projectId: id!,
-  });
+  const fetchedFiles = project?.files;
+  const { getFileContent } = useGetFileContent();
 
   const [files, setFiles] = useState<File[]>([]);
   const [currentFile, setCurrentFile] = useState<File | null>(null);
@@ -69,7 +68,7 @@ export default function EditorPage() {
   }, 10000);
 
   // Conditional return based on loading state - MUST be after all hooks are called
-  if (projectQueryData.loading || filesQueryData.loading) {
+  if (projectQueryData.loading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <span className="loading loading-spinner loading-lg"></span>
@@ -77,29 +76,35 @@ export default function EditorPage() {
     );
   }
 
+  const handleFileSelect = useCallback(async (path: string) => {
+    const file = files.find((f) => f.path === path);
+    if (file) {
+      if (file.content == null && !file.isBinary) {
+        const response = await getFileContent({ id: id!, path });
+        const content = response?.project?.file?.content;
+        const updatedFile = { ...file, content };
+        setFiles(files.map(f => f.path === path ? updatedFile : f));
+        setCurrentFile(updatedFile);
+      } else {
+        setCurrentFile(file);
+      }
+    }
+  }, [files, getFileContent, id]);
+
   useEffect(() => {
     if (fetchedFiles) {
       const initialFiles: File[] = (fetchedFiles as any[]).map(file => { // Use any[] for fetchedFiles to access new fields
-        let isBinary = false;
-        if (file.content === null) {
-          // If content is null, it's either too big or binary (as per backend logic)
-          isBinary = file.isTooBig;
-        } else {
-          // If content is present, use client-side heuristic
-          isBinary = isBinaryContent(file.content, file.path);
-        }
-
         return {
           ...file,
           isDirty: false, // Initialize isDirty to false
-          isBinary: isBinary,
+          isBinary: file.isBinary,
           size: file.size, // Map size from GraphQL response
           isTooBig: file.isTooBig, // Map isTooBig from GraphQL response
         };
       });
       setFiles(initialFiles);
       if (initialFiles.length > 0) {
-        setCurrentFile(initialFiles[0]);
+        handleFileSelect(initialFiles[0].path)
       } else {
         setCurrentFile(null);
       }
@@ -195,15 +200,7 @@ export default function EditorPage() {
     [id, deleteFile, currentFile, files],
   );
 
-  const handleFileSelect = useCallback((path: string) => {
-    setFiles((prevFiles) => {
-      const file = prevFiles.find((f) => f.path === path);
-      if (file) {
-        setCurrentFile(file);
-      }
-      return prevFiles;
-    });
-  }, []);
+
 
   const handleNewFile = useCallback(() => {
     const fileName = prompt("Enter file name:");

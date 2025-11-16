@@ -156,11 +156,13 @@ func (r *mutationResolver) SaveFile(ctx context.Context, projectID string, path 
 	// The actual size and binary status would be determined by a subsequent fetch.
 	// Here, we're just reflecting the saved state.
 	contentPtr := &content // Convert string to *string
+	isBinary := HasBinary([]byte(content), path)
 	return &File{
 		Path:     path,
 		Content:  contentPtr,
-		Size:     len(content),                                                          // Approximate size for the saved content
-		IsTooBig: len(content) > MaxGraphQLFileSize || HasBinary([]byte(content), path), // Heuristic for saved content
+		Size:     len(content), // Approximate size for the saved content
+		IsTooBig: len(content) > MaxGraphQLFileSize,
+		IsBinary: isBinary,
 	}, nil
 }
 
@@ -205,6 +207,104 @@ func (r *mutationResolver) Commit(ctx context.Context, projectID string, message
 		Author:  commit.Author,
 		Date:    commit.Date,
 	}, nil
+}
+
+// Files is the resolver for the files field.
+func (r *projectResolver) Files(ctx context.Context, obj *Project) ([]*File, error) {
+	// Get files from git repository
+	gitFiles, err := r.projectService.ListFiles(obj.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list files: %w", err)
+	}
+
+	files := make([]*File, len(gitFiles))
+	for i, f := range gitFiles {
+		isTooBig := f.Size > MaxGraphQLFileSize
+
+		fileReader, _, err := r.projectService.ReadFile(obj.ID, f.Path)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read file for binary check: %w", err)
+		}
+		defer fileReader.Close()
+
+		var buf [512]byte
+		n, _ := io.ReadFull(fileReader, buf[:])
+		isBinary := HasBinary(buf[:n], f.Path)
+
+		files[i] = &File{
+			Path:     f.Path,
+			Content:  nil, // Content is not provided in this listing
+			Size:     int(f.Size),
+			IsTooBig: isTooBig,
+			IsBinary: isBinary,
+		}
+	}
+
+	return files, nil
+}
+
+// File is the resolver for the file field.
+func (r *projectResolver) File(ctx context.Context, obj *Project, path string) (*File, error) {
+	// Read file from git repository
+	fileReader, fileSize, err := r.projectService.ReadFile(obj.ID, path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file: %w", err)
+	}
+	defer fileReader.Close() // Ensure the file reader is closed
+
+	isTooBig := fileSize > MaxGraphQLFileSize
+	var content *string // Use pointer to string for nullable content
+
+	// Read a small buffer to detect content type for binary check
+	var buf [512]byte
+	n, _ := io.ReadFull(fileReader, buf[:])
+	isBinary := HasBinary(buf[:n], path)
+
+	// Reset the reader to the beginning for full content reading if needed
+	if seeker, ok := fileReader.(io.ReadSeeker); ok {
+		seeker.Seek(0, io.SeekStart)
+	} else {
+		// This case should ideally not be hit for os.File
+		log.Printf("Warning: fileReader is not seekable for %s in GraphQL resolver", path)
+	}
+
+	if !isTooBig && !isBinary {
+		contentBytes, err := io.ReadAll(fileReader)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read file content: %w", err)
+		}
+		c := string(contentBytes)
+		content = &c
+	}
+
+	return &File{
+		Path:     path,
+		Content:  content,
+		Size:     int(fileSize),
+		IsTooBig: isTooBig,
+		IsBinary: isBinary,
+	}, nil
+}
+
+// History is the resolver for the history field.
+func (r *projectResolver) History(ctx context.Context, obj *Project) ([]*Commit, error) {
+	// Get commit history from git repository
+	gitCommits, err := r.projectService.GetHistory(obj.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get history: %w", err)
+	}
+
+	commits := make([]*Commit, len(gitCommits))
+	for i, c := range gitCommits {
+		commits[i] = &Commit{
+			Hash:    c.Hash,
+			Message: c.Message,
+			Author:  c.Author,
+			Date:    c.Date,
+		}
+	}
+
+	return commits, nil
 }
 
 // Me is the resolver for the me field.
@@ -281,111 +381,15 @@ func (r *queryResolver) Project(ctx context.Context, id string) (*Project, error
 	}, nil
 }
 
-// Files is the resolver for the files field.
-func (r *queryResolver) Files(ctx context.Context, projectID string) ([]*File, error) {
-	_, _, _, err := r.getAndCheckProject(ctx, projectID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Get files from git repository
-	gitFiles, err := r.projectService.ListFiles(projectID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list files: %w", err)
-	}
-
-	files := make([]*File, len(gitFiles))
-	for i, f := range gitFiles {
-		isTooBig := f.Size > MaxGraphQLFileSize
-		files[i] = &File{
-			Path:     f.Path,
-			Content:  nil, // Content is not provided in this listing
-			Size:     int(f.Size),
-			IsTooBig: isTooBig,
-		}
-	}
-
-	return files, nil
-}
-
-// File is the resolver for the file field.
-func (r *queryResolver) File(ctx context.Context, projectID string, path string) (*File, error) {
-	_, _, _, err := r.getAndCheckProject(ctx, projectID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Read file from git repository
-	fileReader, fileSize, err := r.projectService.ReadFile(projectID, path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read file: %w", err)
-	}
-	defer fileReader.Close() // Ensure the file reader is closed
-
-	isTooBig := fileSize > MaxGraphQLFileSize
-	var content *string // Use pointer to string for nullable content
-
-	// Read a small buffer to detect content type for binary check
-	var buf [512]byte
-	n, _ := io.ReadFull(fileReader, buf[:])
-	isBinary := HasBinary(buf[:n], path)
-
-	// Reset the reader to the beginning for full content reading if needed
-	if seeker, ok := fileReader.(io.ReadSeeker); ok {
-		seeker.Seek(0, io.SeekStart)
-	} else {
-		// This case should ideally not be hit for os.File
-		log.Printf("Warning: fileReader is not seekable for %s in GraphQL resolver", path)
-	}
-
-	if !isTooBig && !isBinary {
-		contentBytes, err := io.ReadAll(fileReader)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read file content: %w", err)
-		}
-		c := string(contentBytes)
-		content = &c
-	}
-
-	return &File{
-		Path:     path,
-		Content:  content,
-		Size:     int(fileSize),
-		IsTooBig: isTooBig || isBinary, // Consider binary files as "too big" for direct content display
-	}, nil
-}
-
-// History is the resolver for the history field.
-func (r *queryResolver) History(ctx context.Context, projectID string) ([]*Commit, error) {
-	_, _, _, err := r.getAndCheckProject(ctx, projectID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Get commit history from git repository
-	gitCommits, err := r.projectService.GetHistory(projectID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get history: %w", err)
-	}
-
-	commits := make([]*Commit, len(gitCommits))
-	for i, c := range gitCommits {
-		commits[i] = &Commit{
-			Hash:    c.Hash,
-			Message: c.Message,
-			Author:  c.Author,
-			Date:    c.Date,
-		}
-	}
-
-	return commits, nil
-}
-
 // Mutation returns MutationResolver implementation.
 func (r *Resolver) Mutation() MutationResolver { return &mutationResolver{r} }
+
+// Project returns ProjectResolver implementation.
+func (r *Resolver) Project() ProjectResolver { return &projectResolver{r} }
 
 // Query returns QueryResolver implementation.
 func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
 
 type mutationResolver struct{ *Resolver }
+type projectResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }

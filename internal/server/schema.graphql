@@ -1,51 +1,53 @@
 scalar Time
 
 type User {
-  id: ID!
-  email: String!
+    id: ID!
+    email: String!
 }
 
 type Project {
-  id: ID!
-  name: String!
-  createdAt: Time!
-  updatedAt: Time!
+    id: ID!
+    name: String!
+    createdAt: Time!
+    updatedAt: Time!
+
+    files: [File!]!
+    file(path: String!): File
+    history: [Commit!]!
 }
 
 type File {
-  path: String!
-  content: String
-  size: Int!
-  isTooBig: Boolean!
+    path: String!
+    content: String
+    size: Int!
+    isTooBig: Boolean!
+    isBinary: Boolean!
 }
 
 type Commit {
-  hash: String!
-  message: String!
-  author: String!
-  date: Time!
+    hash: String!
+    message: String!
+    author: String!
+    date: Time!
 }
 
 type Query {
-  me: User
-  projects: [Project!]!
-  project(id: ID!): Project
-  files(projectId: ID!): [File!]!
-  file(projectId: ID!, path: String!): File
-  history(projectId: ID!): [Commit!]!
+    me: User
+    projects: [Project!]!
+    project(id: ID!): Project
 }
 
 type Mutation {
-  register(email: String!, password: String!): AuthPayload!
-  login(email: String!, password: String!): AuthPayload!
-  createProject(name: String!): Project!
-  deleteProject(id: ID!): Boolean!
-  saveFile(projectId: ID!, path: String!, content: String!): File!
-  deleteFile(projectId: ID!, path: String!): Boolean!
-  commit(projectId: ID!, message: String!): Commit!
+    register(email: String!, password: String!): AuthPayload!
+    login(email: String!, password: String!): AuthPayload!
+    createProject(name: String!): Project!
+    deleteProject(id: ID!): Boolean!
+    saveFile(projectId: ID!, path: String!, content: String!): File!
+    deleteFile(projectId: ID!, path: String!): Boolean!
+    commit(projectId: ID!, message: String!): Commit!
 }
 
 type AuthPayload {
-  token: String!
-  user: User!
+    token: String!
+    user: User!
 }

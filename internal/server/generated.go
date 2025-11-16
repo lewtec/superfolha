@@ -40,6 +40,7 @@ type Config struct {
 
 type ResolverRoot interface {
 	Mutation() MutationResolver
+	Project() ProjectResolver
 	Query() QueryResolver
 }
 
@@ -78,15 +79,15 @@ type ComplexityRoot struct {
 
 	Project struct {
 		CreatedAt func(childComplexity int) int
+		File      func(childComplexity int, path string) int
+		Files     func(childComplexity int) int
+		History   func(childComplexity int) int
 		ID        func(childComplexity int) int
 		Name      func(childComplexity int) int
 		UpdatedAt func(childComplexity int) int
 	}
 
 	Query struct {
-		File     func(childComplexity int, projectID string, path string) int
-		Files    func(childComplexity int, projectID string) int
-		History  func(childComplexity int, projectID string) int
 		Me       func(childComplexity int) int
 		Project  func(childComplexity int, id string) int
 		Projects func(childComplexity int) int
@@ -107,13 +108,15 @@ type MutationResolver interface {
 	DeleteFile(ctx context.Context, projectID string, path string) (bool, error)
 	Commit(ctx context.Context, projectID string, message string) (*Commit, error)
 }
+type ProjectResolver interface {
+	Files(ctx context.Context, obj *Project) ([]*File, error)
+	File(ctx context.Context, obj *Project, path string) (*File, error)
+	History(ctx context.Context, obj *Project) ([]*Commit, error)
+}
 type QueryResolver interface {
 	Me(ctx context.Context) (*User, error)
 	Projects(ctx context.Context) ([]*Project, error)
 	Project(ctx context.Context, id string) (*Project, error)
-	Files(ctx context.Context, projectID string) ([]*File, error)
-	File(ctx context.Context, projectID string, path string) (*File, error)
-	History(ctx context.Context, projectID string) ([]*Commit, error)
 }
 
 type executableSchema struct {
@@ -296,6 +299,32 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Project.CreatedAt(childComplexity), true
 
+	case "Project.file":
+		if e.complexity.Project.File == nil {
+			break
+		}
+
+		args, err := ec.field_Project_file_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Project.File(childComplexity, args["path"].(string)), true
+
+	case "Project.files":
+		if e.complexity.Project.Files == nil {
+			break
+		}
+
+		return e.complexity.Project.Files(childComplexity), true
+
+	case "Project.history":
+		if e.complexity.Project.History == nil {
+			break
+		}
+
+		return e.complexity.Project.History(childComplexity), true
+
 	case "Project.id":
 		if e.complexity.Project.ID == nil {
 			break
@@ -316,42 +345,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Project.UpdatedAt(childComplexity), true
-
-	case "Query.file":
-		if e.complexity.Query.File == nil {
-			break
-		}
-
-		args, err := ec.field_Query_file_args(context.TODO(), rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Query.File(childComplexity, args["projectId"].(string), args["path"].(string)), true
-
-	case "Query.files":
-		if e.complexity.Query.Files == nil {
-			break
-		}
-
-		args, err := ec.field_Query_files_args(context.TODO(), rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Query.Files(childComplexity, args["projectId"].(string)), true
-
-	case "Query.history":
-		if e.complexity.Query.History == nil {
-			break
-		}
-
-		args, err := ec.field_Query_history_args(context.TODO(), rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Query.History(childComplexity, args["projectId"].(string)), true
 
 	case "Query.me":
 		if e.complexity.Query.Me == nil {
@@ -675,6 +668,21 @@ func (ec *executionContext) field_Mutation_saveFile_args(ctx context.Context, ra
 	return args, nil
 }
 
+func (ec *executionContext) field_Project_file_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["path"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("path"))
+		arg0, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["path"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -687,60 +695,6 @@ func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs
 		}
 	}
 	args["name"] = arg0
-	return args, nil
-}
-
-func (ec *executionContext) field_Query_file_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-	args := map[string]interface{}{}
-	var arg0 string
-	if tmp, ok := rawArgs["projectId"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("projectId"))
-		arg0, err = ec.unmarshalNID2string(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["projectId"] = arg0
-	var arg1 string
-	if tmp, ok := rawArgs["path"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("path"))
-		arg1, err = ec.unmarshalNString2string(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["path"] = arg1
-	return args, nil
-}
-
-func (ec *executionContext) field_Query_files_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-	args := map[string]interface{}{}
-	var arg0 string
-	if tmp, ok := rawArgs["projectId"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("projectId"))
-		arg0, err = ec.unmarshalNID2string(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["projectId"] = arg0
-	return args, nil
-}
-
-func (ec *executionContext) field_Query_history_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-	args := map[string]interface{}{}
-	var arg0 string
-	if tmp, ok := rawArgs["projectId"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("projectId"))
-		arg0, err = ec.unmarshalNID2string(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["projectId"] = arg0
 	return args, nil
 }
 
@@ -1409,6 +1363,12 @@ func (ec *executionContext) fieldContext_Mutation_createProject(ctx context.Cont
 				return ec.fieldContext_Project_createdAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_Project_updatedAt(ctx, field)
+			case "files":
+				return ec.fieldContext_Project_files(ctx, field)
+			case "file":
+				return ec.fieldContext_Project_file(ctx, field)
+			case "history":
+				return ec.fieldContext_Project_history(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Project", field.Name)
 		},
@@ -1843,6 +1803,176 @@ func (ec *executionContext) fieldContext_Project_updatedAt(ctx context.Context, 
 	return fc, nil
 }
 
+func (ec *executionContext) _Project_files(ctx context.Context, field graphql.CollectedField, obj *Project) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Project_files(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Project().Files(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*File)
+	fc.Result = res
+	return ec.marshalNFile2ᚕᚖgithubᚗcomᚋlewtecᚋsuperfolhaᚋinternalᚋserverᚐFileᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Project_files(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Project",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "path":
+				return ec.fieldContext_File_path(ctx, field)
+			case "content":
+				return ec.fieldContext_File_content(ctx, field)
+			case "size":
+				return ec.fieldContext_File_size(ctx, field)
+			case "isTooBig":
+				return ec.fieldContext_File_isTooBig(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type File", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Project_file(ctx context.Context, field graphql.CollectedField, obj *Project) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Project_file(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Project().File(rctx, obj, fc.Args["path"].(string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*File)
+	fc.Result = res
+	return ec.marshalOFile2ᚖgithubᚗcomᚋlewtecᚋsuperfolhaᚋinternalᚋserverᚐFile(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Project_file(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Project",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "path":
+				return ec.fieldContext_File_path(ctx, field)
+			case "content":
+				return ec.fieldContext_File_content(ctx, field)
+			case "size":
+				return ec.fieldContext_File_size(ctx, field)
+			case "isTooBig":
+				return ec.fieldContext_File_isTooBig(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type File", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Project_file_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Project_history(ctx context.Context, field graphql.CollectedField, obj *Project) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Project_history(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Project().History(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*Commit)
+	fc.Result = res
+	return ec.marshalNCommit2ᚕᚖgithubᚗcomᚋlewtecᚋsuperfolhaᚋinternalᚋserverᚐCommitᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Project_history(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Project",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "hash":
+				return ec.fieldContext_Commit_hash(ctx, field)
+			case "message":
+				return ec.fieldContext_Commit_message(ctx, field)
+			case "author":
+				return ec.fieldContext_Commit_author(ctx, field)
+			case "date":
+				return ec.fieldContext_Commit_date(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Commit", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_me(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Query_me(ctx, field)
 	if err != nil {
@@ -1937,6 +2067,12 @@ func (ec *executionContext) fieldContext_Query_projects(ctx context.Context, fie
 				return ec.fieldContext_Project_createdAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_Project_updatedAt(ctx, field)
+			case "files":
+				return ec.fieldContext_Project_files(ctx, field)
+			case "file":
+				return ec.fieldContext_Project_file(ctx, field)
+			case "history":
+				return ec.fieldContext_Project_history(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Project", field.Name)
 		},
@@ -1988,6 +2124,12 @@ func (ec *executionContext) fieldContext_Query_project(ctx context.Context, fiel
 				return ec.fieldContext_Project_createdAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_Project_updatedAt(ctx, field)
+			case "files":
+				return ec.fieldContext_Project_files(ctx, field)
+			case "file":
+				return ec.fieldContext_Project_file(ctx, field)
+			case "history":
+				return ec.fieldContext_Project_history(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Project", field.Name)
 		},
@@ -2000,198 +2142,6 @@ func (ec *executionContext) fieldContext_Query_project(ctx context.Context, fiel
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_project_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Query_files(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Query_files(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().Files(rctx, fc.Args["projectId"].(string))
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.([]*File)
-	fc.Result = res
-	return ec.marshalNFile2ᚕᚖgithubᚗcomᚋlewtecᚋsuperfolhaᚋinternalᚋserverᚐFileᚄ(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Query_files(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Query",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "path":
-				return ec.fieldContext_File_path(ctx, field)
-			case "content":
-				return ec.fieldContext_File_content(ctx, field)
-			case "size":
-				return ec.fieldContext_File_size(ctx, field)
-			case "isTooBig":
-				return ec.fieldContext_File_isTooBig(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type File", field.Name)
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Query_files_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Query_file(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Query_file(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().File(rctx, fc.Args["projectId"].(string), fc.Args["path"].(string))
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*File)
-	fc.Result = res
-	return ec.marshalOFile2ᚖgithubᚗcomᚋlewtecᚋsuperfolhaᚋinternalᚋserverᚐFile(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Query_file(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Query",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "path":
-				return ec.fieldContext_File_path(ctx, field)
-			case "content":
-				return ec.fieldContext_File_content(ctx, field)
-			case "size":
-				return ec.fieldContext_File_size(ctx, field)
-			case "isTooBig":
-				return ec.fieldContext_File_isTooBig(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type File", field.Name)
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Query_file_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Query_history(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Query_history(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().History(rctx, fc.Args["projectId"].(string))
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.([]*Commit)
-	fc.Result = res
-	return ec.marshalNCommit2ᚕᚖgithubᚗcomᚋlewtecᚋsuperfolhaᚋinternalᚋserverᚐCommitᚄ(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Query_history(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Query",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "hash":
-				return ec.fieldContext_Commit_hash(ctx, field)
-			case "message":
-				return ec.fieldContext_Commit_message(ctx, field)
-			case "author":
-				return ec.fieldContext_Commit_author(ctx, field)
-			case "date":
-				return ec.fieldContext_Commit_date(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type Commit", field.Name)
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Query_history_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -4450,23 +4400,128 @@ func (ec *executionContext) _Project(ctx context.Context, sel ast.SelectionSet, 
 		case "id":
 			out.Values[i] = ec._Project_id(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "name":
 			out.Values[i] = ec._Project_name(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "createdAt":
 			out.Values[i] = ec._Project_createdAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "updatedAt":
 			out.Values[i] = ec._Project_updatedAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
+		case "files":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Project_files(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "file":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Project_file(ctx, field, obj)
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "history":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Project_history(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -4560,69 +4615,6 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_project(ctx, field)
-				return res
-			}
-
-			rrm := func(ctx context.Context) graphql.Marshaler {
-				return ec.OperationContext.RootResolverMiddleware(ctx,
-					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
-		case "files":
-			field := field
-
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Query_files(ctx, field)
-				if res == graphql.Null {
-					atomic.AddUint32(&fs.Invalids, 1)
-				}
-				return res
-			}
-
-			rrm := func(ctx context.Context) graphql.Marshaler {
-				return ec.OperationContext.RootResolverMiddleware(ctx,
-					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
-		case "file":
-			field := field
-
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Query_file(ctx, field)
-				return res
-			}
-
-			rrm := func(ctx context.Context) graphql.Marshaler {
-				return ec.OperationContext.RootResolverMiddleware(ctx,
-					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
-		case "history":
-			field := field
-
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Query_history(ctx, field)
-				if res == graphql.Null {
-					atomic.AddUint32(&fs.Invalids, 1)
-				}
 				return res
 			}
 

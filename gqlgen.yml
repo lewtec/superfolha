@@ -32,3 +32,5 @@ models:
   Time:
     model:
       - github.com/lewtec/superfolha/internal/server.Time
+  Project:
+    model: "github.com/lewtec/superfolha/internal/server.Project"

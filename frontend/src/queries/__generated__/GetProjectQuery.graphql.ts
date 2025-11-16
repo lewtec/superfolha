@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<6e51401fcef9bcc1ebb3cfde84ac77fa>>
+ * @generated SignedSource<<3e71b58b0655c03e8503d481ae805474>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -14,6 +14,18 @@ export type GetProjectQuery$variables = {
 };
 export type GetProjectQuery$data = {
   readonly project: {
+    readonly files: ReadonlyArray<{
+      readonly content: string | null | undefined;
+      readonly isTooBig: boolean;
+      readonly path: string;
+      readonly size: number;
+    }>;
+    readonly history: ReadonlyArray<{
+      readonly author: string;
+      readonly date: any;
+      readonly hash: string;
+      readonly message: string;
+    }>;
     readonly id: string;
     readonly name: string;
   } | null | undefined;
@@ -59,6 +71,84 @@ v1 = [
         "kind": "ScalarField",
         "name": "name",
         "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
+        "concreteType": "File",
+        "kind": "LinkedField",
+        "name": "files",
+        "plural": true,
+        "selections": [
+          {
+            "alias": null,
+            "args": null,
+            "kind": "ScalarField",
+            "name": "path",
+            "storageKey": null
+          },
+          {
+            "alias": null,
+            "args": null,
+            "kind": "ScalarField",
+            "name": "content",
+            "storageKey": null
+          },
+          {
+            "alias": null,
+            "args": null,
+            "kind": "ScalarField",
+            "name": "size",
+            "storageKey": null
+          },
+          {
+            "alias": null,
+            "args": null,
+            "kind": "ScalarField",
+            "name": "isTooBig",
+            "storageKey": null
+          }
+        ],
+        "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
+        "concreteType": "Commit",
+        "kind": "LinkedField",
+        "name": "history",
+        "plural": true,
+        "selections": [
+          {
+            "alias": null,
+            "args": null,
+            "kind": "ScalarField",
+            "name": "hash",
+            "storageKey": null
+          },
+          {
+            "alias": null,
+            "args": null,
+            "kind": "ScalarField",
+            "name": "message",
+            "storageKey": null
+          },
+          {
+            "alias": null,
+            "args": null,
+            "kind": "ScalarField",
+            "name": "author",
+            "storageKey": null
+          },
+          {
+            "alias": null,
+            "args": null,
+            "kind": "ScalarField",
+            "name": "date",
+            "storageKey": null
+          }
+        ],
+        "storageKey": null
       }
     ],
     "storageKey": null
@@ -82,16 +172,16 @@ return {
     "selections": (v1/*: any*/)
   },
   "params": {
-    "cacheID": "d4a795c593588aad1587244e37809323",
+    "cacheID": "047dad5e0d7d659a90c2e20a69090e10",
     "id": null,
     "metadata": {},
     "name": "GetProjectQuery",
     "operationKind": "query",
-    "text": "query GetProjectQuery(\n  $id: ID!\n) {\n  project(id: $id) {\n    id\n    name\n  }\n}\n"
+    "text": "query GetProjectQuery(\n  $id: ID!\n) {\n  project(id: $id) {\n    id\n    name\n    files {\n      path\n      content\n      size\n      isTooBig\n    }\n    history {\n      hash\n      message\n      author\n      date\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "1dba6bdeef383b99296125783c8491c1";
+(node as any).hash = "21450e786cf568d81833e46a998b4c6d";
 
 export default node;

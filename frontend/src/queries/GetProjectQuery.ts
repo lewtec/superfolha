@@ -5,6 +5,19 @@ export default graphql`
     project(id: $id) {
       id
       name
+      files {
+        path
+        content
+        size
+        isTooBig
+        isBinary
+      }
+      history {
+        hash
+        message
+        author
+        date
+      }
     }
   }
 `;
