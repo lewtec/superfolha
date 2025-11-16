@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"log"
 
 	"io"
 
@@ -144,125 +145,78 @@ func (s *Server) handleCompile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleUploadFile(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 
 	if r.Method != http.MethodPost {
-
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(map[string]string{"message": "Method not allowed"})
 		return
-
 	}
 
 	projectIdStr := r.PathValue("projectId")
-
 	if projectIdStr == "" {
-
-		http.Error(w, "Missing project ID", http.StatusBadRequest)
-
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"message": "Missing project ID"})
 		return
-
 	}
 
 	err := r.ParseMultipartForm(32 << 20) // 32 MB max
-
 	if err != nil {
-
-		http.Error(w, "Failed to parse form", http.StatusBadRequest)
-
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"message": "Failed to parse form"})
 		return
-
 	}
 
 	file, header, err := r.FormFile("file")
-
 	if err != nil {
-
-		http.Error(w, "Missing file", http.StatusBadRequest)
-
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"message": "Missing file"})
 		return
-
 	}
-
 	defer file.Close()
 
 	fileContent, err := io.ReadAll(file)
-
 	if err != nil {
-
-		http.Error(w, "Failed to read file content", http.StatusInternalServerError)
-
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"message": "Failed to read file content"})
 		return
-
 	}
 
 	filePath := header.Filename // Use original filename as path for now
 
-	// Save the file using git.SaveFile
-
-	// This requires a context and user ID, which are not directly available here.
-
-	// For now, let's directly write to the stateDir and then commit.
-
-	// A more robust solution would involve refactoring the git.SaveFile to accept project ID and file content.
-
 	projectPath := path.Join(s.stateDir, projectIdStr)
-
 	fullFilePath := path.Join(projectPath, filePath)
 
 	// Ensure the directory exists
-
 	err = os.MkdirAll(path.Dir(fullFilePath), 0755)
-
 	if err != nil {
-
-		http.Error(w, "Failed to create directory", http.StatusInternalServerError)
-
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"message": "Failed to create directory"})
 		return
-
 	}
 
 	err = os.WriteFile(fullFilePath, fileContent, 0644)
-
 	if err != nil {
-
-		http.Error(w, "Failed to write file", http.StatusInternalServerError)
-
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"message": "Failed to write file"})
 		return
-
 	}
 
-	// Commit the change
-
-	// This also requires a context and user ID.
-
-	// For simplicity, let's assume a generic commit message and user for now.
-
-	// A proper solution would integrate with the existing git.Commit logic.
-
 	// Add and commit the change
-
 	err = git.AddAll(projectPath)
-
 	if err != nil {
-
-		http.Error(w, "Failed to stage uploaded file", http.StatusInternalServerError)
-
+		log.Printf("Error staging file in project %s: %v", projectIdStr, err) // Added logging
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"message": "Failed to stage uploaded file"})
 		return
-
 	}
 
 	_, err = git.CommitChanges(projectPath, "System", "Uploaded file: "+filePath) // Use a placeholder author
-
 	if err != nil {
-
-		http.Error(w, "Failed to commit uploaded file", http.StatusInternalServerError)
-
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"message": "Failed to commit uploaded file"})
 		return
-
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-
 	json.NewEncoder(w).Encode(map[string]string{"message": "File uploaded successfully", "path": filePath})
-
 }

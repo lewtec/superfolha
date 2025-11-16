@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath" // Added import for filepath
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lewtec/superfolha/internal/server"
@@ -65,6 +66,12 @@ func runServer(cmd *cobra.Command, args []string) {
 	}
 
 	// Create state directory
+	absStateDir, err := filepath.Abs(stateDir)
+	if err != nil {
+		log.Fatalf("Failed to get absolute path for state directory %s: %v", stateDir, err)
+	}
+	stateDir = absStateDir
+
 	if err := os.MkdirAll(stateDir, 0755); err != nil {
 		log.Fatalf("Failed to create state directory: %v", err)
 	}
