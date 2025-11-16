@@ -14,6 +14,14 @@ body {
     height: 100%;
 }
 
+.cm-gutters,
+.cm-lineNumbers,
+.cm-gutterElement {
+    color: var(--base-content) !important;
+    background-color: var(--color-base-100) !important;
+    border-color: var(--color-base-200) !important;
+}
+
 .editor-container {
     height: calc(100vh - 64px);
 }
