@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { buildFileTree, FileTreeNode } from '../utils/fileTree';
-import { Folder, FileText, ChevronRight, ChevronDown, Trash2 } from 'feather-icons-react';
+import { Folder, File as FileIcon, ChevronRight, ChevronDown, Trash2 } from 'feather-icons-react';
 
 interface File {
   path: string;
   content: string;
+  isDirty: boolean; // Added isDirty
 }
 
 interface FileTreeProps {
@@ -55,9 +56,9 @@ const FileTreeItem: React.FC<FileTreeItemProps> = ({ node, currentFile, onFileSe
           ) : (
             <div style={{ width: '16px' }}></div> // Spacer for file icon alignment
           )}
-          {node.type === 'directory' ? <Folder size={16} /> : <FileText size={16} />}
+          {node.type === 'directory' ? <Folder size={16} /> : <FileIcon size={16} />}
           <span className={currentFile === node.path && node.type === 'file' ? 'font-bold text-primary' : ''}>
-            {node.name}
+            {node.name} {node.isDirty && <span className="text-warning">*</span>}
           </span>
         </div>
         {node.type === 'file' && node.path !== 'main.tex' && (
@@ -85,7 +86,7 @@ const FileTreeItem: React.FC<FileTreeItemProps> = ({ node, currentFile, onFileSe
 };
 
 export default function FileTree({ files, currentFile, onFileSelect, onNewFile, onDeleteFile }: FileTreeProps) {
-  const filePaths = files.map(file => file.path);
+  const filePaths = files.map(file => ({ path: file.path, isDirty: file.isDirty }));
   const tree = buildFileTree(filePaths);
 
   return (

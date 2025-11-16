@@ -4,23 +4,34 @@ export interface FileTreeNode {
   type: 'file' | 'directory';
   children?: FileTreeNode[];
   isExpanded?: boolean;
+  isDirty?: boolean; // Added isDirty
 }
 
-export function buildFileTree(filePaths: string[]): FileTreeNode[] {
+interface FlatFile {
+  path: string;
+  isDirty: boolean;
+}
+
+export function buildFileTree(flatFiles: FlatFile[]): FileTreeNode[] {
   const tree: FileTreeNode[] = [];
 
-  filePaths.forEach(fullPath => {
+  flatFiles.forEach(flatFile => {
+    const fullPath = flatFile.path;
     const parts = fullPath.split('/');
     let currentLevel = tree;
     let currentPath = '';
 
     parts.forEach((part, index) => {
       currentPath = currentPath === '' ? part : `${currentPath}/${part}`;
-      const existingNode = currentLevel.find(node => node.name === part);
+      let existingNode = currentLevel.find(node => node.name === part);
 
       if (existingNode) {
         if (existingNode.type === 'directory') {
           currentLevel = existingNode.children!;
+        }
+        // If it's a file and already exists, update its dirty status
+        if (existingNode.type === 'file' && index === parts.length - 1) {
+          existingNode.isDirty = flatFile.isDirty;
         }
       } else {
         const newNode: FileTreeNode = {
@@ -28,6 +39,7 @@ export function buildFileTree(filePaths: string[]): FileTreeNode[] {
           path: currentPath,
           type: index === parts.length - 1 ? 'file' : 'directory',
           isExpanded: false,
+          isDirty: index === parts.length - 1 ? flatFile.isDirty : undefined, // Only files can be dirty
         };
 
         if (newNode.type === 'directory') {
@@ -42,6 +54,18 @@ export function buildFileTree(filePaths: string[]): FileTreeNode[] {
       }
     });
   });
+
+  // Propagate dirty state up the tree
+  const propagateDirtyState = (nodes: FileTreeNode[]) => {
+    nodes.forEach(node => {
+      if (node.type === 'directory' && node.children) {
+        propagateDirtyState(node.children);
+        node.isDirty = node.children.some(child => child.isDirty);
+      }
+    });
+  };
+  propagateDirtyState(tree);
+
 
   // Sort directories and files
   const sortTree = (nodes: FileTreeNode[]) => {

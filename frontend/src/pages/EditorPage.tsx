@@ -14,6 +14,7 @@ import LogsPanel from "../components/LogsPanel";
 interface File {
   path: string;
   content: string;
+  isDirty: boolean;
 }
 
 export default function EditorPage() {
@@ -73,11 +74,14 @@ export default function EditorPage() {
 
   useEffect(() => {
     if (fetchedFiles) {
-      setFiles(fetchedFiles as File[]);
-      if (fetchedFiles.length > 0) {
-        setCurrentFile(fetchedFiles[0] as File);
+      const initialFiles: File[] = (fetchedFiles as File[]).map(file => ({
+        ...file,
+        isDirty: false, // Initialize isDirty to false
+      }));
+      setFiles(initialFiles);
+      if (initialFiles.length > 0) {
+        setCurrentFile(initialFiles[0]);
       } else {
-        // If no files are fetched, ensure currentFile is null
         setCurrentFile(null);
       }
     }
@@ -86,7 +90,9 @@ export default function EditorPage() {
   // Commit on page close
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      if (editorStatus === "dirty" || editorStatus === "saving") {
+      // Check if any file is dirty
+      const anyDirty = files.some(file => file.isDirty);
+      if (anyDirty) {
         event.preventDefault();
         event.returnValue = "";
 
@@ -106,7 +112,7 @@ export default function EditorPage() {
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
     };
-  }, [editorStatus, commitProject, id]);
+  }, [files, commitProject, id]); // Added files to dependency array
 
   // Trigger auto-commit when status changes to 'saved'
   useEffect(() => {
@@ -128,6 +134,13 @@ export default function EditorPage() {
               return;
             }
             setEditorStatus("saved");
+            // Update the isDirty status of the saved file
+            setFiles(prevFiles =>
+              prevFiles.map(file =>
+                file.path === currentFile.path ? { ...file, content, isDirty: false } : file
+              )
+            );
+            setCurrentFile(prev => prev ? { ...prev, content, isDirty: false } : null);
           },
           onError: (err) => {
             setEditorStatus("error");
@@ -150,7 +163,8 @@ export default function EditorPage() {
           }
           setFiles((prev) => prev.filter((f) => f.path !== path));
           if (currentFile?.path === path) {
-            setCurrentFile(files[0] || null);
+            // Try to select the first file if the current one was deleted
+            setCurrentFile(files.filter((f) => f.path !== path)[0] || null);
           }
         },
         onError: (err) => {
@@ -175,7 +189,7 @@ export default function EditorPage() {
   const handleNewFile = useCallback(() => {
     const fileName = prompt("Enter file name:");
     if (fileName) {
-      const newFile: File = { path: fileName, content: "" };
+      const newFile: File = { path: fileName, content: "", isDirty: true }; // New files are dirty
       setFiles((prev) => [...prev, newFile]);
       setCurrentFile(newFile);
     }
@@ -183,7 +197,12 @@ export default function EditorPage() {
 
   const handleEditorChange = useCallback((content: string) => {
     if (currentFile) {
-      setCurrentFile({ ...currentFile, content });
+      setFiles(prevFiles =>
+        prevFiles.map(file =>
+          file.path === currentFile.path ? { ...file, content, isDirty: true } : file
+        )
+      );
+      setCurrentFile(prev => prev ? { ...prev, content, isDirty: true } : null);
       setEditorStatus("dirty");
     }
   }, [currentFile]);
@@ -210,6 +229,13 @@ export default function EditorPage() {
   }, [id]);
 
   const getStatusBadge = () => {
+    // Check if any file is dirty
+    const anyDirty = files.some(file => file.isDirty);
+
+    if (anyDirty) {
+      return <span className="badge badge-error gap-2">Unsaved</span>;
+    }
+
     switch (editorStatus) {
       case "saving":
         return <span className="badge badge-warning gap-2">Saving...</span>;
@@ -218,8 +244,6 @@ export default function EditorPage() {
       case "committed":
       case "clean":
         return <span className="badge badge-info gap-2">Committed</span>;
-      case "dirty":
-        return <span className="badge badge-error gap-2">Unsaved</span>;
       case "error":
         return <span className="badge badge-error gap-2">Error</span>;
       default:
