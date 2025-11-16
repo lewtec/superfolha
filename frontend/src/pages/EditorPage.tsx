@@ -10,11 +10,14 @@ import FileTree from "../components/FileTree";
 import Editor from "../components/Editor";
 import PDFViewer from "../components/PDFViewer";
 import LogsPanel from "../components/LogsPanel";
+import BinaryFileViewer from "../components/BinaryFileViewer"; // Import BinaryFileViewer
+import { isBinaryContent } from "../utils/fileUtils"; // Import isBinaryContent
 
 interface File {
   path: string;
   content: string;
   isDirty: boolean;
+  isBinary: boolean; // Added isBinary property
 }
 
 export default function EditorPage() {
@@ -77,6 +80,7 @@ export default function EditorPage() {
       const initialFiles: File[] = (fetchedFiles as File[]).map(file => ({
         ...file,
         isDirty: false, // Initialize isDirty to false
+        isBinary: isBinaryContent(file.content, file.path), // Determine if binary
       }));
       setFiles(initialFiles);
       if (initialFiles.length > 0) {
@@ -196,23 +200,24 @@ export default function EditorPage() {
   }, []);
 
   const handleLoadFile = useCallback((fileName: string, content: string | null) => {
+    const isBinary = content !== null ? isBinaryContent(content, fileName) : false; // Determine binary status
     setFiles((prev) => {
       // Check if a file with the same name already exists
       const existingFileIndex = prev.findIndex(file => file.path === fileName);
       if (existingFileIndex > -1) {
         // Replace existing file
         const updatedFiles = [...prev];
-        updatedFiles[existingFileIndex] = { ...updatedFiles[existingFileIndex], content: content !== null ? content : updatedFiles[existingFileIndex].content, isDirty: true };
+        updatedFiles[existingFileIndex] = { ...updatedFiles[existingFileIndex], content: content !== null ? content : updatedFiles[existingFileIndex].content, isDirty: true, isBinary };
         return updatedFiles;
       }
       // Add new file
-      const newFile: File = { path: fileName, content: content !== null ? content : "", isDirty: true };
+      const newFile: File = { path: fileName, content: content !== null ? content : "", isDirty: true, isBinary };
       return [...prev, newFile];
     });
     setCurrentFile(prev => {
       // If the current file is the one being loaded, update its content and dirty status
       if (prev && prev.path === fileName) {
-        return { ...prev, content: content !== null ? content : prev.content, isDirty: true };
+        return { ...prev, content: content !== null ? content : prev.content, isDirty: true, isBinary };
       }
       // Otherwise, find the newly loaded file in the updated files array
       const loadedFile = files.find(file => file.path === fileName);
@@ -220,7 +225,7 @@ export default function EditorPage() {
     });
 
     // Automatically save the loaded file if it's a text file
-    if (content !== null) {
+    if (content !== null && !isBinary) { // Only save if not binary
       memoizedOnSave(content);
     }
   }, [files, memoizedOnSave]);
@@ -335,7 +340,12 @@ export default function EditorPage() {
 
           {/* Editor/PDF View */}
           <div className="flex-1 overflow-hidden">
-            {view === "code" && currentFile ? (
+            {currentFile && currentFile.isBinary ? (
+              <BinaryFileViewer
+                fileName={currentFile.path}
+                fileContent={currentFile.content}
+              />
+            ) : view === "code" && currentFile ? (
               <Editor
                 key={currentFile.path} // Add key prop here
                 value={currentFile.content}

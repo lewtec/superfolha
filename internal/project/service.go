@@ -13,9 +13,9 @@ type Service struct {
 }
 
 // NewService creates a new ProjectService.
-func NewService(repoManager *RepositoryManager) *Service {
+func NewService(stateDir string) *Service {
 	return &Service{
-		repoManager: repoManager,
+		repoManager: NewRepositoryManager(stateDir),
 	}
 }
 
