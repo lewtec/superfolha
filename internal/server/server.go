@@ -39,7 +39,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("/api/graphql", auth.Middleware(srv))
 
 	// GraphQL Playground (for development)
-	mux.Handle("/playground", playground.Handler("GraphQL playground", "/api/graphql"))
+	mux.Handle("/api/graphiql", playground.Handler("GraphQL playground", "/api/graphql"))
 
 	// Compile endpoint
 	mux.HandleFunc("/api/compile", s.handleCompile)
