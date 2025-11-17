@@ -42,7 +42,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("/api/graphiql", playground.Handler("GraphQL playground", "/api/graphql"))
 
 	// Compile endpoint
-	mux.HandleFunc("/api/compile", s.handleCompile)
+	mux.Handle("/api/compile", auth.Middleware(http.HandlerFunc(s.handleCompile)))
 
 	// Upload file endpoint
 	mux.HandleFunc("/api/projects/{projectId}/upload-file", s.handleUploadFile)
@@ -57,40 +57,40 @@ func (s *Server) Handler() http.Handler {
 }
 
 func (s *Server) handleCompile(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method != http.MethodGet {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		json.NewEncoder(w).Encode(map[string]string{"message": "Method not allowed"})
 		return
 	}
 
-	// Parse multipart form
-	err := r.ParseMultipartForm(32 << 20) // 32 MB max
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"message": "Failed to parse form"})
+	user := auth.UserFromContext(r.Context())
+	if user == nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"message": "Unauthorized"})
 		return
 	}
 
-	// Get tarball file
-	file, _, err := r.FormFile("tarball")
-	if err != nil {
+	projectId := r.URL.Query().Get("project")
+	if projectId == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"message": "Missing tarball file"})
+		json.NewEncoder(w).Encode(map[string]string{"message": "Missing project query parameter"})
 		return
 	}
-	defer file.Close()
 
-	// Read tarball data
-	tarballData, err := io.ReadAll(file)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"message": "Failed to read tarball"})
+	filePath := r.URL.Query().Get("file")
+	if filePath == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"message": "Missing file query parameter"})
 		return
 	}
 
 	// Compile
-	result, err := compiler.Compile(tarballData)
+	// The compiler.Compile function needs to be updated to accept projectID, filePath, and projectService
+	result, err := compiler.Compile(projectId, filePath, s.projectService)
 	if err != nil {
+		log.Printf("Error compiling project %s file %s for user %s: %v", projectId, filePath, user.ID, err)
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
 		return
