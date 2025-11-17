@@ -2,10 +2,10 @@ package project
 
 import (
 	"errors" // Import the errors package
-	"fmt"
-	"io" // Import the io package
+	"io"     // Import the io package
 	"path/filepath"
 
+	"github.com/go-git/go-git/v5"
 	igit "github.com/lewtec/superfolha/internal/git" // Reusing existing git types and functions
 )
 
@@ -33,12 +33,18 @@ func (s *Service) GetProjectPath(projectId string) string {
 func (s *Service) InitProjectRepo(projectId string) error {
 	pr, err := s.repoManager.GetRepo(projectId)
 	if err != nil {
-		// If repo doesn't exist, InitRepo will create it
-		if err.Error() == fmt.Sprintf("failed to open git repository at %s: repository does not exist", s.GetProjectPath(projectId)) {
+		// Check if the error is specifically that the repository does not exist
+		if err == git.ErrRepositoryNotExists { // Use the specific error type
+			// The pr instance is valid here, but pr.repo is nil.
+			// Call InitRepo on the valid pr instance.
 			return pr.InitRepo()
 		}
+		// For any other error, return it
 		return err
 	}
+	// If no error from GetRepo, it means the repository already exists and was opened successfully.
+	// We can still call InitRepo to ensure it's in a good state, or simply return nil if InitRepo
+	// is only meant for initial creation.
 	return pr.InitRepo()
 }
 

@@ -55,18 +55,27 @@ func (rm *RepositoryManager) GetRepo(projectId string) (*ProjectRepository, erro
 	}
 
 	repoPath := filepath.Join(rm.stateDir, "repos", projectId)
-	r, err := git.PlainOpen(repoPath) // Assuming git.PlainOpen is available and returns *git.Repository
-	if err != nil {
-		// If the repository doesn't exist, it might need to be initialized first
-		// This case should ideally be handled by InitProjectRepo
-		return nil, fmt.Errorf("failed to open git repository at %s: %w", repoPath, err)
-	}
-
+	
+	// Always create the ProjectRepository instance
 	pr = &ProjectRepository{
 		projectId: projectId,
 		repoPath:  repoPath,
-		repo:      r,
 	}
+
+	// Try to open the git repository
+	r, err := git.PlainOpen(repoPath)
+	if err != nil {
+		// If the error is "repository does not exist", we still return the pr,
+		// but with pr.repo = nil, and the error.
+		// Other errors are critical.
+		if err == git.ErrRepositoryNotExists {
+			rm.repos[projectId] = pr // Add to map even if repo doesn't exist yet
+			return pr, err // Return pr and the specific error
+		}
+		return nil, fmt.Errorf("failed to open git repository at %s: %w", repoPath, err)
+	}
+
+	pr.repo = r // Assign the opened repo
 	rm.repos[projectId] = pr
 
 	return pr, nil
