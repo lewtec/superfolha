@@ -9,7 +9,6 @@ import { useCallback, useEffect, useState } from "react";
 import FileTree from "../components/FileTree";
 import Editor from "../components/Editor";
 import PDFViewer from "../components/PDFViewer";
-import LogsPanel from "../components/LogsPanel";
 import BinaryFileViewer from "../components/BinaryFileViewer"; // Import BinaryFileViewer
 import { isBinaryContent } from "../utils/fileUtils"; // Import isBinaryContent
 
@@ -33,7 +32,7 @@ export default function EditorPage() {
 
   const [files, setFiles] = useState<File[]>([]);
   const [currentFile, setCurrentFile] = useState<File | null>(null);
-  const [view, setView] = useState<"code" | "pdf">("code");
+  const [activeTab, setActiveTab] = useState<"code" | "pdf" | "logs">("code");
   const [pdfData, setPdfData] = useState<string | null>(null);
   const [logs, setLogs] = useState("");
   const [compileSuccess, setCompileSuccess] = useState(false);
@@ -76,24 +75,28 @@ export default function EditorPage() {
     );
   }
 
-  const handleFileSelect = useCallback(async (path: string) => {
-    const file = files.find((f) => f.path === path);
-    if (file) {
-      if (file.content == null && !file.isBinary) {
-        const response = await getFileContent({ id: id!, path });
-        const content = response?.project?.file?.content;
-        const updatedFile = { ...file, content };
-        setFiles(files.map(f => f.path === path ? updatedFile : f));
-        setCurrentFile(updatedFile);
-      } else {
-        setCurrentFile(file);
+  const handleFileSelect = useCallback(
+    async (path: string) => {
+      const file = files.find((f) => f.path === path);
+      if (file) {
+        if (file.content == null && !file.isBinary) {
+          const response = await getFileContent({ id: id!, path });
+          const content = response?.project?.file?.content;
+          const updatedFile = { ...file, content };
+          setFiles(files.map((f) => (f.path === path ? updatedFile : f)));
+          setCurrentFile(updatedFile);
+        } else {
+          setCurrentFile(file);
+        }
       }
-    }
-  }, [files, getFileContent, id]);
+    },
+    [files, getFileContent, id],
+  );
 
   useEffect(() => {
     if (fetchedFiles) {
-      const initialFiles: File[] = (fetchedFiles as any[]).map(file => { // Use any[] for fetchedFiles to access new fields
+      const initialFiles: File[] = (fetchedFiles as any[]).map((file) => {
+        // Use any[] for fetchedFiles to access new fields
         return {
           ...file,
           isDirty: false, // Initialize isDirty to false
@@ -104,7 +107,7 @@ export default function EditorPage() {
       });
       setFiles(initialFiles);
       if (initialFiles.length > 0) {
-        handleFileSelect(initialFiles[0].path)
+        handleFileSelect(initialFiles[0].path);
       } else {
         setCurrentFile(null);
       }
@@ -115,7 +118,7 @@ export default function EditorPage() {
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
       // Check if any file is dirty
-      const anyDirty = files.some(file => file.isDirty);
+      const anyDirty = files.some((file) => file.isDirty);
       if (anyDirty) {
         event.preventDefault();
         event.returnValue = "";
@@ -159,12 +162,16 @@ export default function EditorPage() {
             }
             setEditorStatus("saved");
             // Update the isDirty status of the saved file
-            setFiles(prevFiles =>
-              prevFiles.map(file =>
-                file.path === currentFile.path ? { ...file, content, isDirty: false } : file
-              )
+            setFiles((prevFiles) =>
+              prevFiles.map((file) =>
+                file.path === currentFile.path
+                  ? { ...file, content, isDirty: false }
+                  : file,
+              ),
             );
-            setCurrentFile(prev => prev ? { ...prev, content, isDirty: false } : null);
+            setCurrentFile((prev) =>
+              prev ? { ...prev, content, isDirty: false } : null,
+            );
           },
           onError: (err) => {
             setEditorStatus("error");
@@ -200,8 +207,6 @@ export default function EditorPage() {
     [id, deleteFile, currentFile, files],
   );
 
-
-
   const handleNewFile = useCallback(() => {
     const fileName = prompt("Enter file name:");
     if (fileName) {
@@ -211,66 +216,95 @@ export default function EditorPage() {
     }
   }, []);
 
-  const handleLoadFile = useCallback((fileName: string, content: string | null) => {
-    let isBinary = false;
-    let size = 0;
-    let isTooBig = false;
+  const handleLoadFile = useCallback(
+    (fileName: string, content: string | null) => {
+      let isBinary = false;
+      let size = 0;
+      let isTooBig = false;
 
-    if (content !== null) {
-      isBinary = isBinaryContent(content, fileName);
-      size = content.length;
-      // For client-side loaded files, we assume they are not "too big" if content is provided
-      // The backend determines "isTooBig" for fetched files.
-      isTooBig = false;
-    } else {
-      // If content is null, we can't determine binary status or size client-side.
-      // We might assume it's binary or too big if it came from a context that implies it.
-      // For now, we'll default to not binary and size 0 if content is null.
-      // This might need refinement based on how `handleLoadFile` is called for null content.
-      isBinary = false;
-      size = 0;
-      isTooBig = false;
-    }
+      if (content !== null) {
+        isBinary = isBinaryContent(content, fileName);
+        size = content.length;
+        // For client-side loaded files, we assume they are not "too big" if content is provided
+        // The backend determines "isTooBig" for fetched files.
+        isTooBig = false;
+      } else {
+        // If content is null, we can't determine binary status or size client-side.
+        // We might assume it's binary or too big if it came from a context that implies it.
+        // For now, we'll default to not binary and size 0 if content is null.
+        // This might need refinement based on how `handleLoadFile` is called for null content.
+        isBinary = false;
+        size = 0;
+        isTooBig = false;
+      }
 
-    setFiles((prev) => {
-      const existingFileIndex = prev.findIndex(file => file.path === fileName);
-      if (existingFileIndex > -1) {
-        const updatedFiles = [...prev];
-        updatedFiles[existingFileIndex] = {
-          ...updatedFiles[existingFileIndex],
-          content: content !== null ? content : updatedFiles[existingFileIndex].content,
+      setFiles((prev) => {
+        const existingFileIndex = prev.findIndex(
+          (file) => file.path === fileName,
+        );
+        if (existingFileIndex > -1) {
+          const updatedFiles = [...prev];
+          updatedFiles[existingFileIndex] = {
+            ...updatedFiles[existingFileIndex],
+            content:
+              content !== null
+                ? content
+                : updatedFiles[existingFileIndex].content,
+            isDirty: true,
+            isBinary,
+            size,
+            isTooBig,
+          };
+          return updatedFiles;
+        }
+        const newFile: File = {
+          path: fileName,
+          content: content !== null ? content : null,
           isDirty: true,
           isBinary,
           size,
           isTooBig,
         };
-        return updatedFiles;
-      }
-      const newFile: File = { path: fileName, content: content !== null ? content : null, isDirty: true, isBinary, size, isTooBig };
-      return [...prev, newFile];
-    });
-    setCurrentFile(prev => {
-      if (prev && prev.path === fileName) {
-        return { ...prev, content: content !== null ? content : prev.content, isDirty: true, isBinary, size, isTooBig };
-      }
-      const loadedFile = files.find(file => file.path === fileName);
-      return loadedFile || null;
-    });
+        return [...prev, newFile];
+      });
+      setCurrentFile((prev) => {
+        if (prev && prev.path === fileName) {
+          return {
+            ...prev,
+            content: content !== null ? content : prev.content,
+            isDirty: true,
+            isBinary,
+            size,
+            isTooBig,
+          };
+        }
+        const loadedFile = files.find((file) => file.path === fileName);
+        return loadedFile || null;
+      });
 
-    if (content !== null && !isBinary) {
-      memoizedOnSave(content);
-    }
-  }, [files, memoizedOnSave]);
+      if (content !== null && !isBinary) {
+        memoizedOnSave(content);
+      }
+    },
+    [files, memoizedOnSave],
+  );
 
-  const handleEditorChange = useCallback((content: string) => {
-    setFiles(prevFiles =>
-      prevFiles.map(file =>
-        file.path === currentFile?.path ? { ...file, content, isDirty: true } : file
-      )
-    );
-    setCurrentFile(prev => prev ? { ...prev, content, isDirty: true } : null);
-    setEditorStatus("dirty");
-  }, [currentFile]);
+  const handleEditorChange = useCallback(
+    (content: string) => {
+      setFiles((prevFiles) =>
+        prevFiles.map((file) =>
+          file.path === currentFile?.path
+            ? { ...file, content, isDirty: true }
+            : file,
+        ),
+      );
+      setCurrentFile((prev) =>
+        prev ? { ...prev, content, isDirty: true } : null,
+      );
+      setEditorStatus("dirty");
+    },
+    [currentFile],
+  );
 
   const compile = useCallback(async () => {
     if (!currentFile || !currentFile.path) {
@@ -286,27 +320,33 @@ export default function EditorPage() {
     // No Authorization header needed, as the token is in a cookie
 
     try {
-      const response = await fetch(`/api/compile?project=${id}&file=${currentFile.path}`, {
-        method: "GET",
-        headers: {
-          'Content-Type': 'application/json', // Keep this if sending a body, but for GET it's often optional
+      const response = await fetch(
+        `/api/compile?project=${id}&file=${currentFile.path}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json", // Keep this if sending a body, but for GET it's often optional
+          },
+          credentials: "include", // Essential for sending cookies
         },
-        credentials: 'include', // Essential for sending cookies
-      });
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Compilation failed');
+        throw new Error(errorData.message || "Compilation failed");
       }
 
       const data = await response.json();
       setLogs(data.logs || "Compilation completed");
       setCompileSuccess(data.success || false);
-      if (data.pdf) { // Changed from data.pdfData to data.pdf
+      if (data.pdf) {
+        // Changed from data.pdfData to data.pdf
         setPdfData(data.pdf);
       } else if (!data.success) {
         // If compilation failed and no PDF, ensure error is shown
-        setLogs(data.logs || "Compilation failed with no specific error message.");
+        setLogs(
+          data.logs || "Compilation failed with no specific error message.",
+        );
       }
     } catch (error: any) {
       setLogs(`Error: ${error.message || error}`);
@@ -318,7 +358,7 @@ export default function EditorPage() {
 
   const getStatusBadge = () => {
     // Check if any file is dirty
-    const anyDirty = files.some(file => file.isDirty);
+    const anyDirty = files.some((file) => file.isDirty);
 
     if (anyDirty) {
       return <span className="badge badge-error gap-2">Unsaved</span>;
@@ -361,16 +401,22 @@ export default function EditorPage() {
           <div className="flex items-center justify-between bg-base-200 p-2 gap-4">
             <div className="tabs tabs-boxed">
               <a
-                className={`tab ${view === "code" ? "tab-active" : ""}`}
-                onClick={() => setView("code")}
+                className={`tab ${activeTab === "code" ? "tab-active" : ""}`}
+                onClick={() => setActiveTab("code")}
               >
                 Code
               </a>
               <a
-                className={`tab ${view === "pdf" ? "tab-active" : ""}`}
-                onClick={() => setView("pdf")}
+                className={`tab ${activeTab === "pdf" ? "tab-active" : ""}`}
+                onClick={() => setActiveTab("pdf")}
               >
                 PDF
+              </a>
+              <a
+                className={`tab ${activeTab === "logs" ? "tab-active" : ""}`}
+                onClick={() => setActiveTab("logs")}
+              >
+                Logs
               </a>
             </div>
 
@@ -393,27 +439,27 @@ export default function EditorPage() {
             </div>
           </div>
 
-          {/* Editor/PDF View */}
+          {/* Content Area based on activeTab */}
           <div className="flex-1 overflow-hidden">
-            {currentFile && currentFile.isBinary ? (
-              <BinaryFileViewer
-                fileName={currentFile.path}
-                projectId={id!} // Pass projectId here
-              />
-            ) : view === "code" && currentFile ? (
+            {activeTab === "code" && currentFile && currentFile.isBinary ? (
+              <BinaryFileViewer fileName={currentFile.path} projectId={id!} />
+            ) : activeTab === "code" && currentFile ? (
               <Editor
-                key={currentFile.path} // Add key prop here
+                key={currentFile.path}
                 value={currentFile.content}
                 onChange={handleEditorChange}
                 onSave={memoizedOnSave}
               />
-            ) : (
+            ) : activeTab === "pdf" ? (
               <PDFViewer pdfData={pdfData} />
+            ) : activeTab === "logs" ? (
+              <Editor value={logs} onChange={() => null} onSave={() => null} />
+            ) : (
+              <div className="flex items-center justify-center h-full text-base-content/70">
+                Select a file or tab to view content.
+              </div>
             )}
           </div>
-
-          {/* Logs Panel */}
-          <LogsPanel logs={logs} success={compileSuccess} />
         </div>
       </div>
     </div>
