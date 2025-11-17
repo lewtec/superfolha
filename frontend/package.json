@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build --outDir ../web/dist",
     "preview": "vite preview",
+    "format": "prettier --write .",
     "relay": "relay-compiler"
   },
   "dependencies": {
@@ -21,7 +22,7 @@
     "@tailwindcss/typography": "^0.5.19",
     "@tailwindcss/vite": "^4.1.17",
     "codemirror": "^6.0.2",
-
+    "prettier": "^3.6.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-pdf": "^10.2.0",
