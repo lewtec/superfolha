@@ -6,10 +6,8 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath" // Added import for filepath
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lewtec/superfolha/internal/project"
 
 	"github.com/jackc/pgx/v5/pgxpool"
