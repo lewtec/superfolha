@@ -1,12 +1,12 @@
-import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
-import { useLoginMutation } from '../hooks/useLoginMutation';
+import { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { useLoginMutation } from "../hooks/useLoginMutation";
 
 export default function Login() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const navigate = useNavigate()
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const navigate = useNavigate();
 
   const { login, isInFlight } = useLoginMutation({
     onCompleted: (response, errors) => {
@@ -14,30 +14,35 @@ export default function Login() {
         setError(errors[0].message);
         return;
       }
-      if (response.login?.user) { // Check for user presence to confirm successful login
-        navigate('/projects');
+      if (response.login?.user) {
+        // Check for user presence to confirm successful login
+        navigate("/projects");
       } else {
-        setError('Login failed: No user data received.');
+        setError("Login failed: No user data received.");
       }
     },
     onError: (err) => {
-      setError('Failed to login. Please try again.');
+      setError("Failed to login. Please try again.");
       console.error(err);
     },
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
+    e.preventDefault();
+    setError("");
     login(email, password);
-  }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-base-200">
       <div className="card w-96 bg-base-100 shadow-xl">
         <div className="card-body">
-          <h2 className="card-title text-2xl font-bold text-center">Superfolha</h2>
-          <p className="text-center text-base-content/70 mb-4">Sign in to your account</p>
+          <h2 className="card-title text-2xl font-bold text-center">
+            Superfolha
+          </h2>
+          <p className="text-center text-base-content/70 mb-4">
+            Sign in to your account
+          </p>
 
           {error && (
             <div className="alert alert-error">
@@ -77,10 +82,10 @@ export default function Login() {
             <div className="form-control mt-6">
               <button
                 type="submit"
-                className={`btn btn-primary ${isInFlight ? 'loading' : ''}`}
+                className={`btn btn-primary ${isInFlight ? "loading" : ""}`}
                 disabled={isInFlight}
               >
-                {isInFlight ? 'Signing in...' : 'Sign In'}
+                {isInFlight ? "Signing in..." : "Sign In"}
               </button>
             </div>
           </form>
@@ -88,7 +93,7 @@ export default function Login() {
           <div className="divider">OR</div>
 
           <p className="text-center">
-            Don't have an account?{' '}
+            Don't have an account?{" "}
             <Link to="/register" className="link link-primary">
               Sign up
             </Link>
@@ -96,5 +101,5 @@ export default function Login() {
         </div>
       </div>
     </div>
-  )
+  );
 }

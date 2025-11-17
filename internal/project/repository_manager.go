@@ -55,7 +55,7 @@ func (rm *RepositoryManager) GetRepo(projectId string) (*ProjectRepository, erro
 	}
 
 	repoPath := filepath.Join(rm.stateDir, "repos", projectId)
-	
+
 	// Always create the ProjectRepository instance
 	pr = &ProjectRepository{
 		projectId: projectId,
@@ -70,7 +70,7 @@ func (rm *RepositoryManager) GetRepo(projectId string) (*ProjectRepository, erro
 		// Other errors are critical.
 		if err == git.ErrRepositoryNotExists {
 			rm.repos[projectId] = pr // Add to map even if repo doesn't exist yet
-			return pr, err // Return pr and the specific error
+			return pr, err           // Return pr and the specific error
 		}
 		return nil, fmt.Errorf("failed to open git repository at %s: %w", repoPath, err)
 	}

@@ -1,12 +1,15 @@
 // frontend/src/components/BinaryFileViewer.tsx
-import React from 'react';
+import React from "react";
 
 interface BinaryFileViewerProps {
   fileName: string;
   projectId: string; // Added projectId
 }
 
-export default function BinaryFileViewer({ fileName, projectId }: BinaryFileViewerProps) {
+export default function BinaryFileViewer({
+  fileName,
+  projectId,
+}: BinaryFileViewerProps) {
   const handleDownload = () => {
     // Encode the fileName to handle slashes in the path correctly
     const encodedFileName = encodeURIComponent(fileName);
@@ -15,9 +18,13 @@ export default function BinaryFileViewer({ fileName, projectId }: BinaryFileView
     console.log("Attempting to download from URL:", downloadUrl); // Debugging log
 
     // Inform the user about the backend dependency
-    alert("Download initiated. Please ensure the backend route " + downloadUrl + " is correctly implemented to serve the file.");
+    alert(
+      "Download initiated. Please ensure the backend route " +
+        downloadUrl +
+        " is correctly implemented to serve the file.",
+    );
 
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = downloadUrl;
     a.download = fileName; // Suggests the filename for download
     document.body.appendChild(a);
@@ -41,9 +48,12 @@ export default function BinaryFileViewer({ fileName, projectId }: BinaryFileView
           d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
         />
       </svg>
-      <p className="text-lg font-semibold mb-2">Cannot display binary file: {fileName}</p>
+      <p className="text-lg font-semibold mb-2">
+        Cannot display binary file: {fileName}
+      </p>
       <p className="text-sm text-base-content/70 mb-4">
-        This file appears to be a binary format and cannot be rendered directly in the editor.
+        This file appears to be a binary format and cannot be rendered directly
+        in the editor.
       </p>
       <button className="btn btn-primary" onClick={handleDownload}>
         Download {fileName}

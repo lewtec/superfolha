@@ -1,20 +1,21 @@
-import React, { createContext, useContext } from 'react';
+import React, { createContext, useContext } from "react";
 
 interface EditorContextType {
   projectName: string;
   onCompile: () => void;
   compiling: boolean;
-  editorStatus: 'clean' | 'dirty' | 'saving' | 'saved' | 'error';
+  editorStatus: "clean" | "dirty" | "saving" | "saved" | "error";
   // Add other editor-specific state/functions if needed in the layout
 }
 
 const EditorContext = createContext<EditorContextType | undefined>(undefined);
 
-export const EditorProvider: React.FC<{ children: React.ReactNode, value: EditorContextType }> = ({ children, value }) => {
+export const EditorProvider: React.FC<{
+  children: React.ReactNode;
+  value: EditorContextType;
+}> = ({ children, value }) => {
   return (
-    <EditorContext.Provider value={value}>
-      {children}
-    </EditorContext.Provider>
+    <EditorContext.Provider value={value}>{children}</EditorContext.Provider>
   );
 };
 

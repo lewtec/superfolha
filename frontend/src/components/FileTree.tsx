@@ -1,6 +1,13 @@
-import { useState, useRef } from 'react';
-import { buildFileTree, FileTreeNode } from '../utils/fileTree';
-import { Folder, File as FileIcon, ChevronRight, ChevronDown, Trash2, Upload } from 'feather-icons-react';
+import { useState, useRef } from "react";
+import { buildFileTree, FileTreeNode } from "../utils/fileTree";
+import {
+  Folder,
+  File as FileIcon,
+  ChevronRight,
+  ChevronDown,
+  Trash2,
+  Upload,
+} from "feather-icons-react";
 
 interface File {
   path: string;
@@ -26,12 +33,18 @@ interface FileTreeItemProps {
   level: number;
 }
 
-const FileTreeItem: React.FC<FileTreeItemProps> = ({ node, currentFile, onFileSelect, onDeleteFile, level }) => {
+const FileTreeItem: React.FC<FileTreeItemProps> = ({
+  node,
+  currentFile,
+  onFileSelect,
+  onDeleteFile,
+  level,
+}) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const handleToggleExpand = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (node.type === 'directory') {
+    if (node.type === "directory") {
       setIsExpanded(!isExpanded);
     } else {
       onFileSelect(node.path);
@@ -53,23 +66,38 @@ const FileTreeItem: React.FC<FileTreeItemProps> = ({ node, currentFile, onFileSe
         onClick={handleToggleExpand}
       >
         <div className="flex items-center gap-2 flex-grow">
-          {node.type === 'directory' ? (
-            isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />
+          {node.type === "directory" ? (
+            isExpanded ? (
+              <ChevronDown size={16} />
+            ) : (
+              <ChevronRight size={16} />
+            )
           ) : (
-            <div style={{ width: '16px' }}></div> // Spacer for file icon alignment
+            <div style={{ width: "16px" }}></div> // Spacer for file icon alignment
           )}
-          {node.type === 'directory' ? <Folder size={16} /> : <FileIcon size={16} />}
-          <span className={currentFile === node.path && node.type === 'file' ? 'font-bold text-primary' : ''}>
-            {node.name} {node.isDirty && <span className="text-warning">*</span>}
+          {node.type === "directory" ? (
+            <Folder size={16} />
+          ) : (
+            <FileIcon size={16} />
+          )}
+          <span
+            className={
+              currentFile === node.path && node.type === "file"
+                ? "font-bold text-primary"
+                : ""
+            }
+          >
+            {node.name}{" "}
+            {node.isDirty && <span className="text-warning">*</span>}
           </span>
         </div>
-        {node.type === 'file' && node.path !== 'main.tex' && (
+        {node.type === "file" && node.path !== "main.tex" && (
           <button className="btn btn-xs btn-ghost" onClick={handleDelete}>
             <Trash2 size={16} />
           </button>
         )}
       </div>
-      {node.type === 'directory' && isExpanded && node.children && (
+      {node.type === "directory" && isExpanded && node.children && (
         <ul className="pl-4">
           {node.children.map((childNode) => (
             <FileTreeItem
@@ -87,12 +115,25 @@ const FileTreeItem: React.FC<FileTreeItemProps> = ({ node, currentFile, onFileSe
   );
 };
 
-export default function FileTree({ files, currentFile, onFileSelect, onNewFile, onDeleteFile, onLoadFile, projectId }: FileTreeProps) {
+export default function FileTree({
+  files,
+  currentFile,
+  onFileSelect,
+  onNewFile,
+  onDeleteFile,
+  onLoadFile,
+  projectId,
+}: FileTreeProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const filePaths = files.map(file => ({ path: file.path, isDirty: file.isDirty }));
+  const filePaths = files.map((file) => ({
+    path: file.path,
+    isDirty: file.isDirty,
+  }));
   const tree = buildFileTree(filePaths);
 
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -115,7 +156,10 @@ export default function FileTree({ files, currentFile, onFileSelect, onNewFile, 
 
       // For text files, read content on frontend to update editor immediately
       // For binary files, content will be null, and editor won't display it
-      const isTextFile = file.type.startsWith('text/') || file.name.endsWith('.tex') || file.name.endsWith('.md');
+      const isTextFile =
+        file.type.startsWith("text/") ||
+        file.name.endsWith(".tex") ||
+        file.name.endsWith(".md");
       let fileContent: string | null = null;
 
       if (isTextFile) {
@@ -123,14 +167,15 @@ export default function FileTree({ files, currentFile, onFileSelect, onNewFile, 
       }
 
       onLoadFile(uploadedFilePath, fileContent);
-
     } catch (error) {
       console.error("Error uploading file:", error);
-      alert(`Error uploading file: ${error instanceof Error ? error.message : String(error)}`);
+      alert(
+        `Error uploading file: ${error instanceof Error ? error.message : String(error)}`,
+      );
     } finally {
       // Clear the input so the same file can be selected again
       if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+        fileInputRef.current.value = "";
       }
     }
   };

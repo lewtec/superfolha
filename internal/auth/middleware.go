@@ -68,9 +68,9 @@ func Middleware(next http.Handler) http.Handler {
 				// If token validation fails and it came from a cookie, clear the cookie
 				if cookie != nil {
 					http.SetCookie(w, &http.Cookie{
-						Name:    "authToken",
-						Value:   "",
-						Expires: time.Unix(0, 0),
+						Name:     "authToken",
+						Value:    "",
+						Expires:  time.Unix(0, 0),
 						HttpOnly: true,
 						Secure:   true,
 						Path:     "/",
