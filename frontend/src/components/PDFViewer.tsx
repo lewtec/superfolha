@@ -1,48 +1,46 @@
-import { useState } from 'react'
-import { Document, Page, pdfjs } from 'react-pdf'
-import 'react-pdf/dist/Page/AnnotationLayer.css'
-import 'react-pdf/dist/Page/TextLayer.css'
+import { useState } from "react";
+import { Document, Page, pdfjs } from "react-pdf";
+import "react-pdf/dist/Page/AnnotationLayer.css";
+import "react-pdf/dist/Page/TextLayer.css";
 
-// Set the worker source for pdf.js
-// This is crucial for react-pdf to work correctly.
-// It's often recommended to serve this locally or from a reliable CDN.
-// For local development, you might need to adjust this path based on your setup.
-// A common approach is to copy the worker to your public directory during build.
-// For now, we'll point to the node_modules path, assuming Vite can handle it.
+// Explicitly set the worker source for pdf.js
+// This method is often more robust with Vite for assets within node_modules.
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.js',
+  "pdfjs-dist/build/pdf.worker.min.mjs",
   import.meta.url,
-).toString()
+).href;
 
 interface PDFViewerProps {
-  pdfData: string | null
+  pdfData: string | null;
 }
 
 export default function PDFViewer({ pdfData }: PDFViewerProps) {
-  const [numPages, setNumPages] = useState<number>(0)
-  const [currentPage, setCurrentPage] = useState<number>(1)
-  const [error, setError] = useState<string>('')
-  const [loading, setLoading] = useState<boolean>(true)
+  const [numPages, setNumPages] = useState<number>(0);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [error, setError] = useState<string>("");
+  const [loading, setLoading] = useState<boolean>(true);
 
   function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
-    setNumPages(numPages)
-    setCurrentPage(1)
-    setLoading(false)
-    setError('')
+    setNumPages(numPages);
+    setCurrentPage(1);
+    setLoading(false);
+    setError("");
   }
 
   function onDocumentLoadError(err: Error) {
-    setError('Failed to load PDF: ' + err.message)
-    setLoading(false)
-    console.error(err)
+    setError("Failed to load PDF: " + err.message);
+    setLoading(false);
+    console.error(err);
   }
 
   if (!pdfData) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p className="text-base-content/70">No PDF compiled yet. Click "Compile" to generate PDF.</p>
+        <p className="text-base-content/70">
+          No PDF compiled yet. Click "Compile" to generate PDF.
+        </p>
       </div>
-    )
+    );
   }
 
   if (error) {
@@ -50,7 +48,7 @@ export default function PDFViewer({ pdfData }: PDFViewerProps) {
       <div className="flex items-center justify-center h-full">
         <p className="text-error">{error}</p>
       </div>
-    )
+    );
   }
 
   return (
@@ -65,7 +63,7 @@ export default function PDFViewer({ pdfData }: PDFViewerProps) {
           <button
             className="btn btn-sm"
             disabled={currentPage <= 1}
-            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
           >
             Previous
           </button>
@@ -75,7 +73,9 @@ export default function PDFViewer({ pdfData }: PDFViewerProps) {
           <button
             className="btn btn-sm"
             disabled={currentPage >= numPages}
-            onClick={() => setCurrentPage(prev => Math.min(numPages, prev + 1))}
+            onClick={() =>
+              setCurrentPage((prev) => Math.min(numPages, prev + 1))
+            }
           >
             Next
           </button>
@@ -92,9 +92,13 @@ export default function PDFViewer({ pdfData }: PDFViewerProps) {
             </div>
           }
         >
-          <Page pageNumber={currentPage} renderAnnotationLayer={true} renderTextLayer={true} />
+          <Page
+            pageNumber={currentPage}
+            renderAnnotationLayer={true}
+            renderTextLayer={true}
+          />
         </Document>
       </div>
     </div>
-  )
+  );
 }
