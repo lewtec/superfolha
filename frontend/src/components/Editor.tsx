@@ -67,6 +67,7 @@ export default function Editor({ value, onChange, onSave }: EditorProps) {
         basicSetup,
         latexLanguage,
         autocompletion({ override: [latexCompletions] }),
+        EditorView.lineWrapping, // Enable word wrap
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
             const newContent = update.state.doc.toString();
