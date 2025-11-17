@@ -65,8 +65,7 @@ func runServer(cmd *cobra.Command, args []string) {
 	log.Println("Running database migrations...")
 	sqlDB := stdlib.OpenDBFromPool(dbpool)
 	if err := db.RunMigrations(sqlDB); err != nil {
-		log.Printf("Warning: Failed to run migrations: %v", err)
-		log.Println("Continuing anyway...")
+		panic(fmt.Sprintf("Error: Failed to run migrations: %v", err))
 	}
 
 	// Create state directory

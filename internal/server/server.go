@@ -65,7 +65,7 @@ func (s *Server) handleCompile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := auth.UserFromContext(r.Context())
+	user, _ := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(map[string]string{"message": "Unauthorized"})
@@ -90,7 +90,7 @@ func (s *Server) handleCompile(w http.ResponseWriter, r *http.Request) {
 	// The compiler.Compile function needs to be updated to accept projectID, filePath, and projectService
 	result, err := compiler.Compile(s.projectService, projectId, filePath)
 	if err != nil {
-		log.Printf("Error compiling project %s file %s for user %s: %v", projectId, filePath, user.ID, err)
+		log.Printf("Error compiling project %s file %s for user %s: %v", projectId, filePath, user.UserID, err)
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
 		return

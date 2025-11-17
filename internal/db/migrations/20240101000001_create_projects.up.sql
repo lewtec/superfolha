@@ -1,5 +1,5 @@
 CREATE TABLE projects (
-  id UUID PRIMARY KEY DEFAULT uuid_v7(),
+  id UUID PRIMARY KEY DEFAULT uuidv7(),
   user_id UUID REFERENCES users(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   git_path TEXT NOT NULL,
