@@ -87,7 +87,7 @@ func (s *Server) handleCompile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	project, _, user, err := s.resolver.getAndCheckProject(r.Context(), projectId)
+	_, _, user, err := s.resolver.getAndCheckProject(r.Context(), projectId)
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized) // getAndCheckProject returns "not authenticated" or "not authorized"
 		json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})

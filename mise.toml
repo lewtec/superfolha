@@ -39,6 +39,10 @@ run = "echo 'Build complete! Binary: ./server'"
 [tasks."gen:sqlc"]
 run = "sqlc generate"
 
+[tasks."gen:relay"]
+dir = "frontend"
+run = "bun relay"
+
 [tasks."gen:graphql"]
 run = "go run github.com/99designs/gqlgen generate"
 
