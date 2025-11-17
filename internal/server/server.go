@@ -60,10 +60,10 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("/api/compile", auth.Middleware(http.HandlerFunc(s.handleCompile)))
 
 	// Upload file endpoint
-	mux.HandleFunc("/api/projects/{projectId}/upload-file", s.handleUploadFile)
+	mux.Handle("/api/projects/{projectId}/upload-file", auth.Middleware(http.HandlerFunc(s.handleUploadFile)))
 
 	// Download file endpoint
-	mux.HandleFunc("/api/projects/{projectId}/download/{filePath...}", s.handleDownloadFile)
+	mux.Handle("/api/projects/{projectId}/download/{filePath...}", auth.Middleware(http.HandlerFunc(s.handleDownloadFile)))
 
 	// Serve Web App
 	mux.Handle("/", GetWebApp())
@@ -80,17 +80,17 @@ func (s *Server) handleCompile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, _ := auth.GetUserFromContext(r.Context())
-	if user == nil {
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{"message": "Unauthorized"})
-		return
-	}
-
 	projectId := r.URL.Query().Get("project")
 	if projectId == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]string{"message": "Missing project query parameter"})
+		return
+	}
+
+	project, _, user, err := s.resolver.getAndCheckProject(r.Context(), projectId)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized) // getAndCheckProject returns "not authenticated" or "not authorized"
+		json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
 		return
 	}
 
@@ -128,6 +128,13 @@ func (s *Server) handleUploadFile(w http.ResponseWriter, r *http.Request) {
 	if projectIdStr == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]string{"message": "Missing project ID"})
+		return
+	}
+
+	project, _, user, err := s.resolver.getAndCheckProject(r.Context(), projectIdStr)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized) // getAndCheckProject returns "not authenticated" or "not authorized"
+		json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
 		return
 	}
 
@@ -177,19 +184,25 @@ func (s *Server) handleUploadFile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDownloadFile(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		json.NewEncoder(w).Encode(map[string]string{"message": "Method not allowed"})
-		return
-	}
-
-	projectIdStr := r.PathValue("projectId")
-	if projectIdStr == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"message": "Missing project ID"})
-		return
-	}
-
+	    if r.Method != http.MethodGet {
+	        w.WriteHeader(http.StatusMethodNotAllowed)
+	        json.NewEncoder(w).Encode(map[string]string{"message": "Method not allowed"})
+	        return
+	    }
+	
+	    projectIdStr := r.PathValue("projectId")
+	    if projectIdStr == "" {
+	        w.WriteHeader(http.StatusBadRequest)
+	        json.NewEncoder(w).Encode(map[string]string{"message": "Missing project ID"})
+	        return
+	    }
+	
+	    project, _, user, err := s.resolver.getAndCheckProject(r.Context(), projectIdStr)
+	    if err != nil {
+	        w.WriteHeader(http.StatusUnauthorized) // getAndCheckProject returns "not authenticated" or "not authorized"
+	        json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
+	        return
+	    }
 	// filePath will be everything after /api/projects/{projectId}/download/
 	// We need to decode the URL path because encodeURIComponent was used on the frontend
 	encodedFilePath := r.URL.Path[len("/api/projects/"+projectIdStr+"/download/"):]
