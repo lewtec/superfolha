@@ -281,14 +281,17 @@ export default function EditorPage() {
 
     setCompiling(true);
     setLogs("Compiling...\n");
+
+    // No explicit authToken check here, as it's expected in a cookie
+    // No Authorization header needed, as the token is in a cookie
+
     try {
       const response = await fetch(`/api/compile?project=${id}&file=${currentFile.path}`, {
-        method: "GET", // Changed to GET
+        method: "GET",
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`, // Add auth token
-          'Content-Type': 'application/json', // Still good to send, though not strictly needed for GET
+          'Content-Type': 'application/json', // Keep this if sending a body, but for GET it's often optional
         },
-        credentials: 'include', // Add this line
+        credentials: 'include', // Essential for sending cookies
       });
 
       if (!response.ok) {

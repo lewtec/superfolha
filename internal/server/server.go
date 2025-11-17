@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt" // Added fmt import
 	"io"
@@ -31,12 +32,26 @@ func NewServer(db db.DBTX, stateDir string, projectService *project.Service) *Se
 	}
 }
 
+// contextKey is a type for context keys to avoid collisions.
+type contextKey string
+
+// ResponseWriterContextKey is the key to store http.ResponseWriter in context.
+const ResponseWriterContextKey contextKey = "responseWriter"
+
+// ResponseWriterMiddleware adds the http.ResponseWriter to the request context.
+func ResponseWriterMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := context.WithValue(r.Context(), ResponseWriterContextKey, w)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 
 	// GraphQL endpoint
 	srv := handler.NewDefaultServer(NewExecutableSchema(Config{Resolvers: s.resolver}))
-	mux.Handle("/api/graphql", auth.Middleware(srv))
+	mux.Handle("/api/graphql", ResponseWriterMiddleware(auth.Middleware(srv))) // Apply new middleware
 
 	// GraphQL Playground (for development)
 	mux.Handle("/api/graphiql", playground.Handler("GraphQL playground", "/api/graphql"))

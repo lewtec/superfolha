@@ -7,8 +7,7 @@ import (
 )
 
 type AuthPayload struct {
-	Token string `json:"token"`
-	User  *User  `json:"user"`
+	User *User `json:"user"`
 }
 
 type Commit struct {

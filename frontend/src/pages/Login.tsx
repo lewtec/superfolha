@@ -14,11 +14,10 @@ export default function Login() {
         setError(errors[0].message);
         return;
       }
-      if (response.login?.token) {
-        localStorage.setItem('token', response.login.token);
-        navigate('/projects');
-      } else {
-        setError('Login failed: No token received.');
+              if (response.login?.token) {
+                // localStorage.setItem('token', response.login.token); // Token will be handled by HTTP-only cookie
+                navigate('/projects');
+              } else {        setError('Login failed: No token received.');
       }
     },
     onError: (err) => {

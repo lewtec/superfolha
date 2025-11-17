@@ -2,6 +2,7 @@ package auth
 
 import (
 	"errors"
+	"log"
 	"os"
 	"time"
 
@@ -34,13 +35,19 @@ type Claims struct {
 // getJWTSecret retrieves the JWT secret from environment variable
 func getJWTSecret() ([]byte, error) {
 	secret := os.Getenv("JWT_SECRET")
+	goEnv := os.Getenv("GO_ENV")                                                                   // Get GO_ENV as well
+	log.Printf("Auth: getJWTSecret called. JWT_SECRET env: '%s', GO_ENV env: '%s'", secret, goEnv) // Log env vars
+
 	if secret == "" {
 		// Fallback for development only - should never be used in production
-		if os.Getenv("GO_ENV") == "development" {
+		if goEnv == "development" { // Use goEnv here
+			log.Println("Auth: Using development fallback JWT secret.")
 			return []byte("dev-secret-change-in-production"), nil
 		}
+		log.Println("Auth: JWT_SECRET environment variable is required and not found.")
 		return nil, ErrJWTSecretRequired
 	}
+	log.Println("Auth: Using JWT_SECRET from environment variable.")
 	return []byte(secret), nil
 }
 

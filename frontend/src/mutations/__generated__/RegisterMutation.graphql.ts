@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<eaffad763ac0efb9b46d56c0218b0f4c>>
+ * @generated SignedSource<<61e5000b2b429becfa799333ef39728b>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -15,7 +15,6 @@ export type RegisterMutation$variables = {
 };
 export type RegisterMutation$data = {
   readonly register: {
-    readonly token: string;
     readonly user: {
       readonly email: string;
       readonly id: string;
@@ -63,13 +62,6 @@ v1 = [
       {
         "alias": null,
         "args": null,
-        "kind": "ScalarField",
-        "name": "token",
-        "storageKey": null
-      },
-      {
-        "alias": null,
-        "args": null,
         "concreteType": "User",
         "kind": "LinkedField",
         "name": "user",
@@ -114,16 +106,16 @@ return {
     "selections": (v1/*: any*/)
   },
   "params": {
-    "cacheID": "695af060ec211087e9d5e2b6e4b0b8a4",
+    "cacheID": "cbe79788dae3073ce7580f3b2b5e1770",
     "id": null,
     "metadata": {},
     "name": "RegisterMutation",
     "operationKind": "mutation",
-    "text": "mutation RegisterMutation(\n  $email: String!\n  $password: String!\n) {\n  register(email: $email, password: $password) {\n    token\n    user {\n      id\n      email\n    }\n  }\n}\n"
+    "text": "mutation RegisterMutation(\n  $email: String!\n  $password: String!\n) {\n  register(email: $email, password: $password) {\n    user {\n      id\n      email\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "f0487815e6d3056176b3579e476cb7f1";
+(node as any).hash = "60d53ac8fb8a3748304079d3b5a0371b";
 
 export default node;

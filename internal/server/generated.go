@@ -49,8 +49,7 @@ type DirectiveRoot struct {
 
 type ComplexityRoot struct {
 	AuthPayload struct {
-		Token func(childComplexity int) int
-		User  func(childComplexity int) int
+		User func(childComplexity int) int
 	}
 
 	Commit struct {
@@ -138,13 +137,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 	ec := executionContext{nil, e, 0, 0, nil}
 	_ = ec
 	switch typeName + "." + field {
-
-	case "AuthPayload.token":
-		if e.complexity.AuthPayload.Token == nil {
-			break
-		}
-
-		return e.complexity.AuthPayload.Token(childComplexity), true
 
 	case "AuthPayload.user":
 		if e.complexity.AuthPayload.User == nil {
@@ -759,50 +751,6 @@ func (ec *executionContext) field___Type_fields_args(ctx context.Context, rawArg
 
 // region    **************************** field.gotpl *****************************
 
-func (ec *executionContext) _AuthPayload_token(ctx context.Context, field graphql.CollectedField, obj *AuthPayload) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_AuthPayload_token(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Token, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(string)
-	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_AuthPayload_token(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "AuthPayload",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
 func (ec *executionContext) _AuthPayload_user(ctx context.Context, field graphql.CollectedField, obj *AuthPayload) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_AuthPayload_user(ctx, field)
 	if err != nil {
@@ -1285,8 +1233,6 @@ func (ec *executionContext) fieldContext_Mutation_register(ctx context.Context, 
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "token":
-				return ec.fieldContext_AuthPayload_token(ctx, field)
 			case "user":
 				return ec.fieldContext_AuthPayload_user(ctx, field)
 			}
@@ -1346,8 +1292,6 @@ func (ec *executionContext) fieldContext_Mutation_login(ctx context.Context, fie
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "token":
-				return ec.fieldContext_AuthPayload_token(ctx, field)
 			case "user":
 				return ec.fieldContext_AuthPayload_user(ctx, field)
 			}
@@ -4215,11 +4159,6 @@ func (ec *executionContext) _AuthPayload(ctx context.Context, sel ast.SelectionS
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("AuthPayload")
-		case "token":
-			out.Values[i] = ec._AuthPayload_token(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
 		case "user":
 			out.Values[i] = ec._AuthPayload_user(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
