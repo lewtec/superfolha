@@ -24,6 +24,12 @@ type CompileResult struct {
 
 // Compile compiles a specific LaTeX file from a project
 func Compile(projectService *project.Service, projectId string, filePath string) (*CompileResult, error) {
+	// Check if latexmk command exists
+	_, err := exec.LookPath("latexmk")
+	if err != nil {
+		return nil, fmt.Errorf("latexmk command not found: %w", err)
+	}
+
 	// Create temporary directory for compilation
 	compileUUID, err := uuid.NewV7()
 	if err != nil {
@@ -90,7 +96,11 @@ func Compile(projectService *project.Service, projectId string, filePath string)
 	err = cmd.Run()
 	logs := stdout.String() + stderr.String()
 
-	success := err == nil
+	// Check if PDF was generated
+	pdfPath := filepath.Join(tmpDir, strings.TrimSuffix(filePath, ".tex")+".pdf")
+	_, pdfErr := os.Stat(pdfPath) // Check if file exists
+
+	success := err == nil && pdfErr == nil
 
 	result := &CompileResult{
 		Logs:    logs,
@@ -98,9 +108,10 @@ func Compile(projectService *project.Service, projectId string, filePath string)
 	}
 
 	// Read PDF if successful
-	pdfPath := filepath.Join(tmpDir, strings.TrimSuffix(filePath, ".tex")+".pdf")
-	if pdfData, err := os.ReadFile(pdfPath); err == nil {
-		result.PDF = base64.StdEncoding.EncodeToString(pdfData)
+	if pdfErr == nil { // Only attempt to read if the file exists
+		if pdfData, err := os.ReadFile(pdfPath); err == nil {
+			result.PDF = base64.StdEncoding.EncodeToString(pdfData)
+		}
 	}
 
 	// Read synctex if exists
