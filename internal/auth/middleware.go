@@ -1,11 +1,17 @@
 package auth
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"io"
 	"log"
 	"net/http"
-	"strings" // Re-import strings for Authorization header parsing
-	"time"    // Added for cookie expiration
+	"strings"
+	"time"
+
+	"github.com/vektah/gqlparser/v2/ast"
+	"github.com/vektah/gqlparser/v2/parser" // Changed import path
 )
 
 type contextKey string
@@ -17,14 +23,56 @@ type UserContext struct {
 	Email  string
 }
 
+// GraphQLRequest represents a basic GraphQL request structure
+type GraphQLRequest struct {
+	Query         string                 `json:"query"`
+	OperationName string                 `json:"operationName"`
+	Variables     map[string]interface{} `json:"variables"`
+}
+
 // Middleware checks for JWT token in a cookie first, then in the Authorization header.
+// It skips authentication for Login and Register GraphQL mutations.
 func Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// --- NEW: Check for public GraphQL mutations ---
+		// Read the request body
+		bodyBytes, err := io.ReadAll(r.Body)
+		if err != nil {
+			log.Printf("Auth Middleware: Failed to read request body: %v", err)
+			http.Error(w, "Bad Request", http.StatusBadRequest)
+			return
+		}
+		// Restore the body for subsequent handlers
+		r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
+		var gqlReq GraphQLRequest
+		if err := json.Unmarshal(bodyBytes, &gqlReq); err == nil {
+			// Parse the GraphQL query to find the operation name
+			// schema := &ast.Schema{} // Removed unused schema declaration
+			query, parseErr := parser.ParseQuery(&ast.Source{Input: gqlReq.Query}) // Convert string to *ast.Source
+			if parseErr == nil && query != nil && len(query.Operations) > 0 {
+				op := query.Operations[0] // Assuming a single operation per request
+				if op.Operation == ast.Mutation {
+					// Check if it's a Login or Register mutation
+					for _, sel := range op.SelectionSet {
+						if field, ok := sel.(*ast.Field); ok {
+							if field.Name == "login" || field.Name == "register" {
+								log.Printf("Auth Middleware: Skipping authentication for public mutation: %s", field.Name)
+								next.ServeHTTP(w, r) // Skip authentication
+								return
+							}
+						}
+					}
+				}
+			}
+		}
+		// --- END NEW ---
+
 		var tokenString string
-		var authAttempted bool // Flag to indicate if we tried to get a token
+		var authAttempted bool
 
 		// 1. Try to get the token from a cookie
-		cookie, err := r.Cookie("authToken") // Assuming cookie name is "authToken"
+		cookie, err := r.Cookie("authToken")
 		if err == nil {
 			tokenString = cookie.Value
 			authAttempted = true
@@ -65,22 +113,21 @@ func Middleware(next http.Handler) http.Handler {
 			} else {
 				log.Printf("Auth Middleware: Token validation failed: %v", err)
 				// If token validation fails and it came from a cookie, clear the cookie
-				if cookie != nil { // Only clear if it was a cookie token
+				if cookie != nil {
 					http.SetCookie(w, &http.Cookie{
 						Name:    "authToken",
 						Value:   "",
-						Expires: time.Unix(0, 0), // Expire immediately
+						Expires: time.Unix(0, 0),
 						HttpOnly: true,
-						Secure:   true, // Should be true in production
+						Secure:   true,
 						Path:     "/",
 					})
 					log.Println("Auth Middleware: Cleared expired/invalid 'authToken' cookie.")
 				}
 			}
-		} else if authAttempted { // Only log if we actually tried to find a token but found none
+		} else if authAttempted {
 			log.Println("Auth Middleware: No valid token found after checking cookie and Authorization header.")
 		}
-
 
 		next.ServeHTTP(w, r)
 	})

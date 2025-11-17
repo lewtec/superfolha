@@ -1,10 +1,11 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import Login from './pages/Login'
-import Register from './pages/Register'
-import Projects from './pages/Projects'
-import EditorPage from './pages/EditorPage'
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import Projects from "./pages/Projects";
+import EditorPage from "./pages/EditorPage";
 
-import Layout from './components/Layout'; // new import
+import Layout from "./components/Layout";
+import { useAuthStatus } from "./hooks/useAuthStatus"; // Import the new hook
 
 function App() {
   return (
@@ -12,22 +13,49 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/projects" element={<ProtectedRoute><Layout><Projects /></Layout></ProtectedRoute>} />
-        <Route path="/editor/:id" element={<ProtectedRoute><Layout><EditorPage /></Layout></ProtectedRoute>} />
+        <Route
+          path="/projects"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Projects />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/editor/:id"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <EditorPage />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
         <Route path="/" element={<Navigate to="/projects" replace />} />
       </Routes>
     </BrowserRouter>
-  )
+  );
 }
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const token = localStorage.getItem('token')
+  const { isAuthenticated, loading } = useAuthStatus(); // Use the new hook
 
-  if (!token) {
-    return <Navigate to="/login" replace />
+  if (loading) {
+    // Show a loading indicator while authentication status is being determined
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <span className="loading loading-spinner loading-lg"></span>
+      </div>
+    );
   }
 
-  return <>{children}</>
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <>{children}</>;
 }
 
-export default App
+export default App;
