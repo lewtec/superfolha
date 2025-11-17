@@ -16,13 +16,11 @@ interface PDFViewerProps {
 
 export default function PDFViewer({ pdfData }: PDFViewerProps) {
   const [numPages, setNumPages] = useState<number>(0);
-  const [currentPage, setCurrentPage] = useState<number>(1);
   const [error, setError] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
 
   function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
     setNumPages(numPages);
-    setCurrentPage(1);
     setLoading(false);
     setError("");
   }
@@ -58,29 +56,6 @@ export default function PDFViewer({ pdfData }: PDFViewerProps) {
           <span className="loading loading-spinner loading-lg"></span>
         </div>
       )}
-      {!loading && numPages > 1 && (
-        <div className="flex justify-center items-center gap-4 p-4">
-          <button
-            className="btn btn-sm"
-            disabled={currentPage <= 1}
-            onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-          >
-            Previous
-          </button>
-          <span>
-            Page {currentPage} of {numPages}
-          </span>
-          <button
-            className="btn btn-sm"
-            disabled={currentPage >= numPages}
-            onClick={() =>
-              setCurrentPage((prev) => Math.min(numPages, prev + 1))
-            }
-          >
-            Next
-          </button>
-        </div>
-      )}
       <div className="flex-1 overflow-auto flex justify-center p-4">
         <Document
           file={`data:application/pdf;base64,${pdfData}`}
@@ -92,11 +67,14 @@ export default function PDFViewer({ pdfData }: PDFViewerProps) {
             </div>
           }
         >
-          <Page
-            pageNumber={currentPage}
-            renderAnnotationLayer={true}
-            renderTextLayer={true}
-          />
+          {Array.from(new Array(numPages), (el, index) => (
+            <Page
+              key={`page_${index + 1}`}
+              pageNumber={index + 1}
+              renderAnnotationLayer={true}
+              renderTextLayer={true}
+            />
+          ))}
         </Document>
       </div>
     </div>
