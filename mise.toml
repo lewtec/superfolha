@@ -29,7 +29,7 @@ run = "bun run build"
 [tasks."build:backend"]
 description = "Build backend binary"
 depends = ["build:frontend"]
-run = "go build -o server cmd/server"
+run = "go build -o superfolha cmd/superfolha"
 
 [tasks.build]
 description = "Build complete application"
