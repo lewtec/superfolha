@@ -273,25 +273,45 @@ export default function EditorPage() {
   }, [currentFile]);
 
   const compile = useCallback(async () => {
+    if (!currentFile || !currentFile.path) {
+      setLogs("Error: No file selected for compilation.");
+      setCompileSuccess(false);
+      return;
+    }
+
     setCompiling(true);
     setLogs("Compiling...\n");
     try {
-      const response = await fetch(`/api/projects/${id}/compile`, {
-        method: "POST",
+      const response = await fetch(`/api/compile?project=${id}&file=${currentFile.path}`, {
+        method: "GET", // Changed to GET
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`, // Add auth token
+          'Content-Type': 'application/json', // Still good to send, though not strictly needed for GET
+        },
+        credentials: 'include', // Add this line
       });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Compilation failed');
+      }
+
       const data = await response.json();
       setLogs(data.logs || "Compilation completed");
       setCompileSuccess(data.success || false);
-      if (data.pdfData) {
-        setPdfData(data.pdfData);
+      if (data.pdf) { // Changed from data.pdfData to data.pdf
+        setPdfData(data.pdf);
+      } else if (!data.success) {
+        // If compilation failed and no PDF, ensure error is shown
+        setLogs(data.logs || "Compilation failed with no specific error message.");
       }
-    } catch (error) {
-      setLogs(`Error: ${error}`);
+    } catch (error: any) {
+      setLogs(`Error: ${error.message || error}`);
       setCompileSuccess(false);
     } finally {
       setCompiling(false);
     }
-  }, [id]);
+  }, [id, currentFile]); // Added currentFile to dependencies
 
   const getStatusBadge = () => {
     // Check if any file is dirty
