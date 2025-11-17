@@ -88,7 +88,7 @@ func (s *Server) handleCompile(w http.ResponseWriter, r *http.Request) {
 
 	// Compile
 	// The compiler.Compile function needs to be updated to accept projectID, filePath, and projectService
-	result, err := compiler.Compile(projectId, filePath, s.projectService)
+	result, err := compiler.Compile(s.projectService, projectId, filePath)
 	if err != nil {
 		log.Printf("Error compiling project %s file %s for user %s: %v", projectId, filePath, user.ID, err)
 		w.WriteHeader(http.StatusInternalServerError)

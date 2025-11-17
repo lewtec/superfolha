@@ -1,9 +1,7 @@
 package compiler
 
 import (
-	"archive/tar"
 	"bytes"
-	"compress/gzip"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -14,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/lewtec/superfolha/internal/project"
 )
 
 type CompileResult struct {
@@ -24,7 +23,7 @@ type CompileResult struct {
 }
 
 // Compile compiles a specific LaTeX file from a project
-func Compile(projectId string, filePath string, projectService *project.Service) (*CompileResult, error) {
+func Compile(projectService *project.Service, projectId string, filePath string) (*CompileResult, error) {
 	// Create temporary directory for compilation
 	compileUUID, err := uuid.NewV7()
 	if err != nil {
