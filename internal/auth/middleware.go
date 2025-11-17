@@ -1,17 +1,11 @@
 package auth
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"io"
 	"log"
 	"net/http"
 	"strings"
 	"time"
-
-	"github.com/vektah/gqlparser/v2/ast"
-	"github.com/vektah/gqlparser/v2/parser" // Changed import path
 )
 
 type contextKey string
@@ -23,51 +17,10 @@ type UserContext struct {
 	Email  string
 }
 
-// GraphQLRequest represents a basic GraphQL request structure
-type GraphQLRequest struct {
-	Query         string                 `json:"query"`
-	OperationName string                 `json:"operationName"`
-	Variables     map[string]interface{} `json:"variables"`
-}
-
 // Middleware checks for JWT token in a cookie first, then in the Authorization header.
-// It skips authentication for Login and Register GraphQL mutations.
+// It populates the context with UserContext if a valid token is found.
 func Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// --- NEW: Check for public GraphQL mutations ---
-		// Read the request body
-		bodyBytes, err := io.ReadAll(r.Body)
-		if err != nil {
-			log.Printf("Auth Middleware: Failed to read request body: %v", err)
-			http.Error(w, "Bad Request", http.StatusBadRequest)
-			return
-		}
-		// Restore the body for subsequent handlers
-		r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-
-		var gqlReq GraphQLRequest
-		if err := json.Unmarshal(bodyBytes, &gqlReq); err == nil {
-			// Parse the GraphQL query to find the operation name
-			// schema := &ast.Schema{} // Removed unused schema declaration
-			query, parseErr := parser.ParseQuery(&ast.Source{Input: gqlReq.Query}) // Convert string to *ast.Source
-			if parseErr == nil && query != nil && len(query.Operations) > 0 {
-				op := query.Operations[0] // Assuming a single operation per request
-				if op.Operation == ast.Mutation {
-					// Check if it's a Login or Register mutation
-					for _, sel := range op.SelectionSet {
-						if field, ok := sel.(*ast.Field); ok {
-							if field.Name == "login" || field.Name == "register" {
-								log.Printf("Auth Middleware: Skipping authentication for public mutation: %s", field.Name)
-								next.ServeHTTP(w, r) // Skip authentication
-								return
-							}
-						}
-					}
-				}
-			}
-		}
-		// --- END NEW ---
-
 		var tokenString string
 		var authAttempted bool
 
