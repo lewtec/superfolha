@@ -1,7 +1,6 @@
 package git
 
 import (
-
 	"fmt"
 
 	"io" // new import
@@ -14,45 +13,26 @@ import (
 
 	"time"
 
-
-
 	"github.com/go-git/go-git/v5"
 
 	"github.com/go-git/go-git/v5/plumbing/object"
-
 )
 
-
-
 type Commit struct {
-
-	Hash    string
+	Hash string
 
 	Message string
 
-	Author  string
+	Author string
 
-	Date    time.Time
-
+	Date time.Time
 }
-
-
 
 type FileInfo struct {
-
-
-
 	Path string
 
-
-
 	Size int64
-
-
-
 }
-
-
 
 // InitRepo creates a new git repository
 
@@ -63,8 +43,6 @@ func InitRepo(path string) error {
 		return fmt.Errorf("failed to create directory %s: %w", path, err)
 
 	}
-
-
 
 	_, err := git.PlainInit(path, false)
 
@@ -78,8 +56,6 @@ func InitRepo(path string) error {
 
 }
 
-
-
 // AddAll stages all changes
 
 func AddAll(repoPath string) error {
@@ -92,8 +68,6 @@ func AddAll(repoPath string) error {
 
 	}
 
-
-
 	w, err := r.Worktree()
 
 	if err != nil {
@@ -101,8 +75,6 @@ func AddAll(repoPath string) error {
 		return fmt.Errorf("failed to get worktree for repository at %s: %w", repoPath, err)
 
 	}
-
-
 
 	_, err = w.Add(".")
 
@@ -116,8 +88,6 @@ func AddAll(repoPath string) error {
 
 }
 
-
-
 // Commit creates a new commit
 
 func CommitChanges(repoPath, author, message string) (*Commit, error) {
@@ -130,8 +100,6 @@ func CommitChanges(repoPath, author, message string) (*Commit, error) {
 
 	}
 
-
-
 	w, err := r.Worktree()
 
 	if err != nil {
@@ -140,8 +108,6 @@ func CommitChanges(repoPath, author, message string) (*Commit, error) {
 
 	}
 
-
-
 	// Add all changes
 
 	if err := AddAll(repoPath); err != nil {
@@ -149,8 +115,6 @@ func CommitChanges(repoPath, author, message string) (*Commit, error) {
 		return nil, err
 
 	}
-
-
 
 	// Check if there are any changes to commit
 
@@ -161,8 +125,6 @@ func CommitChanges(repoPath, author, message string) (*Commit, error) {
 		return nil, fmt.Errorf("failed to get worktree status: %w", err)
 
 	}
-
-
 
 	// If there are no changes, return the last commit (noop)
 
@@ -176,8 +138,6 @@ func CommitChanges(repoPath, author, message string) (*Commit, error) {
 
 		}
 
-
-
 		obj, err := r.CommitObject(ref.Hash())
 
 		if err != nil {
@@ -186,23 +146,18 @@ func CommitChanges(repoPath, author, message string) (*Commit, error) {
 
 		}
 
-
-
 		return &Commit{
 
-			Hash:    obj.Hash.String(),
+			Hash: obj.Hash.String(),
 
 			Message: obj.Message,
 
-			Author:  obj.Author.String(),
+			Author: obj.Author.String(),
 
-			Date:    obj.Author.When,
-
+			Date: obj.Author.When,
 		}, nil
 
 	}
-
-
 
 	// Create commit
 
@@ -210,14 +165,12 @@ func CommitChanges(repoPath, author, message string) (*Commit, error) {
 
 		Author: &object.Signature{
 
-			Name:  author,
+			Name: author,
 
 			Email: author, // Assuming author is also the email for simplicity
 
-			When:  time.Now(),
-
+			When: time.Now(),
 		},
-
 	})
 
 	if err != nil {
@@ -225,8 +178,6 @@ func CommitChanges(repoPath, author, message string) (*Commit, error) {
 		return nil, fmt.Errorf("failed to commit changes: %w", err)
 
 	}
-
-
 
 	// Get the commit object
 
@@ -238,23 +189,18 @@ func CommitChanges(repoPath, author, message string) (*Commit, error) {
 
 	}
 
-
-
 	return &Commit{
 
-		Hash:    obj.Hash.String(),
+		Hash: obj.Hash.String(),
 
 		Message: obj.Message,
 
-		Author:  obj.Author.String(), // This will include name and email
+		Author: obj.Author.String(), // This will include name and email
 
-		Date:    obj.Author.When,
-
+		Date: obj.Author.When,
 	}, nil
 
 }
-
-
 
 // GetHistory returns commit history
 
@@ -268,8 +214,6 @@ func GetHistory(repoPath string) ([]*Commit, error) {
 
 	}
 
-
-
 	cIter, err := r.Log(&git.LogOptions{Order: git.LogOrderCommitterTime})
 
 	if err != nil {
@@ -278,22 +222,19 @@ func GetHistory(repoPath string) ([]*Commit, error) {
 
 	}
 
-
-
 	var commits []*Commit
 
 	err = cIter.ForEach(func(c *object.Commit) error {
 
 		commits = append(commits, &Commit{
 
-			Hash:    c.Hash.String(),
+			Hash: c.Hash.String(),
 
 			Message: c.Message,
 
-			Author:  c.Author.String(),
+			Author: c.Author.String(),
 
-			Date:    c.Author.When,
-
+			Date: c.Author.When,
 		})
 
 		return nil
@@ -306,373 +247,67 @@ func GetHistory(repoPath string) ([]*Commit, error) {
 
 	}
 
-
-
 	return commits, nil
 
 }
 
-
-
 // ErrGitFileNotFound is returned when a requested file does not exist in the git repository.
-
-
 
 var ErrGitFileNotFound = fmt.Errorf("file not found in git repository")
 
-
-
-
-
-
-
 // ReadFile reads a file from the repository
-
-
-
-
-
-
 
 func ReadFile(repoPath, filePath string) (io.ReadCloser, int64, error) {
 
-
-
-
-
-
-
 	r, err := git.PlainOpen(repoPath)
 
-
-
-
-
-
-
 	if err != nil {
-
-
-
-
-
-
 
 		return nil, 0, fmt.Errorf("failed to open repository at %s: %w", repoPath, err)
 
-
-
-
-
-
-
 	}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 	w, err := r.Worktree()
 
-
-
-
-
-
-
 	if err != nil {
-
-
-
-
-
-
 
 		return nil, 0, fmt.Errorf("failed to get worktree for repository at %s: %w", repoPath, err)
 
-
-
-
-
-
-
 	}
 
+	file, err := w.Filesystem.Open(filePath)
 
+	if err != nil {
 
+		if os.IsNotExist(err) {
 
-
-
-
-
-
-
-
-
-
-
-
-		file, err := w.Filesystem.Open(filePath)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-		if err != nil {
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-			if os.IsNotExist(err) {
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-				return nil, 0, ErrGitFileNotFound
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-			}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-			return nil, 0, fmt.Errorf("failed to open file %s: %w", filePath, err)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+			return nil, 0, ErrGitFileNotFound
 
 		}
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-	
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-		fileInfo, err := w.Filesystem.Stat(filePath) // Use w.Filesystem.Stat
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-		if err != nil {
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-			file.Close() // Ensure file is closed on error
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-			return nil, 0, fmt.Errorf("failed to get file info for %s: %w", filePath, err)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-		}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-	
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-		return file, fileInfo.Size(), nil
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+		return nil, 0, fmt.Errorf("failed to open file %s: %w", filePath, err)
 
 	}
 
+	fileInfo, err := w.Filesystem.Stat(filePath) // Use w.Filesystem.Stat
 
+	if err != nil {
+
+		file.Close() // Ensure file is closed on error
+
+		return nil, 0, fmt.Errorf("failed to get file info for %s: %w", filePath, err)
+
+	}
+
+	return file, fileInfo.Size(), nil
+
+}
 
 // WriteFile writes a file to the repository
 
 func WriteFile(repoPath, filePath, content string) error {
 
 	fullPath := filepath.Join(repoPath, filePath)
-
-
 
 	// Create directory if it doesn't exist
 
@@ -684,13 +319,9 @@ func WriteFile(repoPath, filePath, content string) error {
 
 	}
 
-
-
 	return os.WriteFile(fullPath, []byte(content), 0644)
 
 }
-
-
 
 // DeleteFile removes a file from the repository
 
@@ -702,194 +333,75 @@ func DeleteFile(repoPath, filePath string) error {
 
 }
 
-
-
 // ListFiles lists all files in the repository (excluding .git)
-
-
 
 func ListFiles(repoPath string) ([]*FileInfo, error) {
 
-
-
-
-
-
-
 	// We are using filepath.WalkDir to list files on the filesystem, not the git index.
-
-
 
 	// We don't need to open the git repository here.
 
-
-
-
-
-
-
 	var files []*FileInfo
-
-
-
-
-
-
 
 	err := filepath.WalkDir(repoPath, func(path string, d fs.DirEntry, err error) error {
 
-
-
 		if err != nil {
-
-
 
 			return err
 
-
-
 		}
-
-
-
-
-
-
 
 		// Skip .git directory
 
-
-
 		if d.IsDir() && d.Name() == ".git" {
-
-
 
 			return fs.SkipDir
 
-
-
 		}
-
-
-
-
-
-
 
 		// Skip directories
 
-
-
 		if d.IsDir() {
-
-
 
 			return nil
 
-
-
 		}
-
-
-
-
-
-
 
 		// Get relative path
 
-
-
 		relPath, err := filepath.Rel(repoPath, path)
-
-
 
 		if err != nil {
 
-
-
 			return err
 
-
-
 		}
-
-
-
-
-
-
 
 		info, err := d.Info()
 
-
-
 		if err != nil {
-
-
 
 			return err
 
-
-
 		}
-
-
-
-
-
-
 
 		files = append(files, &FileInfo{
 
-
-
 			Path: relPath,
 
-
-
 			Size: info.Size(),
-
-
-
 		})
-
-
-
-
-
-
 
 		return nil
 
-
-
 	})
-
-
-
-
-
-
 
 	if err != nil {
 
-
-
 		return nil, fmt.Errorf("failed to walk directory %s: %w", repoPath, err)
-
-
 
 	}
 
-
-
-
-
-
-
 	return files, nil
-
-
 
 }

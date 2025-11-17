@@ -1,19 +1,42 @@
 // frontend/src/utils/fileUtils.ts
 
 const BINARY_EXTENSIONS = new Set([
-  '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.ico', // Images
-  '.pdf', // Documents
-  '.zip', '.tar', '.gz', '.rar', '.7z', // Archives
-  '.exe', '.dll', '.bin', '.out', // Executables/Binaries
-  '.mp3', '.wav', '.ogg', '.flac', // Audio
-  '.mp4', '.avi', '.mkv', '.mov', // Video
-  '.woff', '.woff2', '.ttf', '.otf', // Fonts
-  '.sqlite', '.db', // Databases
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".gif",
+  ".bmp",
+  ".webp",
+  ".ico", // Images
+  ".pdf", // Documents
+  ".zip",
+  ".tar",
+  ".gz",
+  ".rar",
+  ".7z", // Archives
+  ".exe",
+  ".dll",
+  ".bin",
+  ".out", // Executables/Binaries
+  ".mp3",
+  ".wav",
+  ".ogg",
+  ".flac", // Audio
+  ".mp4",
+  ".avi",
+  ".mkv",
+  ".mov", // Video
+  ".woff",
+  ".woff2",
+  ".ttf",
+  ".otf", // Fonts
+  ".sqlite",
+  ".db", // Databases
 ]);
 
 export function isBinaryContent(content: string, filename: string): boolean {
   const lowerFilename = filename.toLowerCase();
-  const extension = lowerFilename.substring(lowerFilename.lastIndexOf('.'));
+  const extension = lowerFilename.substring(lowerFilename.lastIndexOf("."));
 
   // 1. Check by extension
   if (BINARY_EXTENSIONS.has(extension)) {
@@ -39,7 +62,7 @@ export function isBinaryContent(content: string, filename: string): boolean {
   }
 
   // If more than 10% of the sample are non-printable (excluding common whitespace), consider it binary
-  if (sampleSize > 0 && (nonPrintableCount / sampleSize) > 0.1) {
+  if (sampleSize > 0 && nonPrintableCount / sampleSize > 0.1) {
     return true;
   }
 

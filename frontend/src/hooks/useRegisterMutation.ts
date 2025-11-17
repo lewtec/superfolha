@@ -1,14 +1,19 @@
-import { useMutation } from 'react-relay';
-import type { RegisterMutation as RegisterMutationType } from '../mutations/__generated__/RegisterMutation.graphql';
-import RegisterMutationGraphql from '../mutations/RegisterMutation';
+import { useMutation } from "react-relay";
+import type { RegisterMutation as RegisterMutationType } from "../mutations/__generated__/RegisterMutation.graphql";
+import RegisterMutationGraphql from "../mutations/RegisterMutation";
 
 interface UseRegisterMutationConfig {
-  onCompleted?: (response: RegisterMutationType['response'], errors: ReadonlyArray<Error> | null) => void;
+  onCompleted?: (
+    response: RegisterMutationType["response"],
+    errors: ReadonlyArray<Error> | null,
+  ) => void;
   onError?: (error: Error) => void;
 }
 
 export function useRegisterMutation(config?: UseRegisterMutationConfig) {
-  const [commit, isInFlight] = useMutation<RegisterMutationType>(RegisterMutationGraphql);
+  const [commit, isInFlight] = useMutation<RegisterMutationType>(
+    RegisterMutationGraphql,
+  );
 
   const register = (email: string, password: string) => {
     commit({
