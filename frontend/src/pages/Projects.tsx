@@ -4,13 +4,6 @@ import { useProjectsQuery } from "../hooks/useProjectsQuery";
 import { useCreateProjectMutation } from "../hooks/useCreateProjectMutation";
 import { useDeleteProjectMutation } from "../hooks/useDeleteProjectMutation";
 
-interface Project {
-  id: string;
-  name: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export default function Projects() {
   const navigate = useNavigate();
   const [newProjectName, setNewProjectName] = useState("");
@@ -51,14 +44,17 @@ export default function Projects() {
         setError("Failed to delete project");
         console.error(err);
       },
-      updater: (store) => {
-        const root = store.getRoot();
-        const projects = root.getLinkedRecords("projects");
-        if (projects) {
-          const newProjects = projects.filter(
-            (project) => project.getValue("id") !== id,
-          );
-          root.setLinkedRecords(newProjects, "projects");
+      updater: (store, response) => {
+        if (response?.deleteProject?.id) {
+          const deletedId = response.deleteProject.id;
+          const root = store.getRoot();
+          const projects = root.getLinkedRecords("projects");
+          if (projects) {
+            const newProjects = projects.filter(
+              (project) => project.getValue("id") !== deletedId
+            );
+            root.setLinkedRecords(newProjects, "projects");
+          }
         }
       },
     });

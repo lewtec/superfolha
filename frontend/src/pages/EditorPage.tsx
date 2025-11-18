@@ -3,7 +3,7 @@ import { useSaveFileMutation } from "../hooks/useSaveFileMutation";
 import { useDeleteFileMutation } from "../hooks/useDeleteFileMutation";
 import { useCommitProjectMutation } from "../hooks/useCommitProjectMutation";
 import { useDebounce } from "../hooks/useDebounce";
-import { useNavigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { useGetProjectQuery } from "../hooks/useGetProjectQuery";
 import { useCallback, useEffect, useState } from "react";
 import FileTree from "../components/FileTree";
@@ -23,7 +23,6 @@ interface File {
 
 export default function EditorPage() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
 
   // All hooks must be called unconditionally before any returns
   const { project, ...projectQueryData } = useGetProjectQuery({ id: id! });
@@ -35,17 +34,14 @@ export default function EditorPage() {
   const [activeTab, setActiveTab] = useState<"code" | "pdf" | "logs">("code");
   const [pdfData, setPdfData] = useState<string | null>(null);
   const [logs, setLogs] = useState("");
-  const [compileSuccess, setCompileSuccess] = useState(false);
   const [compiling, setCompiling] = useState(false);
   const [editorStatus, setEditorStatus] = useState<
     "clean" | "dirty" | "saving" | "saved" | "committed" | "error"
   >("clean");
-  const [isCommitted, setIsCommitted] = useState(false);
 
-  const { saveFile, isInFlight: isSavingFile } = useSaveFileMutation();
+  const { saveFile } = useSaveFileMutation();
   const { deleteFile } = useDeleteFileMutation();
-  const { commitProject, isInFlight: isCommittingProject } =
-    useCommitProjectMutation();
+  const { commitProject } = useCommitProjectMutation();
 
   const debouncedCommit = useDebounce(() => {
     if (editorStatus === "saved") {
@@ -56,7 +52,6 @@ export default function EditorPage() {
             return;
           }
           console.log("Auto-commit successful:", response);
-          setIsCommitted(true);
           setEditorStatus("committed");
         },
         onError: (err) => {
@@ -95,14 +90,18 @@ export default function EditorPage() {
 
   useEffect(() => {
     if (fetchedFiles) {
-      const initialFiles: File[] = (fetchedFiles as any[]).map((file) => {
-        // Use any[] for fetchedFiles to access new fields
+      type FetchedFile = {
+        path: string;
+        isBinary: boolean;
+        size: number;
+        isTooBig: boolean;
+      };
+
+      const initialFiles: File[] = (fetchedFiles as FetchedFile[]).map((file) => {
         return {
           ...file,
-          isDirty: false, // Initialize isDirty to false
-          isBinary: file.isBinary,
-          size: file.size, // Map size from GraphQL response
-          isTooBig: file.isTooBig, // Map isTooBig from GraphQL response
+          content: null,
+          isDirty: false,
         };
       });
       setFiles(initialFiles);
@@ -152,7 +151,6 @@ export default function EditorPage() {
     (content: string) => {
       if (currentFile) {
         setEditorStatus("saving");
-        setIsCommitted(false);
         saveFile(id!, currentFile.path, content, {
           onCompleted: (response, errors) => {
             if (errors) {
@@ -309,7 +307,6 @@ export default function EditorPage() {
   const compile = useCallback(async () => {
     if (!currentFile || !currentFile.path) {
       setLogs("Error: No file selected for compilation.");
-      setCompileSuccess(false);
       return;
     }
 
@@ -338,7 +335,6 @@ export default function EditorPage() {
 
       const data = await response.json();
       setLogs(data.logs || "Compilation completed");
-      setCompileSuccess(data.success || false);
       if (data.pdf) {
         // Changed from data.pdfData to data.pdf
         setPdfData(data.pdf);
@@ -348,9 +344,9 @@ export default function EditorPage() {
           data.logs || "Compilation failed with no specific error message.",
         );
       }
-    } catch (error: any) {
-      setLogs(`Error: ${error.message || error}`);
-      setCompileSuccess(false);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      setLogs(`Error: ${errorMessage}`);
     } finally {
       setCompiling(false);
     }
