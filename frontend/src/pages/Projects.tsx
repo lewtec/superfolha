@@ -51,7 +51,7 @@ export default function Projects() {
           const projects = root.getLinkedRecords("projects");
           if (projects) {
             const newProjects = projects.filter(
-              (project) => project.getValue("id") !== deletedId
+              (project) => project.getValue("id") !== deletedId,
             );
             root.setLinkedRecords(newProjects, "projects");
           }
