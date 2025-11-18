@@ -3,6 +3,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Projects from "./pages/Projects";
 import EditorPage from "./pages/EditorPage";
+import Landing from "./pages/Landing";
 
 import Layout from "./components/Layout";
 import { useAuthStatus } from "./hooks/useAuthStatus"; // Import the new hook
@@ -33,7 +34,7 @@ function App() {
             </ProtectedRoute>
           }
         />
-        <Route path="/" element={<Navigate to="/projects" replace />} />
+        <Route path="/" element={<Landing />} />
       </Routes>
     </BrowserRouter>
   );
