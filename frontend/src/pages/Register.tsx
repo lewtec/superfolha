@@ -95,7 +95,9 @@ export default function Register() {
 
             <div className="form-control mt-4">
               <label className="label">
-                <span className="label-text">{t("confirm_password_label")}</span>
+                <span className="label-text">
+                  {t("confirm_password_label")}
+                </span>
               </label>
               <input
                 type="password"
