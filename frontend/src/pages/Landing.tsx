@@ -29,7 +29,7 @@ const Landing: React.FC = () => {
           <div className="card bg-base-100 shadow-xl">
             <div className="card-body">
               <h4 className="card-title">Compilação Rápida e Eficiente</h4>
-              <p>Com um único clique, veja as alterações no seu PDF, sem a necessidade de compilar manually.</p>
+              <p>Com um único clique, veja as alterações no seu PDF, sem a necessidade de compilar manualmente.</p>
             </div>
           </div>
           {/* Feature 2 */}
@@ -42,8 +42,8 @@ const Landing: React.FC = () => {
           {/* Feature 3 */}
           <div className="card bg-base-100 shadow-xl">
             <div className="card-body">
-              <h4 className="card-title">Colaboração Simplificada</h4>
-              <p>Convide colegas para colaborar em seus projetos, com um fluxo de trabalho semelhante ao GitHub.</p>
+              <h4 className="card-title">Gerenciamento de Múltiplos Projetos</h4>
+              <p>Organize seus documentos em múltiplos projetos, facilitando o gerenciamento e a organização do seu trabalho.</p>
             </div>
           </div>
         </div>
