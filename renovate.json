@@ -6,15 +6,24 @@
   "packageRules": [
     {
       "description": "Group Go updates across Dockerfile and mise.toml",
-      "matchDatasources": ["docker", "golang-version"],
-      "matchPackageNames": ["golang", "go"],
+      "matchDatasources": [
+        "docker",
+        "golang-version"
+      ],
+      "matchPackageNames": [
+        "golang",
+        "go"
+      ],
       "groupName": "Go version"
     }
   ],
-  "regexManagers": [
+  "customManagers": [
     {
+      "customType": "regex",
       "description": "Update Go version in mise.toml",
-      "fileMatch": ["^mise\\.toml$"],
+      "managerFilePatterns": [
+        "/^mise\\.toml$/"
+      ],
       "matchStrings": [
         "go\\s*=\\s*\"(?<currentValue>.*?)\""
       ],
