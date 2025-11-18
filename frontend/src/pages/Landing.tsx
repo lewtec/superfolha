@@ -1,5 +1,6 @@
 // src/pages/Landing.tsx
 import React from 'react';
+import { Link } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import AnimatedSection from '../components/AnimatedSection';
@@ -15,7 +16,7 @@ const Landing: React.FC = () => {
           <div className="max-w-md">
             <h2 className="text-5xl font-bold">O Futuro da Edição LaTeX é Colaborativo</h2>
             <p className="py-6">Crie, edite e compile seus documentos LaTeX em tempo real, com controle de versão Git integrado e colaboração simplificada.</p>
-            <button className="btn btn-primary">Comece Agora</button>
+            <Link to="/register" className="btn btn-primary">Comece Agora</Link>
           </div>
         </div>
       </section>
@@ -27,8 +28,8 @@ const Landing: React.FC = () => {
           {/* Feature 1 */}
           <div className="card bg-base-100 shadow-xl">
             <div className="card-body">
-              <h4 className="card-title">Compilação em Tempo Real</h4>
-              <p>Veja as alterações no seu PDF instantaneamente enquanto digita, sem a necessidade de compilar manualmente.</p>
+              <h4 className="card-title">Compilação Rápida e Eficiente</h4>
+              <p>Com um único clique, veja as alterações no seu PDF, sem a necessidade de compilar manually.</p>
             </div>
           </div>
           {/* Feature 2 */}
@@ -82,7 +83,7 @@ const Landing: React.FC = () => {
       <AnimatedSection className="container mx-auto px-4 py-20 text-center">
         <h3 className="text-4xl font-bold mb-4">Pronto para Otimizar Seu Fluxo de Trabalho?</h3>
         <p className="text-xl mb-8">Junte-se a milhares de desenvolvedores e acadêmicos que já estão usando o Superfolha.</p>
-        <button className="btn btn-primary">Crie Sua Conta Gratuita</button>
+        <Link to="/register" className="btn btn-primary">Crie Sua Conta Gratuita</Link>
       </AnimatedSection>
 
       {/* Footer */}
