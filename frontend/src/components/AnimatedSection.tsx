@@ -1,6 +1,6 @@
 // src/components/AnimatedSection.tsx
-import React, { useRef } from 'react';
-import { motion, useInView } from 'framer-motion';
+import React, { useRef } from "react";
+import { motion, useInView } from "framer-motion";
 
 interface Props {
   children: React.ReactNode;
@@ -21,7 +21,7 @@ const AnimatedSection: React.FC<Props> = ({ children, className }) => {
       ref={ref}
       className={className}
       initial="hidden"
-      animate={isInView ? 'visible' : 'hidden'}
+      animate={isInView ? "visible" : "hidden"}
       variants={variants}
       transition={{ duration: 0.5 }}
     >
