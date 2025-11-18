@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useLoginMutation } from "../hooks/useLoginMutation";
 
 export default function Login() {
+  const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -18,11 +20,11 @@ export default function Login() {
         // Check for user presence to confirm successful login
         navigate("/projects");
       } else {
-        setError("Login failed: No user data received.");
+        setError(t("login_failed"));
       }
     },
     onError: (err) => {
-      setError("Failed to login. Please try again.");
+      setError(t("login_error"));
       console.error(err);
     },
   });
@@ -41,7 +43,7 @@ export default function Login() {
             Superfolha
           </h2>
           <p className="text-center text-base-content/70 mb-4">
-            Sign in to your account
+            {t("login_title")}
           </p>
 
           {error && (
@@ -53,7 +55,7 @@ export default function Login() {
           <form onSubmit={handleSubmit}>
             <div className="form-control">
               <label className="label">
-                <span className="label-text">Email</span>
+                <span className="label-text">{t("email_label")}</span>
               </label>
               <input
                 type="email"
@@ -67,7 +69,7 @@ export default function Login() {
 
             <div className="form-control mt-4">
               <label className="label">
-                <span className="label-text">Password</span>
+                <span className="label-text">{t("password_label")}</span>
               </label>
               <input
                 type="password"
@@ -85,7 +87,7 @@ export default function Login() {
                 className={`btn btn-primary ${isInFlight ? "loading" : ""}`}
                 disabled={isInFlight}
               >
-                {isInFlight ? "Signing in..." : "Sign In"}
+                {isInFlight ? t("signing_in") : t("login_button")}
               </button>
             </div>
           </form>
@@ -93,9 +95,9 @@ export default function Login() {
           <div className="divider">OR</div>
 
           <p className="text-center">
-            Don't have an account?{" "}
+            {t("no_account")}{" "}
             <Link to="/register" className="link link-primary">
-              Sign up
+              {t("register_button")}
             </Link>
           </p>
         </div>

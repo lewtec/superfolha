@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useRegisterMutation } from "../hooks/useRegisterMutation";
 
 export default function Register() {
+  const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -19,11 +21,11 @@ export default function Register() {
         localStorage.setItem("token", response.register.token);
         navigate("/projects");
       } else {
-        setError("Registration failed: No token received.");
+        setError(t("registration_failed"));
       }
     },
     onError: (err) => {
-      setError("Failed to register. Please try again.");
+      setError(t("registration_error"));
       console.error(err);
     },
   });
@@ -33,12 +35,12 @@ export default function Register() {
     setError("");
 
     if (password !== confirmPassword) {
-      setError("Passwords do not match");
+      setError(t("passwords_do_not_match"));
       return;
     }
 
     if (password.length < 6) {
-      setError("Password must be at least 6 characters");
+      setError(t("password_too_short"));
       return;
     }
 
@@ -53,7 +55,7 @@ export default function Register() {
             Superfolha
           </h2>
           <p className="text-center text-base-content/70 mb-4">
-            Create a new account
+            {t("register_title")}
           </p>
 
           {error && (
@@ -65,7 +67,7 @@ export default function Register() {
           <form onSubmit={handleSubmit}>
             <div className="form-control">
               <label className="label">
-                <span className="label-text">Email</span>
+                <span className="label-text">{t("email_label")}</span>
               </label>
               <input
                 type="email"
@@ -79,7 +81,7 @@ export default function Register() {
 
             <div className="form-control mt-4">
               <label className="label">
-                <span className="label-text">Password</span>
+                <span className="label-text">{t("password_label")}</span>
               </label>
               <input
                 type="password"
@@ -93,7 +95,7 @@ export default function Register() {
 
             <div className="form-control mt-4">
               <label className="label">
-                <span className="label-text">Confirm Password</span>
+                <span className="label-text">{t("confirm_password_label")}</span>
               </label>
               <input
                 type="password"
@@ -111,7 +113,7 @@ export default function Register() {
                 className={`btn btn-primary ${isInFlight ? "loading" : ""}`}
                 disabled={isInFlight}
               >
-                {isInFlight ? "Creating account..." : "Sign Up"}
+                {isInFlight ? t("creating_account") : t("register_button")}
               </button>
             </div>
           </form>
@@ -119,9 +121,9 @@ export default function Register() {
           <div className="divider">OR</div>
 
           <p className="text-center">
-            Already have an account?{" "}
+            {t("already_have_account")}{" "}
             <Link to="/login" className="link link-primary">
-              Sign in
+              {t("login_button")}
             </Link>
           </p>
         </div>
