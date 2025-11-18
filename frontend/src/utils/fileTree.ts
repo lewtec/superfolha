@@ -23,7 +23,7 @@ export function buildFileTree(flatFiles: FlatFile[]): FileTreeNode[] {
 
     parts.forEach((part, index) => {
       currentPath = currentPath === "" ? part : `${currentPath}/${part}`;
-      let existingNode = currentLevel.find((node) => node.name === part);
+      const existingNode = currentLevel.find((node) => node.name === part);
 
       if (existingNode) {
         if (existingNode.type === "directory") {
