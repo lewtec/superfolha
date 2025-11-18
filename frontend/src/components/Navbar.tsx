@@ -1,4 +1,3 @@
-
 interface NavbarProps {
   projectName: string;
   onCompile: () => void;

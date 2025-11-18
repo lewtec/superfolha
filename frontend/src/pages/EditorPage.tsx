@@ -97,13 +97,15 @@ export default function EditorPage() {
         isTooBig: boolean;
       };
 
-      const initialFiles: File[] = (fetchedFiles as FetchedFile[]).map((file) => {
-        return {
-          ...file,
-          content: null,
-          isDirty: false,
-        };
-      });
+      const initialFiles: File[] = (fetchedFiles as FetchedFile[]).map(
+        (file) => {
+          return {
+            ...file,
+            content: null,
+            isDirty: false,
+          };
+        },
+      );
       setFiles(initialFiles);
       if (initialFiles.length > 0) {
         handleFileSelect(initialFiles[0].path);
@@ -345,7 +347,8 @@ export default function EditorPage() {
         );
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       setLogs(`Error: ${errorMessage}`);
     } finally {
       setCompiling(false);
