@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from "react"; // Added useCallback
+import { useEffect, useRef } from "react"; // Added useCallback
 import { EditorView, basicSetup } from "codemirror";
 import { EditorState } from "@codemirror/state";
 import { StreamLanguage } from "@codemirror/language";
