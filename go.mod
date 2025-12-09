@@ -11,7 +11,7 @@ require (
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/spf13/cobra v1.8.0
 	github.com/vektah/gqlparser/v2 v2.5.11
-	golang.org/x/crypto v0.37.0
+	golang.org/x/crypto v0.46.0
 )
 
 require (
