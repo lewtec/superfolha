@@ -40,7 +40,7 @@ func Compile(projectService *project.Service, projectId string, filePath string)
 	if err := os.MkdirAll(tmpDir, 0755); err != nil {
 		return nil, err
 	}
-	defer os.RemoveAll(tmpDir) // Cleanup
+	defer func() { _ = os.RemoveAll(tmpDir) }() // Cleanup
 
 	// Get all files from the project
 	projectFiles, err := projectService.ListFiles(projectId)
@@ -64,14 +64,14 @@ func Compile(projectService *project.Service, projectId string, filePath string)
 		// Close the reader after copying
 		// Note: defer in a loop can be problematic if many files, but for typical LaTeX projects, it should be fine.
 		// For very large projects, consider closing immediately after io.Copy.
-		defer fileReader.Close()
+		defer func() { _ = fileReader.Close() }()
 
 		// Write file content to temporary directory
 		outFile, err := os.Create(targetPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create temporary file %s: %w", targetPath, err)
 		}
-		defer outFile.Close() // Close the writer
+		defer func() { _ = outFile.Close() }() // Close the writer
 
 		if _, err := io.Copy(outFile, fileReader); err != nil {
 			return nil, fmt.Errorf("failed to copy file %s to temporary directory: %w", file.Path, err)

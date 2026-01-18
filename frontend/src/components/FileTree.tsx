@@ -61,11 +61,14 @@ const FileTreeItem: React.FC<FileTreeItemProps> = ({
   return (
     <li>
       <div
-        className="flex items-center justify-between py-1 px-2 cursor-pointer hover:bg-base-300 rounded-md"
+        className="
+          flex cursor-pointer items-center justify-between rounded-md px-2 py-1
+          hover:bg-base-300
+        "
         style={{ paddingLeft: `${indent}px` }}
         onClick={handleToggleExpand}
       >
-        <div className="flex items-center gap-2 flex-grow">
+        <div className="flex grow items-center gap-2">
           {node.type === "directory" ? (
             isExpanded ? (
               <ChevronDown size={16} />
@@ -92,7 +95,7 @@ const FileTreeItem: React.FC<FileTreeItemProps> = ({
           </span>
         </div>
         {node.type === "file" && node.path !== "main.tex" && (
-          <button className="btn btn-xs btn-ghost" onClick={handleDelete}>
+          <button className="btn btn-ghost btn-xs" onClick={handleDelete}>
             <Trash2 size={16} />
           </button>
         )}
@@ -186,7 +189,7 @@ export default function FileTree({
 
   return (
     <div className="file-tree bg-base-200 p-4">
-      <div className="flex justify-between items-center mb-4">
+      <div className="mb-4 flex items-center justify-between">
         <h3 className="font-bold">Files</h3>
         <div className="flex gap-2">
           <button className="btn btn-xs btn-primary" onClick={triggerFileInput}>
@@ -204,7 +207,7 @@ export default function FileTree({
         onChange={handleFileChange}
         accept="*/*" // Accept all file types
       />
-      <ul className="menu bg-base-100 rounded-box w-full">
+      <ul className="menu w-full rounded-box bg-base-100">
         {tree.map((node) => (
           <FileTreeItem
             key={node.path}

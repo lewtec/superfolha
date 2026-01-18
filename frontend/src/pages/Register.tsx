@@ -48,13 +48,13 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-base-200">
+    <div className="flex min-h-screen items-center justify-center bg-base-200">
       <div className="card w-96 bg-base-100 shadow-xl">
         <div className="card-body">
-          <h2 className="card-title text-2xl font-bold text-center">
+          <h2 className="card-title text-center text-2xl font-bold">
             Superfolha
           </h2>
-          <p className="text-center text-base-content/70 mb-4">
+          <p className="mb-4 text-center text-base-content/70">
             {t("register_title")}
           </p>
 
@@ -72,7 +72,7 @@ export default function Register() {
               <input
                 type="email"
                 placeholder="email@example.com"
-                className="input input-bordered"
+                className="input-bordered input"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -86,7 +86,7 @@ export default function Register() {
               <input
                 type="password"
                 placeholder="••••••••"
-                className="input input-bordered"
+                className="input-bordered input"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -102,7 +102,7 @@ export default function Register() {
               <input
                 type="password"
                 placeholder="••••••••"
-                className="input input-bordered"
+                className="input-bordered input"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
@@ -112,7 +112,10 @@ export default function Register() {
             <div className="form-control mt-6">
               <button
                 type="submit"
-                className={`btn btn-primary ${isInFlight ? "loading" : ""}`}
+                className={`
+                  btn btn-primary
+                  ${isInFlight ? "loading" : ""}
+                `}
                 disabled={isInFlight}
               >
                 {isInFlight ? t("creating_account") : t("register_button")}

@@ -64,8 +64,8 @@ export default function EditorPage() {
   // Conditional return based on loading state - MUST be after all hooks are called
   if (projectQueryData.loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <span className="loading loading-spinner loading-lg"></span>
+      <div className="flex h-screen items-center justify-center">
+        <span className="loading loading-lg loading-spinner"></span>
       </div>
     );
   }
@@ -360,26 +360,26 @@ export default function EditorPage() {
     const anyDirty = files.some((file) => file.isDirty);
 
     if (anyDirty) {
-      return <span className="badge badge-error gap-2">Unsaved</span>;
+      return <span className="badge gap-2 badge-error">Unsaved</span>;
     }
 
     switch (editorStatus) {
       case "saving":
-        return <span className="badge badge-warning gap-2">Saving...</span>;
+        return <span className="badge gap-2 badge-warning">Saving...</span>;
       case "saved":
-        return <span className="badge badge-success gap-2">Saved</span>;
+        return <span className="badge gap-2 badge-success">Saved</span>;
       case "committed":
       case "clean":
-        return <span className="badge badge-info gap-2">Committed</span>;
+        return <span className="badge gap-2 badge-info">Committed</span>;
       case "error":
-        return <span className="badge badge-error gap-2">Error</span>;
+        return <span className="badge gap-2 badge-error">Error</span>;
       default:
-        return <span className="badge badge-info gap-2">Committed</span>;
+        return <span className="badge gap-2 badge-info">Committed</span>;
     }
   };
 
   return (
-    <div className="h-screen flex flex-col">
+    <div className="flex h-screen flex-col">
       <div className="flex flex-1 overflow-hidden">
         {/* File Tree Sidebar */}
         <div className="w-64 border-r border-base-300">
@@ -395,24 +395,33 @@ export default function EditorPage() {
         </div>
 
         {/* Main Content Area */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex flex-1 flex-col">
           {/* Toolbar */}
-          <div className="flex items-center justify-between bg-base-200 p-2 gap-4">
-            <div className="tabs tabs-boxed">
+          <div className="flex items-center justify-between gap-4 bg-base-200 p-2">
+            <div className="tabs-boxed tabs">
               <a
-                className={`tab ${activeTab === "code" ? "tab-active" : ""}`}
+                className={`
+                  tab
+                  ${activeTab === "code" ? "tab-active" : ""}
+                `}
                 onClick={() => setActiveTab("code")}
               >
                 Code
               </a>
               <a
-                className={`tab ${activeTab === "pdf" ? "tab-active" : ""}`}
+                className={`
+                  tab
+                  ${activeTab === "pdf" ? "tab-active" : ""}
+                `}
                 onClick={() => setActiveTab("pdf")}
               >
                 PDF
               </a>
               <a
-                className={`tab ${activeTab === "logs" ? "tab-active" : ""}`}
+                className={`
+                  tab
+                  ${activeTab === "logs" ? "tab-active" : ""}
+                `}
                 onClick={() => setActiveTab("logs")}
               >
                 Logs
@@ -422,13 +431,16 @@ export default function EditorPage() {
             <div className="flex items-center gap-3">
               {getStatusBadge()}
               <button
-                className={`btn btn-sm ${compiling ? "btn-disabled" : "btn-primary"}`}
+                className={`
+                  btn btn-sm
+                  ${compiling ? "btn-disabled" : `btn-primary`}
+                `}
                 onClick={compile}
                 disabled={compiling}
               >
                 {compiling ? (
                   <>
-                    <span className="loading loading-spinner loading-xs"></span>
+                    <span className="loading loading-xs loading-spinner"></span>
                     Compiling...
                   </>
                 ) : (
@@ -454,7 +466,11 @@ export default function EditorPage() {
             ) : activeTab === "logs" ? (
               <Editor value={logs} onChange={() => null} onSave={() => null} />
             ) : (
-              <div className="flex items-center justify-center h-full text-base-content/70">
+              <div
+                className="
+                  flex h-full items-center justify-center text-base-content/70
+                "
+              >
                 Select a file or tab to view content.
               </div>
             )}

@@ -14,13 +14,16 @@ export default function Navbar({
   return (
     <div className="navbar bg-base-100 shadow-md">
       <div className="navbar-start">
-        <span className="text-base-content/70 ml-4">
+        <span className="ml-4 text-base-content/70">
           Project: {projectName}
         </span>
       </div>
       <div className="navbar-end gap-2">
         <button
-          className={`btn btn-primary ${compiling ? "loading" : ""}`}
+          className={`
+            btn btn-primary
+            ${compiling ? "loading" : ""}
+          `}
           onClick={onCompile}
           disabled={compiling}
         >

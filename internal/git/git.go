@@ -293,7 +293,7 @@ func ReadFile(repoPath, filePath string) (io.ReadCloser, int64, error) {
 
 	if err != nil {
 
-		file.Close() // Ensure file is closed on error
+		_ = file.Close() // Ensure file is closed on error
 
 		return nil, 0, fmt.Errorf("failed to get file info for %s: %w", filePath, err)
 

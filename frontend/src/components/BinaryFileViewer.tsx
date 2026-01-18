@@ -33,10 +33,15 @@ export default function BinaryFileViewer({
   };
 
   return (
-    <div className="flex flex-col items-center justify-center h-full bg-base-100 text-base-content p-4">
+    <div
+      className="
+        flex h-full flex-col items-center justify-center bg-base-100 p-4
+        text-base-content
+      "
+    >
       <svg
         xmlns="http://www.w3.org/2000/svg"
-        className="h-24 w-24 text-warning mb-4"
+        className="mb-4 size-24 text-warning"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
@@ -48,10 +53,10 @@ export default function BinaryFileViewer({
           d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
         />
       </svg>
-      <p className="text-lg font-semibold mb-2">
+      <p className="mb-2 text-lg font-semibold">
         Cannot display binary file: {fileName}
       </p>
-      <p className="text-sm text-base-content/70 mb-4">
+      <p className="mb-4 text-sm text-base-content/70">
         This file appears to be a binary format and cannot be rendered directly
         in the editor.
       </p>

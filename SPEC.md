@@ -1,4 +1,4 @@
-```markdown
+````markdown
 # Superfolha - Especificação Técnica
 
 Construa um editor LaTeX web completo seguindo esta especificação.
@@ -6,6 +6,7 @@ Construa um editor LaTeX web completo seguindo esta especificação.
 ## Stack Tecnológica
 
 ### Backend
+
 - Go com stdlib HTTP router (ServeMux)
 - GraphQL via gqlgen
 - PostgreSQL com sqlc para queries
@@ -15,6 +16,7 @@ Construa um editor LaTeX web completo seguindo esta especificação.
 - embed.FS para servir bundle Vite
 
 ### Frontend
+
 - React + Relay (GraphQL client com codegen)
 - DaisyUI (Tailwind CSS) para UI
 - CodeMirror 6 para editor de código
@@ -22,6 +24,7 @@ Construa um editor LaTeX web completo seguindo esta especificação.
 - React Router para navegação
 
 ### Deploy
+
 - Binário único que embeda frontend
 - Docker com base texlive/texlive:latest
 - TexLive completo instalado
@@ -31,14 +34,17 @@ Construa um editor LaTeX web completo seguindo esta especificação.
 ```bash
 ./server --state-dir=/var/superfolha --db="postgres://..."
 ```
+````
 
 Argumentos via cobra, suportam variáveis de ambiente:
+
 - `--state-dir` (env: STATE_DIR) - diretório para repositórios Git
 - `--db` (env: DATABASE_URL) - connection string PostgreSQL
 
 ## Arquitetura Backend
 
 ### Estrutura de Diretórios
+
 ```
 /cmd/server
   main.go
@@ -55,6 +61,7 @@ Argumentos via cobra, suportam variáveis de ambiente:
 ```
 
 ### Rotas HTTP
+
 ```
 GET  /*          - serve SPA (index.html) para qualquer não-API
 POST /api/graphql - GraphQL endpoint
@@ -142,10 +149,12 @@ type AuthPayload {
 Endpoint: `POST /api/compile`
 
 **Request:**
+
 - Content-Type: multipart/form-data
 - Field: `tarball` (arquivo .tar.gz com projeto)
 
 **Process:**
+
 1. Extrai tarball em `/tmp/compile-{uuid}/`
 2. Detecta `main.tex` ou único arquivo `.tex` no root
 3. Executa: `pdflatex -synctex=1 -interaction=nonstopmode <file>.tex`
@@ -154,6 +163,7 @@ Endpoint: `POST /api/compile`
 6. Cleanup do diretório temporário
 
 **Response JSON:**
+
 ```json
 {
   "pdf": "base64-encoded-pdf",
@@ -166,6 +176,7 @@ Endpoint: `POST /api/compile`
 ### Git Operations (libgit2)
 
 Operações necessárias:
+
 - `InitRepo(path)` - cria novo repositório
 - `AddAll(repoPath)` - adiciona arquivos ao index
 - `Commit(repoPath, author, message)` - cria commit
@@ -187,6 +198,7 @@ Operações necessárias:
 ## Arquitetura Frontend
 
 ### Estrutura de Diretórios
+
 ```
 /src
   /components
@@ -233,6 +245,7 @@ Operações necessárias:
 ### Componentes DaisyUI
 
 Use estes componentes DaisyUI:
+
 - **Navbar**: barra superior
 - **Menu**: árvore de arquivos na sidebar
 - **Tabs**: toggle Code/PDF
@@ -265,11 +278,13 @@ Protected routes checam JWT e redirecionam para `/login` se não autenticado.
 ### Autocomplete (Client-side)
 
 **Arquivos de Completions:**
+
 - Converter LaTeX-cwl `.cwl` files para JSON
 - Estrutura: `{ "commands": ["\\section{}", "\\textbf{}"], "environments": ["itemize", "equation"] }`
 - Servir em `/public/completions/`
 
 **Lógica:**
+
 1. Carrega `core.json` na inicialização
 2. Watcher no editor detecta `\usepackage{X}` via regex
 3. Fetch `/completions/X.json` (cache no browser)
@@ -278,6 +293,7 @@ Protected routes checam JWT e redirecionam para `/login` se não autenticado.
 6. Trigger autocomplete ao digitar `\`
 
 **Regex úteis:**
+
 ```javascript
 // Detecta packages
 /\\usepackage(?:\[.*?\])?\{([\w,]+)\}/g
@@ -302,10 +318,12 @@ Protected routes checam JWT e redirecionam para `/login` se não autenticado.
 
 **Parsing de Erros:**
 Regex para logs pdflatex:
+
 ```
 ! LaTeX Error: ...
 l.42 ...
 ```
+
 Extrair número da linha e mostrar inline no editor.
 
 ### Criar Projeto Flow
@@ -322,6 +340,7 @@ Extrair número da linha e mostrar inline no editor.
 ## Features MVP
 
 ### Essenciais
+
 - [x] Auth (register, login com JWT)
 - [x] CRUD projetos (create, list, delete)
 - [x] Explorador de arquivos (FileTree navegável)
@@ -336,6 +355,7 @@ Extrair número da linha e mostrar inline no editor.
 - [x] Upload de arquivos (imagens, .bib)
 
 ### Layout
+
 - [x] Toggle Code/PDF via tabs
 - [x] FileTree sidebar com DaisyUI menu
 - [x] Logs panel collapsible na parte inferior
@@ -345,6 +365,7 @@ Extrair número da linha e mostrar inline no editor.
 ## Detalhes de Implementação
 
 ### CodeMirror Setup
+
 ```javascript
 import { EditorView, basicSetup } from "codemirror"
 import { latex } from "@codemirror/legacy-modes/mode/stex"
@@ -357,6 +378,7 @@ const latexLanguage = StreamLanguage.define(latex)
 ```
 
 ### PDF.js Setup
+
 ```javascript
 import * as pdfjsLib from 'pdfjs-dist'
 
@@ -367,6 +389,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
 ```
 
 ### Relay Setup
+
 ```javascript
 // RelayEnvironment com JWT token
 const fetchQuery = async (operation, variables) => {
@@ -384,6 +407,7 @@ const fetchQuery = async (operation, variables) => {
 ```
 
 ### Template main.tex Inicial
+
 ```latex
 \documentclass{article}
 \usepackage[utf8]{inputenc}
@@ -406,6 +430,7 @@ Your content here.
 ## Build e Deploy
 
 ### Development
+
 ```bash
 # Frontend
 cd frontend && npm install && npm run dev
@@ -416,6 +441,7 @@ go run cmd/server/main.go --state-dir=./tmp --db="postgres://..."
 ```
 
 ### Production Build
+
 ```bash
 # Build frontend
 cd frontend && npm run build
@@ -431,6 +457,7 @@ docker run -v /data:/data -p 8080:8080 superfolha \
 ```
 
 ### Dockerfile
+
 ```dockerfile
 FROM texlive/texlive:latest
 
@@ -457,10 +484,13 @@ ENTRYPOINT ["server"]
 ## Testing
 
 Implementar testes para:
+
 - Auth flow (register, login, JWT validation)
 - Git operations (init, commit, read/write files)
 - Compilação (success, error handling, cleanup)
 - GraphQL mutations/queries
 
 Use testcontainers para Postgres em testes de integração.
+
+```
 ```

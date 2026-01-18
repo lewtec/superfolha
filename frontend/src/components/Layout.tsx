@@ -25,10 +25,10 @@ export default function Layout({ children }: LayoutProps) {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <div className="navbar bg-base-100 shadow-md flex justify-between">
+    <div className="flex min-h-screen flex-col">
+      <div className="navbar flex justify-between bg-base-100 shadow-md">
         <div className="navbar-start">
-          <a href="/" className="btn btn-ghost normal-case text-xl">
+          <a href="/" className="btn text-xl normal-case btn-ghost">
             superfolha
           </a>
         </div>
@@ -38,7 +38,7 @@ export default function Layout({ children }: LayoutProps) {
               Logout
             </button>
           )}
-          <button onClick={toggleTheme} className="btn btn-ghost btn-circle">
+          <button onClick={toggleTheme} className="btn btn-circle btn-ghost">
             {theme === "light" ? <Moon size={20} /> : <Sun size={20} />}
           </button>
         </div>

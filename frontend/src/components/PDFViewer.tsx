@@ -33,7 +33,7 @@ export default function PDFViewer({ pdfData }: PDFViewerProps) {
 
   if (!pdfData) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="flex h-full items-center justify-center">
         <p className="text-base-content/70">
           No PDF compiled yet. Click "Compile" to generate PDF.
         </p>
@@ -43,27 +43,27 @@ export default function PDFViewer({ pdfData }: PDFViewerProps) {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="flex h-full items-center justify-center">
         <p className="text-error">{error}</p>
       </div>
     );
   }
 
   return (
-    <div className="pdf-viewer bg-base-200 flex flex-col h-full">
+    <div className="pdf-viewer flex h-full flex-col bg-base-200">
       {loading && (
-        <div className="flex items-center justify-center h-full">
-          <span className="loading loading-spinner loading-lg"></span>
+        <div className="flex h-full items-center justify-center">
+          <span className="loading loading-lg loading-spinner"></span>
         </div>
       )}
-      <div className="flex-1 overflow-auto flex justify-center p-4">
+      <div className="flex flex-1 justify-center overflow-auto p-4">
         <Document
           file={`data:application/pdf;base64,${pdfData}`}
           onLoadSuccess={onDocumentLoadSuccess}
           onLoadError={onDocumentLoadError}
           loading={
-            <div className="flex items-center justify-center h-full">
-              <span className="loading loading-spinner loading-lg"></span>
+            <div className="flex h-full items-center justify-center">
+              <span className="loading loading-lg loading-spinner"></span>
             </div>
           }
         >

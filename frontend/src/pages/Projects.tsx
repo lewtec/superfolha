@@ -80,7 +80,7 @@ export default function Projects() {
     <div className="min-h-screen bg-base-200">
       {/* Content */}
       <div className="container mx-auto p-8">
-        <div className="flex justify-between items-center mb-6">
+        <div className="mb-6 flex items-center justify-between">
           <h1 className="text-3xl font-bold">My Projects</h1>
           <button
             className="btn btn-primary"
@@ -92,18 +92,18 @@ export default function Projects() {
         </div>
 
         {error && (
-          <div className="alert alert-error mb-4">
+          <div className="mb-4 alert alert-error">
             <span>{error}</span>
           </div>
         )}
 
         {queryData.loading ? (
-          <div className="flex justify-center items-center h-64">
-            <span className="loading loading-spinner loading-lg"></span>
+          <div className="flex h-64 items-center justify-center">
+            <span className="loading loading-lg loading-spinner"></span>
           </div>
         ) : projects && projects.length === 0 ? (
-          <div className="text-center py-16">
-            <p className="text-lg text-base-content/70 mb-4">No projects yet</p>
+          <div className="py-16 text-center">
+            <p className="mb-4 text-lg text-base-content/70">No projects yet</p>
             <button
               className="btn btn-primary"
               onClick={() => setShowModal(true)}
@@ -113,7 +113,13 @@ export default function Projects() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div
+            className="
+              grid grid-cols-1 gap-6
+              md:grid-cols-2
+              lg:grid-cols-3
+            "
+          >
             {projects &&
               projects.map((project) => (
                 <div key={project.id} className="card bg-base-100 shadow-xl">
@@ -123,15 +129,15 @@ export default function Projects() {
                       Updated:{" "}
                       {new Date(project.updatedAt).toLocaleDateString()}
                     </p>
-                    <div className="card-actions justify-end mt-4">
+                    <div className="mt-4 card-actions justify-end">
                       <button
-                        className="btn btn-primary btn-sm"
+                        className="btn btn-sm btn-primary"
                         onClick={() => navigate(`/editor/${project.id}`)}
                       >
                         Open
                       </button>
                       <button
-                        className="btn btn-error btn-sm"
+                        className="btn btn-sm btn-error"
                         onClick={() => handleDeleteProject(project.id)}
                         disabled={isDeletingProject}
                       >
@@ -147,9 +153,9 @@ export default function Projects() {
 
       {/* Create Project Modal */}
       {showModal && (
-        <div className="modal modal-open">
+        <div className="modal-open modal">
           <div className="modal-box">
-            <h3 className="font-bold text-lg mb-4">Create New Project</h3>
+            <h3 className="mb-4 text-lg font-bold">Create New Project</h3>
             <div className="form-control">
               <label className="label">
                 <span className="label-text">Project Name</span>
@@ -157,7 +163,7 @@ export default function Projects() {
               <input
                 type="text"
                 placeholder="My LaTeX Document"
-                className="input input-bordered"
+                className="input-bordered input"
                 value={newProjectName}
                 onChange={(e) => setNewProjectName(e.target.value)}
                 onKeyPress={(e) => e.key === "Enter" && handleCreateProject()}

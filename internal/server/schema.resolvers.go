@@ -261,7 +261,7 @@ func (r *projectResolver) Files(ctx context.Context, obj *Project) ([]*File, err
 		if err != nil {
 			return nil, fmt.Errorf("failed to read file for binary check: %w", err)
 		}
-		defer fileReader.Close()
+		defer func() { _ = fileReader.Close() }()
 
 		var buf [512]byte
 		n, _ := io.ReadFull(fileReader, buf[:])
@@ -286,7 +286,7 @@ func (r *projectResolver) File(ctx context.Context, obj *Project, path string) (
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file: %w", err)
 	}
-	defer fileReader.Close() // Ensure the file reader is closed
+	defer func() { _ = fileReader.Close() }() // Ensure the file reader is closed
 
 	isTooBig := fileSize > MaxGraphQLFileSize
 	var content *string // Use pointer to string for nullable content
@@ -298,7 +298,7 @@ func (r *projectResolver) File(ctx context.Context, obj *Project, path string) (
 
 	// Reset the reader to the beginning for full content reading if needed
 	if seeker, ok := fileReader.(io.ReadSeeker); ok {
-		seeker.Seek(0, io.SeekStart)
+		_, _ = seeker.Seek(0, io.SeekStart)
 	} else {
 		// This case should ideally not be hit for os.File
 		log.Printf("Warning: fileReader is not seekable for %s in GraphQL resolver", path)

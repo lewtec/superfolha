@@ -16,6 +16,7 @@ A complete web-based LaTeX editor with Git version control, real-time compilatio
 ## Tech Stack
 
 ### Backend (Go)
+
 - HTTP server with stdlib router
 - GraphQL API via gqlgen
 - PostgreSQL with sqlc
@@ -24,6 +25,7 @@ A complete web-based LaTeX editor with Git version control, real-time compilatio
 - LaTeX compilation with pdflatex
 
 ### Frontend (React + TypeScript)
+
 - Vite build tool
 - Relay GraphQL client
 - DaisyUI + Tailwind CSS
@@ -34,6 +36,7 @@ A complete web-based LaTeX editor with Git version control, real-time compilatio
 ## Development
 
 ### Prerequisites
+
 - [mise](https://mise.jdx.dev/) - Runtime and task manager
 - PostgreSQL
 - TexLive (for LaTeX compilation)

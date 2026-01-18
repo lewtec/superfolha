@@ -8,7 +8,7 @@ const Header: React.FC = () => {
 
   return (
     <header className="bg-base-100 shadow-md">
-      <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+      <div className="container mx-auto flex items-center justify-between p-4">
         <Link to="/" className="text-2xl font-bold">
           Superfolha
         </Link>
@@ -16,7 +16,7 @@ const Header: React.FC = () => {
           <Link to="/login" className="btn btn-ghost">
             {t("login_button")}
           </Link>
-          <Link to="/register" className="btn btn-primary ml-4">
+          <Link to="/register" className="btn ml-4 btn-primary">
             {t("register_button")}
           </Link>
         </nav>

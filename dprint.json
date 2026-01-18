@@ -1,0 +1,14 @@
+{
+  "incremental": true,
+  "markdown": {
+  },
+  "includes": ["**/*.md"],
+  "excludes": [
+    "**/node_modules",
+    "**/dist",
+    "**/build"
+  ],
+  "plugins": [
+    "https://plugins.dprint.dev/markdown-0.17.8.wasm"
+  ]
+}

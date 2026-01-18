@@ -13,7 +13,7 @@ type Time time.Time
 
 func (t Time) MarshalGQL(w io.Writer) {
 	tyme := time.Time(t)
-	w.Write([]byte(strconv.Quote(tyme.Format(time.RFC3339))))
+	_, _ = w.Write([]byte(strconv.Quote(tyme.Format(time.RFC3339))))
 }
 
 func (t *Time) UnmarshalGQL(v interface{}) error {
@@ -33,7 +33,7 @@ func (t *Time) UnmarshalGQL(v interface{}) error {
 
 func MarshalTime(t time.Time) graphql.Marshaler {
 	return graphql.WriterFunc(func(w io.Writer) {
-		w.Write([]byte(strconv.Quote(t.Format(time.RFC3339))))
+		_, _ = w.Write([]byte(strconv.Quote(t.Format(time.RFC3339))))
 	})
 }
 

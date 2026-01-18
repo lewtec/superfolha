@@ -46,8 +46,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (loading) {
     // Show a loading indicator while authentication status is being determined
     return (
-      <div className="flex items-center justify-center h-screen">
-        <span className="loading loading-spinner loading-lg"></span>
+      <div className="flex h-screen items-center justify-center">
+        <span className="loading loading-lg loading-spinner"></span>
       </div>
     );
   }
