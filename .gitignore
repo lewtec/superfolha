@@ -8,6 +8,7 @@
 *.out
 /data
 /tmp
+/mise
 
 # Frontend
 node_modules/

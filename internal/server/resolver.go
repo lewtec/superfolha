@@ -62,10 +62,6 @@ func NewResolver(db db.DBTX, stateDir string, projectService *project.Service) *
 	}
 }
 
-func (r *Resolver) getProjectPath(projectID string) string {
-	return r.projectService.GetProjectPath(projectID)
-}
-
 func (r *Resolver) getAndCheckProject(ctx context.Context, projectID string) (*db.Project, string, *auth.UserContext, error) {
 	user, ok := auth.GetUserFromContext(ctx)
 	if !ok {
