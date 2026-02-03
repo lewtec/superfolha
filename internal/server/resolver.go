@@ -52,13 +52,15 @@ type Resolver struct {
 	DB             db.DBTX
 	StateDir       string
 	projectService *project.Service // Added projectService
+	authService    *auth.Service
 }
 
-func NewResolver(db db.DBTX, stateDir string, projectService *project.Service) *Resolver {
+func NewResolver(db db.DBTX, stateDir string, projectService *project.Service, authService *auth.Service) *Resolver {
 	return &Resolver{
 		DB:             db,
 		StateDir:       stateDir,
 		projectService: projectService, // Initialize projectService
+		authService:    authService,
 	}
 }
 

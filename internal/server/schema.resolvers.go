@@ -22,24 +22,7 @@ import (
 
 // Register is the resolver for the register field.
 func (r *mutationResolver) Register(ctx context.Context, email string, password string) (*AuthPayload, error) {
-	// Hash password
-	hashedPassword, err := auth.HashPassword(password)
-	if err != nil {
-		return nil, err
-	}
-
-	// Insert user into database
-	q := db.New(r.DB)
-	dbUser, err := q.CreateUser(ctx, db.CreateUserParams{
-		Email:        email,
-		PasswordHash: hashedPassword,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create user: %w", err)
-	}
-
-	// Generate token
-	token, err := auth.GenerateToken(uuid.UUID(dbUser.ID.Bytes).String(), email)
+	authResp, err := r.authService.Register(ctx, email, password)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +36,7 @@ func (r *mutationResolver) Register(ctx context.Context, email string, password 
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     "authToken",
-		Value:    token,
+		Value:    authResp.Token,
 		Expires:  time.Now().Add(7 * 24 * time.Hour), // Match token expiration
 		HttpOnly: true,
 		Secure:   true, // Set to true in production for HTTPS
@@ -62,30 +45,16 @@ func (r *mutationResolver) Register(ctx context.Context, email string, password 
 	// --- END NEW ---
 
 	return &AuthPayload{
-		// Token: token, // REMOVED: Token is now in cookie
 		User: &User{
-			ID:    uuid.UUID(dbUser.ID.Bytes).String(),
-			Email: dbUser.Email,
+			ID:    uuid.UUID(authResp.User.ID.Bytes).String(),
+			Email: authResp.User.Email,
 		},
 	}, nil
 }
 
 // Login is the resolver for the login field.
 func (r *mutationResolver) Login(ctx context.Context, email string, password string) (*AuthPayload, error) {
-	// Get user from database
-	q := db.New(r.DB)
-	dbUser, err := q.GetUserByEmail(ctx, email)
-	if err != nil {
-		return nil, fmt.Errorf("invalid credentials")
-	}
-
-	// Check password
-	if !auth.CheckPasswordHash(password, dbUser.PasswordHash) {
-		return nil, fmt.Errorf("invalid credentials")
-	}
-
-	// Generate token
-	token, err := auth.GenerateToken(uuid.UUID(dbUser.ID.Bytes).String(), dbUser.Email)
+	authResp, err := r.authService.Login(ctx, email, password)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +68,7 @@ func (r *mutationResolver) Login(ctx context.Context, email string, password str
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     "authToken",
-		Value:    token,
+		Value:    authResp.Token,
 		Expires:  time.Now().Add(7 * 24 * time.Hour), // Match token expiration
 		HttpOnly: true,
 		Secure:   true, // Set to true in production for HTTPS
@@ -108,10 +77,9 @@ func (r *mutationResolver) Login(ctx context.Context, email string, password str
 	// --- END NEW ---
 
 	return &AuthPayload{
-		// Token: token, // REMOVED: Token is now in cookie
 		User: &User{
-			ID:    uuid.UUID(dbUser.ID.Bytes).String(),
-			Email: dbUser.Email,
+			ID:    uuid.UUID(authResp.User.ID.Bytes).String(),
+			Email: authResp.User.Email,
 		},
 	}, nil
 }

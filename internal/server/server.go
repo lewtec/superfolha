@@ -21,14 +21,16 @@ type Server struct {
 	stateDir       string
 	resolver       *Resolver
 	projectService *project.Service // Added projectService
+	authService    *auth.Service
 }
 
-func NewServer(db db.DBTX, stateDir string, projectService *project.Service) *Server {
+func NewServer(db db.DBTX, stateDir string, projectService *project.Service, authService *auth.Service) *Server {
 	return &Server{
 		db:             db,
 		stateDir:       stateDir,
-		resolver:       NewResolver(db, stateDir, projectService), // Pass projectService here
+		resolver:       NewResolver(db, stateDir, projectService, authService), // Pass projectService and authService here
 		projectService: projectService,
+		authService:    authService,
 	}
 }
 
