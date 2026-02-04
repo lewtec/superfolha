@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/go-git/go-git/v5"
@@ -105,12 +106,25 @@ func (pr *ProjectRepository) CommitChanges(author, message string) (*igit.Commit
 	return igit.CommitChanges(pr.repoPath, author, message)
 }
 
+// validatePath ensures the filePath is within the repoPath.
+func (pr *ProjectRepository) validatePath(filePath string) (string, error) {
+	fullPath := filepath.Join(pr.repoPath, filePath)
+	if !strings.HasPrefix(fullPath, filepath.Clean(pr.repoPath)+string(os.PathSeparator)) {
+		return "", fmt.Errorf("invalid file path: %s", filePath)
+	}
+	return fullPath, nil
+}
+
 // SaveFile writes content to a file within the repository.
 func (pr *ProjectRepository) SaveFile(filePath, content string) error {
 	pr.Lock()
 	defer pr.Unlock()
 
-	fullPath := filepath.Join(pr.repoPath, filePath)
+	// SECURITY-NOTE: Validate path to prevent directory traversal
+	fullPath, err := pr.validatePath(filePath)
+	if err != nil {
+		return err
+	}
 
 	// Ensure the directory exists
 	dir := filepath.Dir(fullPath)
@@ -130,7 +144,12 @@ func (pr *ProjectRepository) DeleteFile(filePath string) error {
 	pr.Lock()
 	defer pr.Unlock()
 
-	fullPath := filepath.Join(pr.repoPath, filePath)
+	// SECURITY-NOTE: Validate path to prevent directory traversal
+	fullPath, err := pr.validatePath(filePath)
+	if err != nil {
+		return err
+	}
+
 	return os.Remove(fullPath)
 }
 
@@ -138,6 +157,11 @@ func (pr *ProjectRepository) DeleteFile(filePath string) error {
 func (pr *ProjectRepository) ReadFile(filePath string) (io.ReadCloser, int64, error) {
 	pr.Lock()
 	defer pr.Unlock()
+
+	// SECURITY-NOTE: Validate path to prevent directory traversal
+	if _, err := pr.validatePath(filePath); err != nil {
+		return nil, 0, err
+	}
 
 	return igit.ReadFile(pr.repoPath, filePath)
 }
