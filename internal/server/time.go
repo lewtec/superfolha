@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"io"
+	"log"
 	"strconv"
 	"time"
 
@@ -13,7 +14,9 @@ type Time time.Time
 
 func (t Time) MarshalGQL(w io.Writer) {
 	tyme := time.Time(t)
-	w.Write([]byte(strconv.Quote(tyme.Format(time.RFC3339))))
+	if _, err := w.Write([]byte(strconv.Quote(tyme.Format(time.RFC3339)))); err != nil {
+		log.Printf("Error writing time: %v", err)
+	}
 }
 
 func (t *Time) UnmarshalGQL(v interface{}) error {
@@ -33,7 +36,9 @@ func (t *Time) UnmarshalGQL(v interface{}) error {
 
 func MarshalTime(t time.Time) graphql.Marshaler {
 	return graphql.WriterFunc(func(w io.Writer) {
-		w.Write([]byte(strconv.Quote(t.Format(time.RFC3339))))
+		if _, err := w.Write([]byte(strconv.Quote(t.Format(time.RFC3339)))); err != nil {
+			log.Printf("Error writing time: %v", err)
+		}
 	})
 }
 
