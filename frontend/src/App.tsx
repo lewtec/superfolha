@@ -41,16 +41,7 @@ function App() {
 }
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, loading } = useAuthStatus(); // Use the new hook
-
-  if (loading) {
-    // Show a loading indicator while authentication status is being determined
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <span className="loading loading-spinner loading-lg"></span>
-      </div>
-    );
-  }
+  const { isAuthenticated } = useAuthStatus(); // Use the new hook
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;

@@ -1,0 +1,1 @@
+- 2025-02-18: Remove dead code checking for non-existent 'loading' property on Relay hooks results (Relay uses Suspense).
