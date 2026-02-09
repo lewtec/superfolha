@@ -10,7 +10,7 @@ export default function Projects() {
   const [showModal, setShowModal] = useState(false);
   const [error, setError] = useState("");
 
-  const { projects, ...queryData } = useProjectsQuery();
+  const { projects } = useProjectsQuery();
 
   const { createProject, isInFlight: isCreatingProject } =
     useCreateProjectMutation({
@@ -97,11 +97,7 @@ export default function Projects() {
           </div>
         )}
 
-        {queryData.loading ? (
-          <div className="flex justify-center items-center h-64">
-            <span className="loading loading-spinner loading-lg"></span>
-          </div>
-        ) : projects && projects.length === 0 ? (
+        {projects && projects.length === 0 ? (
           <div className="text-center py-16">
             <p className="text-lg text-base-content/70 mb-4">No projects yet</p>
             <button

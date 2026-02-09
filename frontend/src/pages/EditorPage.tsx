@@ -25,7 +25,7 @@ export default function EditorPage() {
   const { id } = useParams<{ id: string }>();
 
   // All hooks must be called unconditionally before any returns
-  const { project, ...projectQueryData } = useGetProjectQuery({ id: id! });
+  const { project } = useGetProjectQuery({ id: id! });
   const fetchedFiles = project?.files;
   const { getFileContent } = useGetFileContent();
 
@@ -60,15 +60,6 @@ export default function EditorPage() {
       });
     }
   }, 10000);
-
-  // Conditional return based on loading state - MUST be after all hooks are called
-  if (projectQueryData.loading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <span className="loading loading-spinner loading-lg"></span>
-      </div>
-    );
-  }
 
   const handleFileSelect = useCallback(
     async (path: string) => {
