@@ -16,12 +16,12 @@ func NewService(db db.DBTX) *Service {
 	return &Service{db: db}
 }
 
-type AuthResponse struct {
+type Response struct {
 	User  *db.User
 	Token string
 }
 
-func (s *Service) Register(ctx context.Context, email, password string) (*AuthResponse, error) {
+func (s *Service) Register(ctx context.Context, email, password string) (*Response, error) {
 	// Hash password
 	hashedPassword, err := HashPassword(password)
 	if err != nil {
@@ -44,13 +44,13 @@ func (s *Service) Register(ctx context.Context, email, password string) (*AuthRe
 		return nil, err
 	}
 
-	return &AuthResponse{
+	return &Response{
 		User:  &dbUser,
 		Token: token,
 	}, nil
 }
 
-func (s *Service) Login(ctx context.Context, email, password string) (*AuthResponse, error) {
+func (s *Service) Login(ctx context.Context, email, password string) (*Response, error) {
 	// Get user from database
 	q := db.New(s.db)
 	dbUser, err := q.GetUserByEmail(ctx, email)
@@ -69,7 +69,7 @@ func (s *Service) Login(ctx context.Context, email, password string) (*AuthRespo
 		return nil, err
 	}
 
-	return &AuthResponse{
+	return &Response{
 		User:  &dbUser,
 		Token: token,
 	}, nil

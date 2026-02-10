@@ -6,7 +6,8 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path/filepath" // Added import for filepath
+	"path/filepath"
+	"time"
 
 	"github.com/lewtec/superfolha/internal/auth"
 	"github.com/lewtec/superfolha/internal/project"
@@ -44,7 +45,7 @@ func getEnv(key, defaultValue string) string {
 	return defaultValue
 }
 
-func runServer(cmd *cobra.Command, args []string) {
+func runServer(_ *cobra.Command, _ []string) {
 	if dbURL == "" {
 		log.Fatal("Database URL is required (--db or DATABASE_URL)")
 	}
@@ -90,7 +91,13 @@ func runServer(cmd *cobra.Command, args []string) {
 	log.Printf("Starting server on http://localhost%s", addr)
 	log.Printf("GraphQL Playground: http://localhost%s/playground", addr)
 
-	if err := http.ListenAndServe(addr, srv.Handler()); err != nil {
+	httpServer := &http.Server{
+		Addr:              addr,
+		Handler:           srv.Handler(),
+		ReadHeaderTimeout: 3 * time.Second,
+	}
+
+	if err := httpServer.ListenAndServe(); err != nil {
 		log.Fatalf("Server failed: %v", err)
 	}
 }

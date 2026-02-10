@@ -11,18 +11,18 @@ import (
 	igit "github.com/lewtec/superfolha/internal/git"
 )
 
-// ProjectRepository wraps a git.Repository and provides thread-safe operations.
-type ProjectRepository struct {
-	projectId  string
+// Repository wraps a git.Repository and provides thread-safe operations.
+type Repository struct {
+	projectID  string
 	repoPath   string
 	repo       *git.Repository
 	sync.Mutex // Protects access to the underlying git.Repository
 }
 
-// RepositoryManager manages a collection of ProjectRepository instances.
+// RepositoryManager manages a collection of Repository instances.
 type RepositoryManager struct {
 	stateDir string
-	repos    map[string]*ProjectRepository
+	repos    map[string]*Repository
 	mu       sync.RWMutex // Protects access to the repos map
 }
 
@@ -30,14 +30,14 @@ type RepositoryManager struct {
 func NewRepositoryManager(stateDir string) *RepositoryManager {
 	return &RepositoryManager{
 		stateDir: stateDir,
-		repos:    make(map[string]*ProjectRepository),
+		repos:    make(map[string]*Repository),
 	}
 }
 
-// GetRepo retrieves or initializes a ProjectRepository for the given projectId.
-func (rm *RepositoryManager) GetRepo(projectId string) (*ProjectRepository, error) {
+// GetRepo retrieves or initializes a Repository for the given projectID.
+func (rm *RepositoryManager) GetRepo(projectID string) (*Repository, error) {
 	rm.mu.RLock()
-	pr, ok := rm.repos[projectId]
+	pr, ok := rm.repos[projectID]
 	rm.mu.RUnlock()
 
 	if ok {
@@ -49,16 +49,16 @@ func (rm *RepositoryManager) GetRepo(projectId string) (*ProjectRepository, erro
 	defer rm.mu.Unlock()
 
 	// Double-check if it was created by another goroutine while we were waiting for the lock
-	pr, ok = rm.repos[projectId]
+	pr, ok = rm.repos[projectID]
 	if ok {
 		return pr, nil
 	}
 
-	repoPath := filepath.Join(rm.stateDir, "repos", projectId)
+	repoPath := filepath.Join(rm.stateDir, "repos", projectID)
 
-	// Always create the ProjectRepository instance
-	pr = &ProjectRepository{
-		projectId: projectId,
+	// Always create the Repository instance
+	pr = &Repository{
+		projectID: projectID,
 		repoPath:  repoPath,
 	}
 
@@ -69,20 +69,20 @@ func (rm *RepositoryManager) GetRepo(projectId string) (*ProjectRepository, erro
 		// but with pr.repo = nil, and the error.
 		// Other errors are critical.
 		if err == git.ErrRepositoryNotExists {
-			rm.repos[projectId] = pr // Add to map even if repo doesn't exist yet
+			rm.repos[projectID] = pr // Add to map even if repo doesn't exist yet
 			return pr, err           // Return pr and the specific error
 		}
 		return nil, fmt.Errorf("failed to open git repository at %s: %w", repoPath, err)
 	}
 
 	pr.repo = r // Assign the opened repo
-	rm.repos[projectId] = pr
+	rm.repos[projectID] = pr
 
 	return pr, nil
 }
 
 // InitRepo initializes a new Git repository for this project.
-func (pr *ProjectRepository) InitRepo() error {
+func (pr *Repository) InitRepo() error {
 	pr.Lock()
 	defer pr.Unlock()
 
@@ -90,7 +90,7 @@ func (pr *ProjectRepository) InitRepo() error {
 }
 
 // AddAll stages all changes in the repository.
-func (pr *ProjectRepository) AddAll() error {
+func (pr *Repository) AddAll() error {
 	pr.Lock()
 	defer pr.Unlock()
 
@@ -98,7 +98,7 @@ func (pr *ProjectRepository) AddAll() error {
 }
 
 // CommitChanges commits all staged changes in the repository.
-func (pr *ProjectRepository) CommitChanges(author, message string) (*igit.Commit, error) {
+func (pr *Repository) CommitChanges(author, message string) (*igit.Commit, error) {
 	pr.Lock()
 	defer pr.Unlock()
 
@@ -106,7 +106,7 @@ func (pr *ProjectRepository) CommitChanges(author, message string) (*igit.Commit
 }
 
 // SaveFile writes content to a file within the repository.
-func (pr *ProjectRepository) SaveFile(filePath, content string) error {
+func (pr *Repository) SaveFile(filePath, content string) error {
 	pr.Lock()
 	defer pr.Unlock()
 
@@ -118,7 +118,7 @@ func (pr *ProjectRepository) SaveFile(filePath, content string) error {
 		return fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
 
-	if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(fullPath, []byte(content), 0600); err != nil {
 		return fmt.Errorf("failed to write file %s: %w", fullPath, err)
 	}
 
@@ -126,7 +126,7 @@ func (pr *ProjectRepository) SaveFile(filePath, content string) error {
 }
 
 // DeleteFile removes a file from the repository.
-func (pr *ProjectRepository) DeleteFile(filePath string) error {
+func (pr *Repository) DeleteFile(filePath string) error {
 	pr.Lock()
 	defer pr.Unlock()
 
@@ -135,7 +135,7 @@ func (pr *ProjectRepository) DeleteFile(filePath string) error {
 }
 
 // ReadFile reads a file from the repository.
-func (pr *ProjectRepository) ReadFile(filePath string) (io.ReadCloser, int64, error) {
+func (pr *Repository) ReadFile(filePath string) (io.ReadCloser, int64, error) {
 	pr.Lock()
 	defer pr.Unlock()
 
@@ -143,7 +143,7 @@ func (pr *ProjectRepository) ReadFile(filePath string) (io.ReadCloser, int64, er
 }
 
 // ListFiles lists all files in the repository.
-func (pr *ProjectRepository) ListFiles() ([]*igit.FileInfo, error) {
+func (pr *Repository) ListFiles() ([]*igit.FileInfo, error) {
 	pr.Lock()
 	defer pr.Unlock()
 
@@ -151,7 +151,7 @@ func (pr *ProjectRepository) ListFiles() ([]*igit.FileInfo, error) {
 }
 
 // GetHistory returns the commit history for the repository.
-func (pr *ProjectRepository) GetHistory() ([]*igit.Commit, error) {
+func (pr *Repository) GetHistory() ([]*igit.Commit, error) {
 	pr.Lock()
 	defer pr.Unlock()
 

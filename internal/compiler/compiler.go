@@ -23,9 +23,14 @@ type CompileResult struct {
 }
 
 // Compile compiles a specific LaTeX file from a project
-func Compile(projectService *project.Service, projectId string, filePath string) (*CompileResult, error) {
+func Compile(projectService *project.Service, projectID string, filePath string) (*CompileResult, error) {
+	// Validate filePath
+	if filepath.IsAbs(filePath) || strings.Contains(filePath, "..") {
+		return nil, fmt.Errorf("invalid file path")
+	}
+
 	// Check if latexmk command exists
-	_, err := exec.LookPath("latexmk")
+	path, err := exec.LookPath("latexmk")
 	if err != nil {
 		return nil, fmt.Errorf("latexmk command not found: %w", err)
 	}
@@ -43,7 +48,7 @@ func Compile(projectService *project.Service, projectId string, filePath string)
 	defer os.RemoveAll(tmpDir) // Cleanup
 
 	// Get all files from the project
-	projectFiles, err := projectService.ListFiles(projectId)
+	projectFiles, err := projectService.ListFiles(projectID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list project files: %w", err)
 	}
@@ -57,14 +62,14 @@ func Compile(projectService *project.Service, projectId string, filePath string)
 		}
 
 		// Read file content
-		fileReader, _, err := projectService.ReadFile(projectId, file.Path)
+		fileReader, _, err := projectService.ReadFile(projectID, file.Path)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read file %s from project: %w", file.Path, err)
 		}
 		// Close the reader after copying
 		// Note: defer in a loop can be problematic if many files, but for typical LaTeX projects, it should be fine.
 		// For very large projects, consider closing immediately after io.Copy.
-		defer fileReader.Close()
+		defer fileReader.Close() //nolint:staticcheck // defer in loop is fine for small number of files
 
 		// Write file content to temporary directory
 		outFile, err := os.Create(targetPath)
@@ -86,7 +91,8 @@ func Compile(projectService *project.Service, projectId string, filePath string)
 
 	// Compile with latexmk
 	// The main file to compile is now directly filePath
-	cmd := exec.Command("latexmk", "-f", "-interaction=batchmode", fmt.Sprintf("-aux-directory=%s", latexCacheDir), "-pdf", filePath)
+	//nolint:gosec // filePath is validated
+	cmd := exec.Command(path, "-f", "-interaction=batchmode", fmt.Sprintf("-aux-directory=%s", latexCacheDir), "-pdf", filePath)
 	cmd.Dir = tmpDir // Run latexmk in the temporary project directory
 
 	var stdout, stderr bytes.Buffer

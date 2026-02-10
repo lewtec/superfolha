@@ -3,7 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"fmt" // Added fmt import
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -13,14 +13,15 @@ import (
 	"github.com/lewtec/superfolha/internal/auth"
 	"github.com/lewtec/superfolha/internal/compiler"
 	"github.com/lewtec/superfolha/internal/db"
-	"github.com/lewtec/superfolha/internal/project" // Import project package
+	"github.com/lewtec/superfolha/internal/project"
+	"github.com/lewtec/superfolha/internal/telemetry"
 )
 
 type Server struct {
 	db             db.DBTX
 	stateDir       string
 	resolver       *Resolver
-	projectService *project.Service // Added projectService
+	projectService *project.Service
 	authService    *auth.Service
 }
 
@@ -28,7 +29,7 @@ func NewServer(db db.DBTX, stateDir string, projectService *project.Service, aut
 	return &Server{
 		db:             db,
 		stateDir:       stateDir,
-		resolver:       NewResolver(db, stateDir, projectService, authService), // Pass projectService and authService here
+		resolver:       NewResolver(db, stateDir, projectService, authService),
 		projectService: projectService,
 		authService:    authService,
 	}
@@ -53,7 +54,7 @@ func (s *Server) Handler() http.Handler {
 
 	// GraphQL endpoint
 	srv := handler.NewDefaultServer(NewExecutableSchema(Config{Resolvers: s.resolver}))
-	mux.Handle("/api/graphql", ResponseWriterMiddleware(auth.Middleware(srv))) // Apply new middleware
+	mux.Handle("/api/graphql", ResponseWriterMiddleware(auth.Middleware(srv)))
 
 	// GraphQL Playground (for development)
 	mux.Handle("/api/graphiql", playground.Handler("GraphQL playground", "/api/graphql"))
@@ -62,10 +63,10 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("/api/compile", auth.Middleware(http.HandlerFunc(s.handleCompile)))
 
 	// Upload file endpoint
-	mux.Handle("/api/projects/{projectId}/upload-file", auth.Middleware(http.HandlerFunc(s.handleUploadFile)))
+	mux.Handle("/api/projects/{projectID}/upload-file", auth.Middleware(http.HandlerFunc(s.handleUploadFile)))
 
 	// Download file endpoint
-	mux.Handle("/api/projects/{projectId}/download/{filePath...}", auth.Middleware(http.HandlerFunc(s.handleDownloadFile)))
+	mux.Handle("/api/projects/{projectID}/download/{filePath...}", auth.Middleware(http.HandlerFunc(s.handleDownloadFile)))
 
 	// Serve Web App
 	mux.Handle("/", GetWebApp())
@@ -82,14 +83,14 @@ func (s *Server) handleCompile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	projectId := r.URL.Query().Get("project")
-	if projectId == "" {
+	projectID := r.URL.Query().Get("project")
+	if projectID == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]string{"message": "Missing project query parameter"})
 		return
 	}
 
-	_, _, user, err := s.resolver.getAndCheckProject(r.Context(), projectId)
+	_, _, user, err := s.resolver.getAndCheckProject(r.Context(), projectID)
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized) // getAndCheckProject returns "not authenticated" or "not authorized"
 		json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
@@ -105,9 +106,9 @@ func (s *Server) handleCompile(w http.ResponseWriter, r *http.Request) {
 
 	// Compile
 	// The compiler.Compile function needs to be updated to accept projectID, filePath, and projectService
-	result, err := compiler.Compile(s.projectService, projectId, filePath)
+	result, err := compiler.Compile(s.projectService, projectID, filePath)
 	if err != nil {
-		log.Printf("Error compiling project %s file %s for user %s: %v", projectId, filePath, user.UserID, err)
+		telemetry.ReportError(r.Context(), fmt.Errorf("compiling project %s file %s for user %s: %w", projectID, filePath, user.UserID, err))
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
 		return
@@ -126,14 +127,14 @@ func (s *Server) handleUploadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	projectIdStr := r.PathValue("projectId")
-	if projectIdStr == "" {
+	projectIDStr := r.PathValue("projectID")
+	if projectIDStr == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]string{"message": "Missing project ID"})
 		return
 	}
 
-	_, _, _, err := s.resolver.getAndCheckProject(r.Context(), projectIdStr)
+	_, _, _, err := s.resolver.getAndCheckProject(r.Context(), projectIDStr)
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized) // getAndCheckProject returns "not authenticated" or "not authorized"
 		json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
@@ -165,18 +166,18 @@ func (s *Server) handleUploadFile(w http.ResponseWriter, r *http.Request) {
 	filePath := header.Filename // Use original filename as path for now
 
 	// Use ProjectService to save the file
-	err = s.projectService.SaveFile(projectIdStr, filePath, string(fileContent))
+	err = s.projectService.SaveFile(projectIDStr, filePath, string(fileContent))
 	if err != nil {
-		log.Printf("Error saving file %s to project %s: %v", filePath, projectIdStr, err)
+		telemetry.ReportError(r.Context(), fmt.Errorf("saving file %s to project %s: %w", filePath, projectIDStr, err))
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"message": "Failed to save uploaded file"})
 		return
 	}
 
 	// Use ProjectService to commit the change
-	_, err = s.projectService.CommitChanges(projectIdStr, "System", "Uploaded file: "+filePath) // Use a placeholder author
+	_, err = s.projectService.CommitChanges(projectIDStr, "System", "Uploaded file: "+filePath) // Use a placeholder author
 	if err != nil {
-		log.Printf("Error committing file %s to project %s: %v", filePath, projectIdStr, err)
+		telemetry.ReportError(r.Context(), fmt.Errorf("committing file %s to project %s: %w", filePath, projectIDStr, err))
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"message": "Failed to commit uploaded file"})
 		return
@@ -192,22 +193,22 @@ func (s *Server) handleDownloadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	projectIdStr := r.PathValue("projectId")
-	if projectIdStr == "" {
+	projectIDStr := r.PathValue("projectID")
+	if projectIDStr == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]string{"message": "Missing project ID"})
 		return
 	}
 
-	_, _, _, err := s.resolver.getAndCheckProject(r.Context(), projectIdStr)
+	_, _, _, err := s.resolver.getAndCheckProject(r.Context(), projectIDStr)
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized) // getAndCheckProject returns "not authenticated" or "not authorized"
 		json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
 		return
 	}
-	// filePath will be everything after /api/projects/{projectId}/download/
+	// filePath will be everything after /api/projects/{projectID}/download/
 	// We need to decode the URL path because encodeURIComponent was used on the frontend
-	encodedFilePath := r.URL.Path[len("/api/projects/"+projectIdStr+"/download/"):]
+	encodedFilePath := r.URL.Path[len("/api/projects/"+projectIDStr+"/download/"):]
 	filePath, err := project.DecodeFilePath(encodedFilePath)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -221,14 +222,14 @@ func (s *Server) handleDownloadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fileReader, fileSize, err := s.projectService.ReadFile(projectIdStr, filePath)
+	fileReader, fileSize, err := s.projectService.ReadFile(projectIDStr, filePath)
 	if err != nil {
 		if err == project.ErrFileNotFound {
 			w.WriteHeader(http.StatusNotFound)
 			json.NewEncoder(w).Encode(map[string]string{"message": "File not found"})
 			return
 		}
-		log.Printf("Error reading file %s from project %s: %v", filePath, projectIdStr, err)
+		telemetry.ReportError(r.Context(), fmt.Errorf("reading file %s from project %s: %w", filePath, projectIDStr, err))
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"message": "Failed to read file"})
 		return
@@ -260,7 +261,7 @@ func (s *Server) handleDownloadFile(w http.ResponseWriter, r *http.Request) {
 
 	_, err = io.Copy(w, fileReader) // Stream the file content
 	if err != nil {
-		log.Printf("Error writing file content to response for %s: %v", filePath, err)
+		telemetry.ReportError(r.Context(), fmt.Errorf("writing file content to response for %s: %w", filePath, err))
 		// No need to set status code again, as headers might have been sent
 	}
 }
