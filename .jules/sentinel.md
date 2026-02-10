@@ -1,0 +1,1 @@
+- 2025-02-18: [Critical] Hardcoded/Logged secrets (check for sensitive env vars in logs)
