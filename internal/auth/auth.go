@@ -36,7 +36,7 @@ type Claims struct {
 func getJWTSecret() ([]byte, error) {
 	secret := os.Getenv("JWT_SECRET")
 	goEnv := os.Getenv("GO_ENV")                                                                   // Get GO_ENV as well
-	log.Printf("Auth: getJWTSecret called. JWT_SECRET set: %v, GO_ENV env: '%s'", secret != "", goEnv) // Log env vars safely
+	log.Printf("Auth: getJWTSecret called. GO_ENV: '%s'", goEnv)
 
 	if secret == "" {
 		// Fallback for development only - should never be used in production

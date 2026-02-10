@@ -1,21 +1,13 @@
 package auth
 
 import (
-	"os"
 	"testing"
 )
 
 func TestGenerateToken(t *testing.T) {
-	// Setup environment
-	originalJwtSecret := os.Getenv("JWT_SECRET")
-	originalGoEnv := os.Getenv("GO_ENV")
-	defer func() {
-		os.Setenv("JWT_SECRET", originalJwtSecret)
-		os.Setenv("GO_ENV", originalGoEnv)
-	}()
-
-	os.Setenv("JWT_SECRET", "test-secret-key-12345")
-	os.Setenv("GO_ENV", "test")
+	// Setup environment using t.Setenv for automatic cleanup
+	t.Setenv("JWT_SECRET", "test-secret-key-12345")
+	t.Setenv("GO_ENV", "test")
 
 	token, err := GenerateToken("user123", "test@example.com")
 	if err != nil {
@@ -40,16 +32,9 @@ func TestGenerateToken(t *testing.T) {
 }
 
 func TestGetJWTSecretDevFallback(t *testing.T) {
-	// Setup environment
-	originalJwtSecret := os.Getenv("JWT_SECRET")
-	originalGoEnv := os.Getenv("GO_ENV")
-	defer func() {
-		os.Setenv("JWT_SECRET", originalJwtSecret)
-		os.Setenv("GO_ENV", originalGoEnv)
-	}()
-
-	os.Setenv("JWT_SECRET", "")
-	os.Setenv("GO_ENV", "development")
+	// Setup environment using t.Setenv for automatic cleanup
+	t.Setenv("JWT_SECRET", "")
+	t.Setenv("GO_ENV", "development")
 
 	secret, err := getJWTSecret()
 	if err != nil {
@@ -61,16 +46,9 @@ func TestGetJWTSecretDevFallback(t *testing.T) {
 }
 
 func TestGetJWTSecretProductionMissing(t *testing.T) {
-	// Setup environment
-	originalJwtSecret := os.Getenv("JWT_SECRET")
-	originalGoEnv := os.Getenv("GO_ENV")
-	defer func() {
-		os.Setenv("JWT_SECRET", originalJwtSecret)
-		os.Setenv("GO_ENV", originalGoEnv)
-	}()
-
-	os.Setenv("JWT_SECRET", "")
-	os.Setenv("GO_ENV", "production")
+	// Setup environment using t.Setenv for automatic cleanup
+	t.Setenv("JWT_SECRET", "")
+	t.Setenv("GO_ENV", "production")
 
 	_, err := getJWTSecret()
 	if err != ErrJWTSecretRequired {
