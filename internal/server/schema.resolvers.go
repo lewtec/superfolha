@@ -10,14 +10,13 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net/http"
 	"os"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/lewtec/superfolha/internal/auth"
 	"github.com/lewtec/superfolha/internal/db"
+	"github.com/lewtec/superfolha/internal/telemetry"
 )
 
 // Register is the resolver for the register field.
@@ -27,22 +26,9 @@ func (r *mutationResolver) Register(ctx context.Context, email string, password 
 		return nil, err
 	}
 
-	// --- NEW: Set token as HTTP-only cookie ---
-	w, ok := ctx.Value(ResponseWriterContextKey).(http.ResponseWriter)
-	if !ok {
-		log.Println("Register Resolver: http.ResponseWriter not found in context.")
-		return nil, errors.New("internal server error: response writer not available")
+	if err := SetAuthCookie(ctx, authResp.Token); err != nil {
+		return nil, err
 	}
-
-	http.SetCookie(w, &http.Cookie{
-		Name:     "authToken",
-		Value:    authResp.Token,
-		Expires:  time.Now().Add(7 * 24 * time.Hour), // Match token expiration
-		HttpOnly: true,
-		Secure:   true, // Set to true in production for HTTPS
-		Path:     "/",  // Make cookie available to all paths
-	})
-	// --- END NEW ---
 
 	return &AuthPayload{
 		User: &User{
@@ -59,22 +45,9 @@ func (r *mutationResolver) Login(ctx context.Context, email string, password str
 		return nil, err
 	}
 
-	// --- NEW: Set token as HTTP-only cookie ---
-	w, ok := ctx.Value(ResponseWriterContextKey).(http.ResponseWriter)
-	if !ok {
-		log.Println("Login Resolver: http.ResponseWriter not found in context.")
-		return nil, errors.New("internal server error: response writer not available")
+	if err := SetAuthCookie(ctx, authResp.Token); err != nil {
+		return nil, err
 	}
-
-	http.SetCookie(w, &http.Cookie{
-		Name:     "authToken",
-		Value:    authResp.Token,
-		Expires:  time.Now().Add(7 * 24 * time.Hour), // Match token expiration
-		HttpOnly: true,
-		Secure:   true, // Set to true in production for HTTPS
-		Path:     "/",  // Make cookie available to all paths
-	})
-	// --- END NEW ---
 
 	return &AuthPayload{
 		User: &User{
@@ -202,7 +175,7 @@ func (r *mutationResolver) Commit(ctx context.Context, projectID string, message
 	q := db.New(r.DB)
 	if err := q.UpdateProjectTimestamp(ctx, project.ID); err != nil {
 		// Log error but don't fail the operation
-		fmt.Printf("Warning: failed to update project timestamp: %v\n", err)
+		telemetry.ReportError(ctx, fmt.Errorf("failed to update project timestamp: %w", err))
 	}
 
 	return &Commit{
