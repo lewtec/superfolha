@@ -3,24 +3,25 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"fmt" // Added fmt import
+	"fmt"
 	"io"
 	"log"
 	"net/http"
 
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
+	"github.com/google/uuid"
 	"github.com/lewtec/superfolha/internal/auth"
 	"github.com/lewtec/superfolha/internal/compiler"
 	"github.com/lewtec/superfolha/internal/db"
-	"github.com/lewtec/superfolha/internal/project" // Import project package
+	"github.com/lewtec/superfolha/internal/project"
 )
 
 type Server struct {
 	db             db.DBTX
 	stateDir       string
 	resolver       *Resolver
-	projectService *project.Service // Added projectService
+	projectService *project.Service
 	authService    *auth.Service
 }
 
@@ -28,7 +29,7 @@ func NewServer(db db.DBTX, stateDir string, projectService *project.Service, aut
 	return &Server{
 		db:             db,
 		stateDir:       stateDir,
-		resolver:       NewResolver(db, stateDir, projectService, authService), // Pass projectService and authService here
+		resolver:       NewResolver(db, stateDir, projectService, authService),
 		projectService: projectService,
 		authService:    authService,
 	}
@@ -53,7 +54,7 @@ func (s *Server) Handler() http.Handler {
 
 	// GraphQL endpoint
 	srv := handler.NewDefaultServer(NewExecutableSchema(Config{Resolvers: s.resolver}))
-	mux.Handle("/api/graphql", ResponseWriterMiddleware(auth.Middleware(srv))) // Apply new middleware
+	mux.Handle("/api/graphql", ResponseWriterMiddleware(auth.Middleware(srv)))
 
 	// GraphQL Playground (for development)
 	mux.Handle("/api/graphiql", playground.Handler("GraphQL playground", "/api/graphql"))
@@ -89,9 +90,22 @@ func (s *Server) handleCompile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, _, user, err := s.resolver.getAndCheckProject(r.Context(), projectId)
+	user, ok := auth.GetUserFromContext(r.Context())
+	if !ok {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"message": "not authenticated"})
+		return
+	}
+	userID, err := uuid.Parse(user.UserID)
 	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized) // getAndCheckProject returns "not authenticated" or "not authorized"
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"message": "invalid user id"})
+		return
+	}
+
+	_, err = s.projectService.GetProjectForUser(r.Context(), projectId, userID)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
 		return
 	}
@@ -104,7 +118,6 @@ func (s *Server) handleCompile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Compile
-	// The compiler.Compile function needs to be updated to accept projectID, filePath, and projectService
 	result, err := compiler.Compile(s.projectService, projectId, filePath)
 	if err != nil {
 		log.Printf("Error compiling project %s file %s for user %s: %v", projectId, filePath, user.UserID, err)
@@ -133,9 +146,22 @@ func (s *Server) handleUploadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, _, _, err := s.resolver.getAndCheckProject(r.Context(), projectIdStr)
+	user, ok := auth.GetUserFromContext(r.Context())
+	if !ok {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"message": "not authenticated"})
+		return
+	}
+	userID, err := uuid.Parse(user.UserID)
 	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized) // getAndCheckProject returns "not authenticated" or "not authorized"
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"message": "invalid user id"})
+		return
+	}
+
+	_, err = s.projectService.GetProjectForUser(r.Context(), projectIdStr, userID)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
 		return
 	}
@@ -199,14 +225,27 @@ func (s *Server) handleDownloadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, _, _, err := s.resolver.getAndCheckProject(r.Context(), projectIdStr)
+	user, ok := auth.GetUserFromContext(r.Context())
+	if !ok {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"message": "not authenticated"})
+		return
+	}
+	userID, err := uuid.Parse(user.UserID)
 	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized) // getAndCheckProject returns "not authenticated" or "not authorized"
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"message": "invalid user id"})
+		return
+	}
+
+	_, err = s.projectService.GetProjectForUser(r.Context(), projectIdStr, userID)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
 		return
 	}
+
 	// filePath will be everything after /api/projects/{projectId}/download/
-	// We need to decode the URL path because encodeURIComponent was used on the frontend
 	encodedFilePath := r.URL.Path[len("/api/projects/"+projectIdStr+"/download/"):]
 	filePath, err := project.DecodeFilePath(encodedFilePath)
 	if err != nil {
@@ -236,31 +275,23 @@ func (s *Server) handleDownloadFile(w http.ResponseWriter, r *http.Request) {
 	defer fileReader.Close() // Ensure the file is closed
 
 	// Read a small chunk to detect content type
-	// http.DetectContentType needs at most 512 bytes
 	var buf [512]byte
 	n, _ := io.ReadFull(fileReader, buf[:])
 	contentType := http.DetectContentType(buf[:n])
 
 	// Reset the reader to the beginning for full content streaming
-	// This requires the underlying reader to be seekable.
-	// Since fileReader is an os.File, it is seekable.
 	if seeker, ok := fileReader.(io.ReadSeeker); ok {
 		seeker.Seek(0, io.SeekStart)
 	} else {
-		// If not seekable, we would need to handle this differently,
-		// e.g., by reading into a buffer and then prepending the buffer
-		// to the stream, or by not detecting content type this way.
-		// For os.File, this path should not be taken.
 		log.Printf("Warning: fileReader is not seekable for %s", filePath)
 	}
 
 	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("Content-Disposition", "attachment; filename=\""+filePath+"\"")
-	w.Header().Set("Content-Length", fmt.Sprintf("%d", fileSize)) // Set Content-Length header
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", fileSize))
 
 	_, err = io.Copy(w, fileReader) // Stream the file content
 	if err != nil {
 		log.Printf("Error writing file content to response for %s: %v", filePath, err)
-		// No need to set status code again, as headers might have been sent
 	}
 }

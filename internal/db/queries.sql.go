@@ -12,19 +12,25 @@ import (
 )
 
 const createProject = `-- name: CreateProject :one
-INSERT INTO projects (user_id, name, git_path)
-VALUES ($1, $2, $3)
+INSERT INTO projects (id, user_id, name, git_path)
+VALUES ($1, $2, $3, $4)
 RETURNING id, user_id, name, git_path, created_at, updated_at
 `
 
 type CreateProjectParams struct {
+	ID      pgtype.UUID `json:"id"`
 	UserID  pgtype.UUID `json:"user_id"`
 	Name    string      `json:"name"`
 	GitPath string      `json:"git_path"`
 }
 
 func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (Project, error) {
-	row := q.db.QueryRow(ctx, createProject, arg.UserID, arg.Name, arg.GitPath)
+	row := q.db.QueryRow(ctx, createProject,
+		arg.ID,
+		arg.UserID,
+		arg.Name,
+		arg.GitPath,
+	)
 	var i Project
 	err := row.Scan(
 		&i.ID,

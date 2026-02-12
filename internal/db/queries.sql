@@ -12,8 +12,8 @@ SELECT * FROM users
 WHERE id = $1;
 
 -- name: CreateProject :one
-INSERT INTO projects (user_id, name, git_path)
-VALUES ($1, $2, $3)
+INSERT INTO projects (id, user_id, name, git_path)
+VALUES ($1, $2, $3, $4)
 RETURNING *;
 
 -- name: GetProject :one
