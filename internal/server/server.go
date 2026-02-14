@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/lewtec/superfolha/internal/auth"
@@ -73,6 +74,31 @@ func (s *Server) Handler() http.Handler {
 	return mux
 }
 
+// getProjectFromRequest extracts user and project info from request and verifies access.
+func (s *Server) getProjectFromRequest(r *http.Request, projectIDStr string) (*db.Project, *auth.UserContext, int, error) {
+	user, ok := auth.GetUserFromContext(r.Context())
+	if !ok {
+		return nil, nil, http.StatusUnauthorized, fmt.Errorf("not authenticated")
+	}
+
+	projectUUID, err := uuid.Parse(projectIDStr)
+	if err != nil {
+		return nil, nil, http.StatusBadRequest, fmt.Errorf("invalid project ID")
+	}
+
+	userUUID, err := uuid.Parse(user.UserID)
+	if err != nil {
+		return nil, nil, http.StatusInternalServerError, fmt.Errorf("invalid user ID")
+	}
+
+	project, err := s.projectService.GetProject(r.Context(), projectUUID, userUUID)
+	if err != nil {
+		// Map errors to status codes if possible, otherwise default to 401 or 500
+		return nil, nil, http.StatusUnauthorized, err
+	}
+	return project, user, http.StatusOK, nil
+}
+
 func (s *Server) handleCompile(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -89,9 +115,9 @@ func (s *Server) handleCompile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, _, user, err := s.resolver.getAndCheckProject(r.Context(), projectId)
+	_, user, status, err := s.getProjectFromRequest(r, projectId)
 	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized) // getAndCheckProject returns "not authenticated" or "not authorized"
+		w.WriteHeader(status)
 		json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
 		return
 	}
@@ -133,9 +159,9 @@ func (s *Server) handleUploadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, _, _, err := s.resolver.getAndCheckProject(r.Context(), projectIdStr)
+	_, _, status, err := s.getProjectFromRequest(r, projectIdStr)
 	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized) // getAndCheckProject returns "not authenticated" or "not authorized"
+		w.WriteHeader(status)
 		json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
 		return
 	}
@@ -199,12 +225,13 @@ func (s *Server) handleDownloadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, _, _, err := s.resolver.getAndCheckProject(r.Context(), projectIdStr)
+	_, _, status, err := s.getProjectFromRequest(r, projectIdStr)
 	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized) // getAndCheckProject returns "not authenticated" or "not authorized"
+		w.WriteHeader(status)
 		json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
 		return
 	}
+
 	// filePath will be everything after /api/projects/{projectId}/download/
 	// We need to decode the URL path because encodeURIComponent was used on the frontend
 	encodedFilePath := r.URL.Path[len("/api/projects/"+projectIdStr+"/download/"):]

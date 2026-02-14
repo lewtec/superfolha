@@ -81,7 +81,7 @@ func runServer(cmd *cobra.Command, args []string) {
 	}
 
 	// Create server
-	projectService := project.NewService(stateDir)
+	projectService := project.NewService(dbpool, stateDir)
 	authService := auth.NewService(dbpool)
 	srv := server.NewServer(dbpool, stateDir, projectService, authService)
 

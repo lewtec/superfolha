@@ -1,26 +1,41 @@
 package project
 
 import (
-	"errors" // Import the errors package
-	"io"     // Import the io package
+	"bytes"
+	"context"
+	"embed"
+	"errors"
+	"fmt"
+	"io"
+	"io/fs"
+	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/go-git/go-git/v5"
-	igit "github.com/lewtec/superfolha/internal/git" // Reusing existing git types and functions
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/lewtec/superfolha/internal/db"
+	igit "github.com/lewtec/superfolha/internal/git"
 )
+
+//go:embed templates
+var templatesFS embed.FS
 
 // ErrFileNotFound is returned when a requested file does not exist in the project.
 var ErrFileNotFound = errors.New("file not found")
 
-// Service provides project-related operations, encapsulating Git interactions.
+// Service provides project-related operations, encapsulating Git interactions and Database operations.
 type Service struct {
 	repoManager *RepositoryManager
+	db          db.DBTX
 }
 
 // NewService creates a new ProjectService.
-func NewService(stateDir string) *Service {
+func NewService(db db.DBTX, stateDir string) *Service {
 	return &Service{
 		repoManager: NewRepositoryManager(stateDir),
+		db:          db,
 	}
 }
 
@@ -33,18 +48,11 @@ func (s *Service) GetProjectPath(projectId string) string {
 func (s *Service) InitProjectRepo(projectId string) error {
 	pr, err := s.repoManager.GetRepo(projectId)
 	if err != nil {
-		// Check if the error is specifically that the repository does not exist
-		if err == git.ErrRepositoryNotExists { // Use the specific error type
-			// The pr instance is valid here, but pr.repo is nil.
-			// Call InitRepo on the valid pr instance.
+		if err == git.ErrRepositoryNotExists {
 			return pr.InitRepo()
 		}
-		// For any other error, return it
 		return err
 	}
-	// If no error from GetRepo, it means the repository already exists and was opened successfully.
-	// We can still call InitRepo to ensure it's in a good state, or simply return nil if InitRepo
-	// is only meant for initial creation.
 	return pr.InitRepo()
 }
 
@@ -93,10 +101,7 @@ func (s *Service) ReadFile(projectId, filePath string) (io.ReadCloser, int64, er
 
 // DecodeFilePath decodes a URL-encoded file path.
 func DecodeFilePath(encodedPath string) (string, error) {
-	// filepath.FromSlash returns only one value (the string result), not two.
-	// The error handling for filepath.FromSlash is incorrect.
 	decodedPath := filepath.FromSlash(encodedPath)
-	// No error is returned by filepath.FromSlash, so no error check needed here.
 	return decodedPath, nil
 }
 
@@ -116,4 +121,152 @@ func (s *Service) GetHistory(projectId string) ([]*igit.Commit, error) {
 		return nil, err
 	}
 	return pr.GetHistory()
+}
+
+// CreateProject creates a new project in the DB and initializes its Git repository with templates.
+func (s *Service) CreateProject(ctx context.Context, userID uuid.UUID, name string, userEmail string) (*db.Project, error) {
+	projectUUID, err := uuid.NewV7()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate project ID: %w", err)
+	}
+	projectID := projectUUID.String()
+	projectPath := s.GetProjectPath(projectID)
+
+	q := db.New(s.db)
+	dbProject, err := q.CreateProject(ctx, db.CreateProjectParams{
+		UserID:  pgtype.UUID{Bytes: userID, Valid: true},
+		Name:    name,
+		GitPath: projectPath,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create project in db: %w", err)
+	}
+
+	if err := s.InitProjectRepo(projectID); err != nil {
+		return nil, fmt.Errorf("failed to init git repo: %w", err)
+	}
+
+	// Copy template files
+	templateDir := "templates/simple"
+	err = fs.WalkDir(templatesFS, templateDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+
+		content, err := templatesFS.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("failed to read template file %s: %w", path, err)
+		}
+
+		relativePath := strings.TrimPrefix(path, templateDir+"/")
+		if err := s.SaveFile(projectID, relativePath, string(content)); err != nil {
+			return fmt.Errorf("failed to write template file %s: %w", relativePath, err)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to copy template files: %w", err)
+	}
+
+	_, err = s.CommitChanges(projectID, userEmail, "Initial commit")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create initial commit: %w", err)
+	}
+
+	return &dbProject, nil
+}
+
+// DeleteProject deletes a project from the DB and removes its Git repository.
+func (s *Service) DeleteProject(ctx context.Context, projectID uuid.UUID) error {
+	q := db.New(s.db)
+	proj, err := q.GetProject(ctx, pgtype.UUID{Bytes: projectID, Valid: true})
+	if err != nil {
+		return err
+	}
+
+	if err := q.DeleteProject(ctx, proj.ID); err != nil {
+		return fmt.Errorf("failed to delete project from db: %w", err)
+	}
+
+	// Delete git repository
+	repoPath := s.GetProjectPath(projectID.String())
+	if err := os.RemoveAll(repoPath); err != nil {
+		return fmt.Errorf("failed to delete git repository: %w", err)
+	}
+
+	return nil
+}
+
+// GetProject retrieves a project from the DB, verifies ownership, and ensures the Git repository exists.
+func (s *Service) GetProject(ctx context.Context, projectID uuid.UUID, userID uuid.UUID) (*db.Project, error) {
+	q := db.New(s.db)
+	project, err := q.GetProject(ctx, pgtype.UUID{Bytes: projectID, Valid: true})
+	if err != nil {
+		return nil, fmt.Errorf("project not found")
+	}
+
+	if !bytes.Equal(project.UserID.Bytes[:], userID[:]) {
+		return nil, fmt.Errorf("not authorized")
+	}
+
+	projectPath := s.GetProjectPath(projectID.String())
+
+	// Lazy initialization: Check if repo exists, if not, recover it.
+	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
+		user, err := q.GetUserByID(ctx, pgtype.UUID{Bytes: userID, Valid: true})
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch user for repo recovery: %w", err)
+		}
+
+		if err := s.InitProjectRepo(projectID.String()); err != nil {
+			return nil, fmt.Errorf("failed to init git repo: %w", err)
+		}
+
+		// Copy template files
+		templateDir := "templates/simple"
+		err = fs.WalkDir(templatesFS, templateDir, func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if d.IsDir() {
+				return nil
+			}
+
+			content, err := templatesFS.ReadFile(path)
+			if err != nil {
+				return fmt.Errorf("failed to read template file %s: %w", path, err)
+			}
+
+			relativePath := strings.TrimPrefix(path, templateDir+"/")
+			if err := s.SaveFile(projectID.String(), relativePath, string(content)); err != nil {
+				return fmt.Errorf("failed to write template file %s: %w", relativePath, err)
+			}
+			return nil
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to copy template files: %w", err)
+		}
+
+		_, err = s.CommitChanges(projectID.String(), user.Email, "Initial commit (recovery)")
+		if err != nil {
+			return nil, fmt.Errorf("failed to create initial commit: %w", err)
+		}
+	}
+
+	return &project, nil
+}
+
+// ListProjects lists all projects for a user.
+func (s *Service) ListProjects(ctx context.Context, userID uuid.UUID) ([]db.Project, error) {
+	q := db.New(s.db)
+	return q.GetUserProjects(ctx, pgtype.UUID{Bytes: userID, Valid: true})
+}
+
+// TouchProject updates the project's updated_at timestamp.
+func (s *Service) TouchProject(ctx context.Context, projectID uuid.UUID) error {
+	q := db.New(s.db)
+	return q.UpdateProjectTimestamp(ctx, pgtype.UUID{Bytes: projectID, Valid: true})
 }

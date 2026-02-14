@@ -11,13 +11,10 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/lewtec/superfolha/internal/auth"
-	"github.com/lewtec/superfolha/internal/db"
 )
 
 // Register is the resolver for the register field.
@@ -96,22 +93,9 @@ func (r *mutationResolver) CreateProject(ctx context.Context, name string) (*Pro
 		return nil, fmt.Errorf("invalid user ID: %w", err)
 	}
 
-	projectUUID, err := uuid.NewV7()
+	dbProject, err := r.projectService.CreateProject(ctx, userID, name, user.Email)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate project ID: %w", err)
-	}
-	projectID := projectUUID.String()
-	projectPath := r.projectService.GetProjectPath(projectID) // Use projectService
-
-	// Create project in database
-	q := db.New(r.DB)
-	dbProject, err := q.CreateProject(ctx, db.CreateProjectParams{
-		UserID:  pgtype.UUID{Bytes: userID, Valid: true},
-		Name:    name,
-		GitPath: projectPath,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create project in db: %w", err)
+		return nil, err
 	}
 
 	return &Project{
@@ -124,20 +108,28 @@ func (r *mutationResolver) CreateProject(ctx context.Context, name string) (*Pro
 
 // DeleteProject is the resolver for the deleteProject field.
 func (r *mutationResolver) DeleteProject(ctx context.Context, id string) (bool, error) {
-	project, projectPath, _, err := r.getAndCheckProject(ctx, id)
+	user, ok := auth.GetUserFromContext(ctx)
+	if !ok {
+		return false, errors.New("not authenticated")
+	}
+
+	projectUUID, err := uuid.Parse(id)
 	if err != nil {
+		return false, fmt.Errorf("invalid project ID: %w", err)
+	}
+
+	userID, err := uuid.Parse(user.UserID)
+	if err != nil {
+		return false, fmt.Errorf("invalid user ID: %w", err)
+	}
+
+	// Verify ownership before deleting
+	if _, err := r.projectService.GetProject(ctx, projectUUID, userID); err != nil {
 		return false, err
 	}
 
-	// Delete project from database
-	q := db.New(r.DB)
-	if err := q.DeleteProject(ctx, project.ID); err != nil {
-		return false, fmt.Errorf("failed to delete project from db: %w", err)
-	}
-
-	// Delete git repository
-	if err := os.RemoveAll(projectPath); err != nil {
-		return false, fmt.Errorf("failed to delete git repository: %w", err)
+	if err := r.projectService.DeleteProject(ctx, projectUUID); err != nil {
+		return false, err
 	}
 
 	return true, nil
@@ -145,8 +137,23 @@ func (r *mutationResolver) DeleteProject(ctx context.Context, id string) (bool, 
 
 // SaveFile is the resolver for the saveFile field.
 func (r *mutationResolver) SaveFile(ctx context.Context, projectID string, path string, content string) (*File, error) {
-	_, _, _, err := r.getAndCheckProject(ctx, projectID)
+	user, ok := auth.GetUserFromContext(ctx)
+	if !ok {
+		return nil, errors.New("not authenticated")
+	}
+
+	projectUUID, err := uuid.Parse(projectID)
 	if err != nil {
+		return nil, fmt.Errorf("invalid project ID: %w", err)
+	}
+
+	userID, err := uuid.Parse(user.UserID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user ID: %w", err)
+	}
+
+	// Verify ownership
+	if _, err := r.projectService.GetProject(ctx, projectUUID, userID); err != nil {
 		return nil, err
 	}
 
@@ -156,9 +163,6 @@ func (r *mutationResolver) SaveFile(ctx context.Context, projectID string, path 
 	}
 
 	// Return the file with content, size, and isTooBig.
-	// For SaveFile, we assume the saved content is not too big and not binary for direct return.
-	// The actual size and binary status would be determined by a subsequent fetch.
-	// Here, we're just reflecting the saved state.
 	contentPtr := &content // Convert string to *string
 	isBinary := HasBinary([]byte(content), path)
 	return &File{
@@ -172,8 +176,23 @@ func (r *mutationResolver) SaveFile(ctx context.Context, projectID string, path 
 
 // DeleteFile is the resolver for the deleteFile field.
 func (r *mutationResolver) DeleteFile(ctx context.Context, projectID string, path string) (bool, error) {
-	_, _, _, err := r.getAndCheckProject(ctx, projectID)
+	user, ok := auth.GetUserFromContext(ctx)
+	if !ok {
+		return false, errors.New("not authenticated")
+	}
+
+	projectUUID, err := uuid.Parse(projectID)
 	if err != nil {
+		return false, fmt.Errorf("invalid project ID: %w", err)
+	}
+
+	userID, err := uuid.Parse(user.UserID)
+	if err != nil {
+		return false, fmt.Errorf("invalid user ID: %w", err)
+	}
+
+	// Verify ownership
+	if _, err := r.projectService.GetProject(ctx, projectUUID, userID); err != nil {
 		return false, err
 	}
 
@@ -187,7 +206,23 @@ func (r *mutationResolver) DeleteFile(ctx context.Context, projectID string, pat
 
 // Commit is the resolver for the commit field.
 func (r *mutationResolver) Commit(ctx context.Context, projectID string, message string) (*Commit, error) {
-	project, _, user, err := r.getAndCheckProject(ctx, projectID)
+	user, ok := auth.GetUserFromContext(ctx)
+	if !ok {
+		return nil, errors.New("not authenticated")
+	}
+
+	projectUUID, err := uuid.Parse(projectID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid project ID: %w", err)
+	}
+
+	userID, err := uuid.Parse(user.UserID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user ID: %w", err)
+	}
+
+	// Verify ownership
+	_, err = r.projectService.GetProject(ctx, projectUUID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -199,10 +234,8 @@ func (r *mutationResolver) Commit(ctx context.Context, projectID string, message
 	}
 
 	// Update project timestamp
-	q := db.New(r.DB)
-	if err := q.UpdateProjectTimestamp(ctx, project.ID); err != nil {
-		// Log error but don't fail the operation
-		fmt.Printf("Warning: failed to update project timestamp: %v\n", err)
+	if err := r.projectService.TouchProject(ctx, projectUUID); err != nil {
+		log.Printf("Warning: failed to update project timestamp: %v\n", err)
 	}
 
 	return &Commit{
@@ -323,10 +356,7 @@ func (r *queryResolver) Me(ctx context.Context) (*User, error) {
 		return nil, fmt.Errorf("invalid user ID: %w", err)
 	}
 
-	pgUserID := pgtype.UUID{Bytes: userID, Valid: true}
-
-	q := db.New(r.DB)
-	dbUser, err := q.GetUserByID(ctx, pgUserID)
+	dbUser, err := r.authService.GetUser(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("user not found")
 	}
@@ -349,10 +379,7 @@ func (r *queryResolver) Projects(ctx context.Context) ([]*Project, error) {
 		return nil, fmt.Errorf("invalid user ID: %w", err)
 	}
 
-	pgUserID := pgtype.UUID{Bytes: userID, Valid: true}
-
-	q := db.New(r.DB)
-	dbProjects, err := q.GetUserProjects(ctx, pgUserID)
+	dbProjects, err := r.projectService.ListProjects(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -372,7 +399,22 @@ func (r *queryResolver) Projects(ctx context.Context) ([]*Project, error) {
 
 // Project is the resolver for the project field.
 func (r *queryResolver) Project(ctx context.Context, id string) (*Project, error) {
-	project, _, _, err := r.getAndCheckProject(ctx, id)
+	user, ok := auth.GetUserFromContext(ctx)
+	if !ok {
+		return nil, errors.New("not authenticated")
+	}
+
+	projectUUID, err := uuid.Parse(id)
+	if err != nil {
+		return nil, fmt.Errorf("invalid project ID: %w", err)
+	}
+
+	userID, err := uuid.Parse(user.UserID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user ID: %w", err)
+	}
+
+	project, err := r.projectService.GetProject(ctx, projectUUID, userID)
 	if err != nil {
 		return nil, err
 	}

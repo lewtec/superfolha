@@ -1,26 +1,14 @@
 package server
 
 import (
-	"bytes"
-	"context"
-	"embed"
-	"errors"
-	"fmt"
-	"io/fs"
 	"log"
-	"net/http" // Added net/http import for DetectContentType
-	"os"
+	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/lewtec/superfolha/internal/auth"
 	"github.com/lewtec/superfolha/internal/db"
 	"github.com/lewtec/superfolha/internal/project" // Import project package
 )
-
-//go:embed templates
-var templatesFS embed.FS
 
 // MaxGraphQLFileSize defines the maximum file size (in bytes) for content to be returned directly via GraphQL.
 const MaxGraphQLFileSize = 1024 * 1024 * 5 // 5 MB
@@ -66,74 +54,4 @@ func NewResolver(db db.DBTX, stateDir string, projectService *project.Service, a
 
 func (r *Resolver) getProjectPath(projectID string) string {
 	return r.projectService.GetProjectPath(projectID)
-}
-
-func (r *Resolver) getAndCheckProject(ctx context.Context, projectID string) (*db.Project, string, *auth.UserContext, error) {
-	user, ok := auth.GetUserFromContext(ctx)
-	if !ok {
-		return nil, "", nil, errors.New("not authenticated")
-	}
-
-	projectUUID, err := uuid.Parse(projectID)
-	if err != nil {
-		return nil, "", nil, fmt.Errorf("invalid project ID: %w", err)
-	}
-
-	pgProjectID := pgtype.UUID{Bytes: projectUUID, Valid: true}
-
-	// Verify ownership
-	q := db.New(r.DB)
-	project, err := q.GetProject(ctx, pgProjectID)
-	if err != nil {
-		return nil, "", nil, fmt.Errorf("project not found")
-	}
-
-	userUUID, err := uuid.Parse(user.UserID)
-	if err != nil {
-		return nil, "", nil, fmt.Errorf("invalid user ID: %w", err)
-	}
-
-	if !bytes.Equal(project.UserID.Bytes[:], userUUID[:]) {
-		return nil, "", nil, fmt.Errorf("not authorized")
-	}
-
-	projectPath := r.projectService.GetProjectPath(projectID)
-	// Check if repo exists, if not, initialize it and copy templates
-	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
-		if err := r.projectService.InitProjectRepo(projectID); err != nil {
-			return nil, "", nil, fmt.Errorf("failed to init git repo: %w", err)
-		}
-
-		// Copy template files
-		templateDir := "templates/simple"
-		err = fs.WalkDir(templatesFS, templateDir, func(path string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-			if d.IsDir() {
-				return nil
-			}
-
-			content, err := templatesFS.ReadFile(path)
-			if err != nil {
-				return fmt.Errorf("failed to read template file %s: %w", path, err)
-			}
-
-			relativePath := strings.TrimPrefix(path, templateDir+"/")
-			if err := r.projectService.SaveFile(projectID, relativePath, string(content)); err != nil {
-				return fmt.Errorf("failed to write template file %s: %w", relativePath, err)
-			}
-			return nil
-		})
-		if err != nil {
-			return nil, "", nil, fmt.Errorf("failed to copy template files: %w", err)
-		}
-		// Initial commit
-		_, err = r.projectService.CommitChanges(projectID, user.Email, "Initial commit")
-		if err != nil {
-			return nil, "", nil, fmt.Errorf("failed to create initial commit: %w", err)
-		}
-	}
-
-	return &project, projectPath, user, nil
 }

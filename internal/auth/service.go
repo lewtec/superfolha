@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/lewtec/superfolha/internal/db"
 )
 
@@ -73,4 +74,14 @@ func (s *Service) Login(ctx context.Context, email, password string) (*AuthRespo
 		User:  &dbUser,
 		Token: token,
 	}, nil
+}
+
+// GetUser retrieves a user by ID.
+func (s *Service) GetUser(ctx context.Context, userID uuid.UUID) (*db.User, error) {
+	q := db.New(s.db)
+	user, err := q.GetUserByID(ctx, pgtype.UUID{Bytes: userID, Valid: true})
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
 }
