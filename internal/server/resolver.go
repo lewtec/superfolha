@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log"
-	"net/http" // Added net/http import for DetectContentType
+	"net/http"
 	"os"
 	"strings"
 
@@ -16,7 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/lewtec/superfolha/internal/auth"
 	"github.com/lewtec/superfolha/internal/db"
-	"github.com/lewtec/superfolha/internal/project" // Import project package
+	"github.com/lewtec/superfolha/internal/project"
 )
 
 //go:embed templates
@@ -51,7 +51,7 @@ func HasBinary(content []byte, filename string) bool {
 type Resolver struct {
 	DB             db.DBTX
 	StateDir       string
-	projectService *project.Service // Added projectService
+	projectService *project.Service
 	authService    *auth.Service
 }
 
@@ -59,13 +59,9 @@ func NewResolver(db db.DBTX, stateDir string, projectService *project.Service, a
 	return &Resolver{
 		DB:             db,
 		StateDir:       stateDir,
-		projectService: projectService, // Initialize projectService
+		projectService: projectService,
 		authService:    authService,
 	}
-}
-
-func (r *Resolver) getProjectPath(projectID string) string {
-	return r.projectService.GetProjectPath(projectID)
 }
 
 func (r *Resolver) getAndCheckProject(ctx context.Context, projectID string) (*db.Project, string, *auth.UserContext, error) {
