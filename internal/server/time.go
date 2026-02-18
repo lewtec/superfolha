@@ -6,14 +6,19 @@ import (
 	"strconv"
 	"time"
 
+	"context"
+
 	"github.com/99designs/gqlgen/graphql"
+	"github.com/lewtec/superfolha/internal/telemetry"
 )
 
 type Time time.Time
 
 func (t Time) MarshalGQL(w io.Writer) {
 	tyme := time.Time(t)
-	w.Write([]byte(strconv.Quote(tyme.Format(time.RFC3339))))
+	if _, err := w.Write([]byte(strconv.Quote(tyme.Format(time.RFC3339)))); err != nil {
+		telemetry.ReportError(context.Background(), err)
+	}
 }
 
 func (t *Time) UnmarshalGQL(v interface{}) error {
@@ -33,7 +38,9 @@ func (t *Time) UnmarshalGQL(v interface{}) error {
 
 func MarshalTime(t time.Time) graphql.Marshaler {
 	return graphql.WriterFunc(func(w io.Writer) {
-		w.Write([]byte(strconv.Quote(t.Format(time.RFC3339))))
+		if _, err := w.Write([]byte(strconv.Quote(t.Format(time.RFC3339)))); err != nil {
+			telemetry.ReportError(context.Background(), err)
+		}
 	})
 }
 
