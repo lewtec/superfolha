@@ -15,14 +15,44 @@ import (
 	"github.com/lewtec/superfolha/internal/project"
 )
 
+// CompileResult represents the outcome of a LaTeX compilation process.
 type CompileResult struct {
-	PDF     string `json:"pdf"`
-	Logs    string `json:"logs"`
+	// PDF contains the base64-encoded content of the generated PDF file.
+	PDF string `json:"pdf"`
+	// Logs contains the combined stdout and stderr output from the latexmk command.
+	Logs string `json:"logs"`
+	// Synctex contains the base64-encoded content of the generated synctex file (if any).
 	Synctex string `json:"synctex"`
-	Success bool   `json:"success"`
+	// Success indicates whether the compilation process completed without errors.
+	Success bool `json:"success"`
 }
 
-// Compile compiles a specific LaTeX file from a project
+// Compile compiles a specific LaTeX file from a project into a PDF using latexmk.
+//
+// Ideally, this function orchestrates the compilation process in an isolated environment to ensure
+// reproducibility and prevent side effects on the source project.
+//
+// The process involves:
+// 1. Creating a unique, temporary directory for the compilation job.
+// 2. Retrieving all files from the project via ProjectService.
+// 3. Copying these files into the temporary directory, preserving the directory structure.
+// 4. Creating a dedicated cache directory for LaTeX auxiliary files.
+// 5. Executing `latexmk` with interaction disabled (batchmode) to generate the PDF.
+// 6. capturing the generated PDF, logs, and Synctex file.
+// 7. Cleaning up the temporary directory.
+//
+// Parameters:
+//   - projectService: Service to access project files.
+//   - projectId: The ID of the project containing the file to compile.
+//   - filePath: The relative path of the LaTeX file to compile within the project (e.g., "main.tex").
+//
+// Returns:
+//   - *CompileResult: A struct containing the compilation artifacts (PDF, logs, Synctex) and status.
+//   - error: An error if the compilation setup fails (e.g., missing latexmk, file system errors).
+//     Note that compilation errors (latexmk failure) are reported via the Success field and Logs, not as a returned error.
+//
+// Dependencies:
+//   - Requires `latexmk` to be installed and available in the system PATH.
 func Compile(projectService *project.Service, projectId string, filePath string) (*CompileResult, error) {
 	// Check if latexmk command exists
 	_, err := exec.LookPath("latexmk")
