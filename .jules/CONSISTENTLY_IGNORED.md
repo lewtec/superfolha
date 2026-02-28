@@ -31,3 +31,9 @@ This file lists patterns that are consistently rejected in Pull Requests. Agents
 **- Pattern:** Downgrading versions in `go.mod` or `mise.toml` (e.g., Go 1.25 -> 1.24) without explicit instruction.
 **- Justification:** The project aims to stay on pinned, modern versions. Downgrades are generally regressions.
 **- Files Affected:** `go.mod`, `mise.toml`
+
+## IGNORE: Unrequested Architectural Changes
+
+**- Pattern:** Introducing new packages (e.g., `internal/telemetry`), extracting interfaces (e.g., `ProjectReader`), or moving logic to new files (e.g., `cookies.go`) without explicit user request.
+**- Justification:** Significant architectural changes and introduction of unrequested packages are out-of-scope and clutter Pull Requests. Keep changes localized to the requested task.
+**- Files Affected:** `internal/telemetry/**`, `internal/**/*.go`
