@@ -31,3 +31,21 @@ This file lists patterns that are consistently rejected in Pull Requests. Agents
 **- Pattern:** Downgrading versions in `go.mod` or `mise.toml` (e.g., Go 1.25 -> 1.24) without explicit instruction.
 **- Justification:** The project aims to stay on pinned, modern versions. Downgrades are generally regressions.
 **- Files Affected:** `go.mod`, `mise.toml`
+
+## IGNORE: Manually Editing Generated Code
+
+**- Pattern:** Modifying generated files manually (e.g., `internal/db/queries.sql.go` or frontend `__generated__` files) instead of updating the source file and running the code generator.
+**- Justification:** Changes to generated code will be overwritten and lost the next time the generator runs. Always modify the source and regenerate.
+**- Files Affected:** `*.sql.go`, `**/__generated__/**`
+
+## IGNORE: Unpinned Tool Versions
+
+**- Pattern:** Using `latest`, `lts`, or unpinned versions for tools in `mise.toml` (e.g., `bun = "latest"`).
+**- Justification:** The project requires deterministic and reproducible builds. All tools must be pinned to explicit, specific versions.
+**- Files Affected:** `mise.toml`
+
+## IGNORE: Committing Bootstrap Artifacts
+
+**- Pattern:** Committing local setup scripts, downloaded binaries, or temporary installers like `install-mise.sh` or `install.sh`.
+**- Justification:** These are environment-specific transient files that pollute the repository and pose security risks.
+**- Files Affected:** `install*.sh`, `*.tar.gz`, `*.zip`
