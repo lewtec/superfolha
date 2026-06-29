@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useLoginMutation } from "../hooks/useLoginMutation";
+import { reportError } from "../utils/errorReporting";
 
 export default function Login() {
   const { t } = useTranslation();
@@ -25,7 +26,7 @@ export default function Login() {
     },
     onError: (err) => {
       setError(t("login_error"));
-      console.error(err);
+          reportError(err, { context: "Login.tsx useLoginMutation onError" });
     },
   });
 

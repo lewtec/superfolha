@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { buildFileTree, FileTreeNode } from "../utils/fileTree";
+import { reportError } from "../utils/errorReporting";
 import {
   Folder,
   File as FileIcon,
@@ -168,7 +169,7 @@ export default function FileTree({
 
       onLoadFile(uploadedFilePath, fileContent);
     } catch (error) {
-      console.error("Error uploading file:", error);
+      reportError(error, { context: "FileTree.tsx upload file" });
       alert(
         `Error uploading file: ${error instanceof Error ? error.message : String(error)}`,
       );

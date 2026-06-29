@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useRegisterMutation } from "../hooks/useRegisterMutation";
+import { reportError } from "../utils/errorReporting";
 
 export default function Register() {
   const { t } = useTranslation();
@@ -26,7 +27,7 @@ export default function Register() {
     },
     onError: (err) => {
       setError(t("registration_error"));
-      console.error(err);
+          reportError(err, { context: "Register.tsx useRegisterMutation onError" });
     },
   });
 

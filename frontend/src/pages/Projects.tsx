@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useProjectsQuery } from "../hooks/useProjectsQuery";
 import { useCreateProjectMutation } from "../hooks/useCreateProjectMutation";
 import { useDeleteProjectMutation } from "../hooks/useDeleteProjectMutation";
+import { reportError } from "../utils/errorReporting";
 
 export default function Projects() {
   const navigate = useNavigate();
@@ -28,7 +29,7 @@ export default function Projects() {
       },
       onError: (err) => {
         setError("Failed to create project");
-        console.error(err);
+        reportError(err, { context: "Projects.tsx createProject mutation error" });
       },
     });
 
@@ -42,7 +43,7 @@ export default function Projects() {
       },
       onError: (err) => {
         setError("Failed to delete project");
-        console.error(err);
+        reportError(err, { context: "Projects.tsx deleteProject mutation error" });
       },
       updater: (store, response) => {
         if (response?.deleteProject?.id) {
