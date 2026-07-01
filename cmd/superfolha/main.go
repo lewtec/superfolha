@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath" // Added import for filepath
+	"time"
 
 	"github.com/lewtec/superfolha/internal/auth"
 	"github.com/lewtec/superfolha/internal/project"
@@ -90,7 +91,15 @@ func runServer(cmd *cobra.Command, args []string) {
 	log.Printf("Starting server on http://localhost%s", addr)
 	log.Printf("GraphQL Playground: http://localhost%s/playground", addr)
 
-	if err := http.ListenAndServe(addr, srv.Handler()); err != nil {
+	httpServer := &http.Server{
+		Addr:         addr,
+		Handler:      srv.Handler(),
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	if err := httpServer.ListenAndServe(); err != nil {
 		log.Fatalf("Server failed: %v", err)
 	}
 }
