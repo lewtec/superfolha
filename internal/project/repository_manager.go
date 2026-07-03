@@ -118,7 +118,7 @@ func (pr *ProjectRepository) SaveFile(filePath, content string) error {
 		return fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
 
-	if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(fullPath, []byte(content), 0600); err != nil {
 		return fmt.Errorf("failed to write file %s: %w", fullPath, err)
 	}
 

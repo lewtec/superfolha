@@ -319,7 +319,7 @@ func WriteFile(repoPath, filePath, content string) error {
 
 	}
 
-	return os.WriteFile(fullPath, []byte(content), 0644)
+	return os.WriteFile(fullPath, []byte(content), 0600)
 
 }
 
