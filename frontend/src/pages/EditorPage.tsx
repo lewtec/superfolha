@@ -1,3 +1,4 @@
+import { reportError } from "../utils/errorReporting";
 import { useGetFileContent } from "../hooks/useGetFileContentQuery";
 import { useSaveFileMutation } from "../hooks/useSaveFileMutation";
 import { useDeleteFileMutation } from "../hooks/useDeleteFileMutation";
@@ -48,14 +49,14 @@ export default function EditorPage() {
       commitProject(id!, "Auto-commit: changes saved.", {
         onCompleted: (response, errors) => {
           if (errors) {
-            console.error("Auto-commit failed:", errors[0].message);
+            reportError("Auto-commit failed:", errors[0].message);
             return;
           }
           console.log("Auto-commit successful:", response);
           setEditorStatus("committed");
         },
         onError: (err) => {
-          console.error("Auto-commit failed:", err);
+          reportError("Auto-commit failed:", err);
         },
       });
     }
@@ -120,7 +121,7 @@ export default function EditorPage() {
             console.log("Final commit successful before unload.");
           },
           onError: (err) => {
-            console.error("Final commit failed before unload:", err);
+            reportError("Final commit failed before unload:", err);
           },
         });
       }
@@ -167,7 +168,7 @@ export default function EditorPage() {
           onError: (err) => {
             setEditorStatus("error");
             alert("Failed to save file");
-            console.error(err);
+            reportError(err);
           },
         });
       }
@@ -191,7 +192,7 @@ export default function EditorPage() {
         },
         onError: (err) => {
           alert("Failed to delete file");
-          console.error(err);
+          reportError(err);
         },
       });
     },

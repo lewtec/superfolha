@@ -1,6 +1,8 @@
 package server
 
 import (
+	"github.com/lewtec/superfolha/internal/telemetry"
+
 	"context"
 	"encoding/json"
 	"fmt" // Added fmt import
@@ -107,7 +109,7 @@ func (s *Server) handleCompile(w http.ResponseWriter, r *http.Request) {
 	// The compiler.Compile function needs to be updated to accept projectID, filePath, and projectService
 	result, err := compiler.Compile(s.projectService, projectId, filePath)
 	if err != nil {
-		log.Printf("Error compiling project %s file %s for user %s: %v", projectId, filePath, user.UserID, err)
+		telemetry.ReportError(context.Background(), fmt.Errorf("Error compiling project %s file %s for user %s: %v", projectId, filePath, user.UserID, err))
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
 		return
@@ -167,7 +169,7 @@ func (s *Server) handleUploadFile(w http.ResponseWriter, r *http.Request) {
 	// Use ProjectService to save the file
 	err = s.projectService.SaveFile(projectIdStr, filePath, string(fileContent))
 	if err != nil {
-		log.Printf("Error saving file %s to project %s: %v", filePath, projectIdStr, err)
+		telemetry.ReportError(context.Background(), fmt.Errorf("Error saving file %s to project %s: %v", filePath, projectIdStr, err))
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"message": "Failed to save uploaded file"})
 		return
@@ -176,7 +178,7 @@ func (s *Server) handleUploadFile(w http.ResponseWriter, r *http.Request) {
 	// Use ProjectService to commit the change
 	_, err = s.projectService.CommitChanges(projectIdStr, "System", "Uploaded file: "+filePath) // Use a placeholder author
 	if err != nil {
-		log.Printf("Error committing file %s to project %s: %v", filePath, projectIdStr, err)
+		telemetry.ReportError(context.Background(), fmt.Errorf("Error committing file %s to project %s: %v", filePath, projectIdStr, err))
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"message": "Failed to commit uploaded file"})
 		return
@@ -228,7 +230,7 @@ func (s *Server) handleDownloadFile(w http.ResponseWriter, r *http.Request) {
 			json.NewEncoder(w).Encode(map[string]string{"message": "File not found"})
 			return
 		}
-		log.Printf("Error reading file %s from project %s: %v", filePath, projectIdStr, err)
+		telemetry.ReportError(context.Background(), fmt.Errorf("Error reading file %s from project %s: %v", filePath, projectIdStr, err))
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"message": "Failed to read file"})
 		return
@@ -260,7 +262,7 @@ func (s *Server) handleDownloadFile(w http.ResponseWriter, r *http.Request) {
 
 	_, err = io.Copy(w, fileReader) // Stream the file content
 	if err != nil {
-		log.Printf("Error writing file content to response for %s: %v", filePath, err)
+		telemetry.ReportError(context.Background(), fmt.Errorf("Error writing file content to response for %s: %v", filePath, err))
 		// No need to set status code again, as headers might have been sent
 	}
 }

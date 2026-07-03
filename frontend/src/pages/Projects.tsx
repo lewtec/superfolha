@@ -1,3 +1,4 @@
+import { reportError } from "../utils/errorReporting";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useProjectsQuery } from "../hooks/useProjectsQuery";
@@ -28,7 +29,7 @@ export default function Projects() {
       },
       onError: (err) => {
         setError("Failed to create project");
-        console.error(err);
+        reportError(err);
       },
     });
 
@@ -42,7 +43,7 @@ export default function Projects() {
       },
       onError: (err) => {
         setError("Failed to delete project");
-        console.error(err);
+        reportError(err);
       },
       updater: (store, response) => {
         if (response?.deleteProject?.id) {

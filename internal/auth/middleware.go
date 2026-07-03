@@ -1,6 +1,10 @@
 package auth
 
 import (
+	"fmt"
+
+	"github.com/lewtec/superfolha/internal/telemetry"
+
 	"context"
 	"log"
 	"net/http"
@@ -29,9 +33,9 @@ func Middleware(next http.Handler) http.Handler {
 		if err == nil {
 			tokenString = cookie.Value
 			authAttempted = true
-			log.Printf("Auth Middleware: Extracted token from cookie.")
+			telemetry.ReportError(context.Background(), fmt.Errorf("Auth Middleware: Extracted token from cookie."))
 		} else {
-			log.Printf("Auth Middleware: No 'authToken' cookie found: %v", err)
+			telemetry.ReportError(context.Background(), fmt.Errorf("Auth Middleware: No 'authToken' cookie found: %v", err))
 		}
 
 		// 2. If no token from cookie, try Authorization header
@@ -39,16 +43,16 @@ func Middleware(next http.Handler) http.Handler {
 			authHeader := r.Header.Get("Authorization")
 			if authHeader != "" {
 				authAttempted = true
-				log.Printf("Auth Middleware: Received Authorization header.")
+				telemetry.ReportError(context.Background(), fmt.Errorf("Auth Middleware: Received Authorization header."))
 				parts := strings.Split(authHeader, " ")
 				if len(parts) == 2 && parts[0] == "Bearer" {
 					tokenString = parts[1]
-					log.Printf("Auth Middleware: Extracted token from Authorization header.")
+					telemetry.ReportError(context.Background(), fmt.Errorf("Auth Middleware: Extracted token from Authorization header."))
 				} else {
 					log.Printf("Auth Middleware: Authorization header malformed: %s", authHeader)
 				}
 			} else {
-				log.Println("Auth Middleware: No Authorization header found.")
+				telemetry.ReportError(context.Background(), fmt.Errorf("Auth Middleware: No Authorization header found."))
 			}
 		}
 
@@ -64,7 +68,7 @@ func Middleware(next http.Handler) http.Handler {
 				})
 				r = r.WithContext(ctx)
 			} else {
-				log.Printf("Auth Middleware: Token validation failed: %v", err)
+				telemetry.ReportError(context.Background(), fmt.Errorf("Auth Middleware: Token validation failed: %v", err))
 				// If token validation fails and it came from a cookie, clear the cookie
 				if cookie != nil {
 					http.SetCookie(w, &http.Cookie{
@@ -75,11 +79,11 @@ func Middleware(next http.Handler) http.Handler {
 						Secure:   true,
 						Path:     "/",
 					})
-					log.Println("Auth Middleware: Cleared expired/invalid 'authToken' cookie.")
+					telemetry.ReportError(context.Background(), fmt.Errorf("Auth Middleware: Cleared expired/invalid 'authToken' cookie."))
 				}
 			}
 		} else if authAttempted {
-			log.Println("Auth Middleware: No valid token found after checking cookie and Authorization header.")
+			telemetry.ReportError(context.Background(), fmt.Errorf("Auth Middleware: No valid token found after checking cookie and Authorization header."))
 		}
 
 		next.ServeHTTP(w, r)

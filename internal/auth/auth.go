@@ -1,6 +1,12 @@
 package auth
 
 import (
+	"fmt"
+
+	"context"
+
+	"github.com/lewtec/superfolha/internal/telemetry"
+
 	"errors"
 	"log"
 	"os"
@@ -41,13 +47,13 @@ func getJWTSecret() ([]byte, error) {
 	if secret == "" {
 		// Fallback for development only - should never be used in production
 		if goEnv == "development" { // Use goEnv here
-			log.Println("Auth: Using development fallback JWT secret.")
+			telemetry.ReportError(context.Background(), fmt.Errorf("Auth: Using development fallback JWT secret."))
 			return []byte("dev-secret-change-in-production"), nil
 		}
-		log.Println("Auth: JWT_SECRET environment variable is required and not found.")
+		telemetry.ReportError(context.Background(), fmt.Errorf("Auth: JWT_SECRET environment variable is required and not found."))
 		return nil, ErrJWTSecretRequired
 	}
-	log.Println("Auth: Using JWT_SECRET from environment variable.")
+	telemetry.ReportError(context.Background(), fmt.Errorf("Auth: Using JWT_SECRET from environment variable."))
 	return []byte(secret), nil
 }
 

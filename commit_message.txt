@@ -1,0 +1,13 @@
+🧹 Janitor: Centralized error reporting for frontend and backend
+
+Assumptions
+- We need a single place to log errors so we can integrate Sentry later if needed.
+
+Alternatives Not Chosen
+- Skipping frontend or backend because I noticed both needed fixes.
+
+How To Pivot
+- Drop the imports to `telemetry.ReportError` or `reportError` to restore localized logging.
+
+Next Knobs
+- Sentry integrations can be added inside `internal/telemetry/error.go` and `frontend/src/utils/errorReporting.ts`.
