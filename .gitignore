@@ -28,3 +28,6 @@ Thumbs.db
 
 # Build artifacts
 *.tar.gz
+
+# Executable
+/superfolha
