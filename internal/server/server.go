@@ -3,9 +3,9 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"fmt" // Added fmt import
+	"fmt"
+	"github.com/lewtec/superfolha/internal/telemetry"
 	"io"
-	"log"
 	"net/http"
 
 	"github.com/99designs/gqlgen/graphql/handler"
@@ -89,7 +89,7 @@ func (s *Server) handleCompile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, _, user, err := s.resolver.getAndCheckProject(r.Context(), projectId)
+	_, _, _, err := s.resolver.getAndCheckProject(r.Context(), projectId)
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized) // getAndCheckProject returns "not authenticated" or "not authorized"
 		json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
@@ -107,7 +107,7 @@ func (s *Server) handleCompile(w http.ResponseWriter, r *http.Request) {
 	// The compiler.Compile function needs to be updated to accept projectID, filePath, and projectService
 	result, err := compiler.Compile(s.projectService, projectId, filePath)
 	if err != nil {
-		log.Printf("Error compiling project %s file %s for user %s: %v", projectId, filePath, user.UserID, err)
+		telemetry.ReportError(r.Context(), fmt.Errorf("error compiling project %s file %s: %w", projectId, filePath, err))
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
 		return
@@ -167,7 +167,7 @@ func (s *Server) handleUploadFile(w http.ResponseWriter, r *http.Request) {
 	// Use ProjectService to save the file
 	err = s.projectService.SaveFile(projectIdStr, filePath, string(fileContent))
 	if err != nil {
-		log.Printf("Error saving file %s to project %s: %v", filePath, projectIdStr, err)
+		telemetry.ReportError(r.Context(), fmt.Errorf("error saving file %s to project %s: %w", filePath, projectIdStr, err))
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"message": "Failed to save uploaded file"})
 		return
@@ -176,7 +176,7 @@ func (s *Server) handleUploadFile(w http.ResponseWriter, r *http.Request) {
 	// Use ProjectService to commit the change
 	_, err = s.projectService.CommitChanges(projectIdStr, "System", "Uploaded file: "+filePath) // Use a placeholder author
 	if err != nil {
-		log.Printf("Error committing file %s to project %s: %v", filePath, projectIdStr, err)
+		telemetry.ReportError(r.Context(), fmt.Errorf("error committing file %s to project %s: %w", filePath, projectIdStr, err))
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"message": "Failed to commit uploaded file"})
 		return
@@ -228,7 +228,7 @@ func (s *Server) handleDownloadFile(w http.ResponseWriter, r *http.Request) {
 			json.NewEncoder(w).Encode(map[string]string{"message": "File not found"})
 			return
 		}
-		log.Printf("Error reading file %s from project %s: %v", filePath, projectIdStr, err)
+		telemetry.ReportError(r.Context(), fmt.Errorf("error reading file %s from project %s: %w", filePath, projectIdStr, err))
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"message": "Failed to read file"})
 		return
@@ -251,7 +251,7 @@ func (s *Server) handleDownloadFile(w http.ResponseWriter, r *http.Request) {
 		// e.g., by reading into a buffer and then prepending the buffer
 		// to the stream, or by not detecting content type this way.
 		// For os.File, this path should not be taken.
-		log.Printf("Warning: fileReader is not seekable for %s", filePath)
+		telemetry.ReportError(r.Context(), fmt.Errorf("fileReader is not seekable for %s", filePath))
 	}
 
 	w.Header().Set("Content-Type", contentType)
@@ -260,7 +260,7 @@ func (s *Server) handleDownloadFile(w http.ResponseWriter, r *http.Request) {
 
 	_, err = io.Copy(w, fileReader) // Stream the file content
 	if err != nil {
-		log.Printf("Error writing file content to response for %s: %v", filePath, err)
+		telemetry.ReportError(r.Context(), fmt.Errorf("error writing file content to response for %s: %w", filePath, err))
 		// No need to set status code again, as headers might have been sent
 	}
 }

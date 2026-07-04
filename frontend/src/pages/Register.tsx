@@ -1,3 +1,4 @@
+import { reportError } from "../utils/errorReporting";
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -26,7 +27,7 @@ export default function Register() {
     },
     onError: (err) => {
       setError(t("registration_error"));
-      console.error(err);
+      reportError(err);
     },
   });
 

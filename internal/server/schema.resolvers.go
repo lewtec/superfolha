@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/lewtec/superfolha/internal/telemetry"
 	"io"
 	"log"
 	"net/http"
@@ -269,7 +270,7 @@ func (r *projectResolver) File(ctx context.Context, obj *Project, path string) (
 		seeker.Seek(0, io.SeekStart)
 	} else {
 		// This case should ideally not be hit for os.File
-		log.Printf("Warning: fileReader is not seekable for %s in GraphQL resolver", path)
+		telemetry.ReportError(ctx, fmt.Errorf("fileReader is not seekable for %s in GraphQL resolver", path))
 	}
 
 	if !isTooBig && !isBinary {

@@ -1,3 +1,4 @@
+import { reportError } from "../utils/errorReporting";
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -25,7 +26,7 @@ export default function Login() {
     },
     onError: (err) => {
       setError(t("login_error"));
-      console.error(err);
+      reportError(err);
     },
   });
 

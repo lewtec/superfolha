@@ -1,3 +1,4 @@
+import { reportError } from "../utils/errorReporting";
 import { useState } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
@@ -28,7 +29,7 @@ export default function PDFViewer({ pdfData }: PDFViewerProps) {
   function onDocumentLoadError(err: Error) {
     setError("Failed to load PDF: " + err.message);
     setLoading(false);
-    console.error(err);
+    reportError(err);
   }
 
   if (!pdfData) {

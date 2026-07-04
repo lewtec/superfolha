@@ -1,3 +1,4 @@
+import { reportError } from "../utils/errorReporting";
 import { useState, useRef } from "react";
 import { buildFileTree, FileTreeNode } from "../utils/fileTree";
 import {
@@ -168,7 +169,7 @@ export default function FileTree({
 
       onLoadFile(uploadedFilePath, fileContent);
     } catch (error) {
-      console.error("Error uploading file:", error);
+      reportError("Error uploading file:", error);
       alert(
         `Error uploading file: ${error instanceof Error ? error.message : String(error)}`,
       );
