@@ -16,7 +16,7 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o server ./cmd/server
 
 # Stage 2: Final image with texlive
-FROM texlive/texlive:latest@sha256:d68a3312b23872b8cd02d6a982d5e6702f406fc8c0b5673626b8bdf263c49654
+FROM texlive/texlive:latest@sha256:20fa06486e76ebc91b93422153e22d8bca7d4e5366f4baf11693feea47d7ecde
 
 # Install dependencies
 RUN apt-get update && apt-get install -y \
