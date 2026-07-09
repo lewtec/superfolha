@@ -91,20 +91,22 @@ func Compile(projectService *project.Service, projectId string, filePath string)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read file %s from project: %w", file.Path, err)
 		}
-		// Close the reader after copying
-		// Note: defer in a loop can be problematic if many files, but for typical LaTeX projects, it should be fine.
-		// For very large projects, consider closing immediately after io.Copy.
-		defer fileReader.Close()
 
 		// Write file content to temporary directory
 		outFile, err := os.Create(targetPath)
 		if err != nil {
+			fileReader.Close()
 			return nil, fmt.Errorf("failed to create temporary file %s: %w", targetPath, err)
 		}
-		defer outFile.Close() // Close the writer
 
-		if _, err := io.Copy(outFile, fileReader); err != nil {
-			return nil, fmt.Errorf("failed to copy file %s to temporary directory: %w", file.Path, err)
+		_, copyErr := io.Copy(outFile, fileReader)
+
+		// Close explicitly instead of using defer in loop
+		fileReader.Close()
+		outFile.Close()
+
+		if copyErr != nil {
+			return nil, fmt.Errorf("failed to copy file %s to temporary directory: %w", file.Path, copyErr)
 		}
 	}
 
