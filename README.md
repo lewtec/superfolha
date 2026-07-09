@@ -83,22 +83,22 @@ mise run lint                # Lint code
 ### Manual Setup
 
 ```bash
-# Run server (migrations run automatically on startup)
-go run cmd/server/main.go --db="$DATABASE_URL" --state-dir=./data
+# Run server (migrations run automatically on startup; dev UI proxies to Vite)
+go run ./cmd/superfolha --db="$DATABASE_URL" --state-dir=./data
 ```
 
 ## Production Build
 
 ```bash
-# Using mise
+# Using mise (builds SPA + embeds it with -tags release)
 mise run build
 
 # Manual
-cd frontend && npm run build && cd ..
-go build -o server cmd/server/main.go
+cd frontend && bun run build && cd ..
+go build -tags release -o superfolha ./cmd/superfolha
 
 # Run
-./server --db="postgres://..." --state-dir=/var/superfolha
+./superfolha --db="postgres://..." --state-dir=/var/superfolha
 ```
 
 ## Docker
@@ -123,9 +123,9 @@ Deploy with the root `render.yaml` Blueprint (Docker web service + Postgres + 2â
 
 - `DATABASE_URL`: PostgreSQL connection string (required)
 - `JWT_SECRET`: Secret key for JWT token signing (required in production)
-- `STATE_DIR`: Directory for Git repositories (default: `./data`)
-- `PORT`: Server port (default: `8080`)
-- `GO_ENV`: Set to `development` for dev mode (allows JWT_SECRET fallback)
+- `STATE_DIR`: Root for Git repositories (default: `./data`; Docker/Render: `/data`). Projects live at `{STATE_DIR}/repos/{uuid}`
+- `PORT`: Server port (default: `8080`; Render injects this automatically)
+- `GO_ENV`: Set to `development` for dev mode only (allows JWT_SECRET fallback; never set in production)
 
 ### CLI Flags
 

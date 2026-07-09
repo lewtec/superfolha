@@ -50,8 +50,7 @@ run = "go run github.com/99designs/gqlgen generate"
 depends = ["gen:*"]
 
 [tasks.docker]
-description = "Build Docker image"
-depends = ["build"]
+description = "Build production Docker image (multi-stage: SPA + Go release + TeX Live)"
 run = "docker build -t superfolha ."
 
 [tasks.test]

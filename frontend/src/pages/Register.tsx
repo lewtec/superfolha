@@ -17,15 +17,15 @@ export default function Register() {
         setError(errors[0].message);
         return;
       }
-      if (response.register?.token) {
-        localStorage.setItem("token", response.register.token);
+      // Session is the HttpOnly authToken cookie set by the server.
+      if (response.register?.user) {
         navigate("/projects");
       } else {
         setError(t("registration_failed"));
       }
     },
     onError: (err) => {
-      setError(t("registration_error"));
+      setError(err.message || t("registration_error"));
       console.error(err);
     },
   });
@@ -39,12 +39,13 @@ export default function Register() {
       return;
     }
 
-    if (password.length < 6) {
+    // Backend requires MinPasswordLength = 8
+    if (password.length < 8) {
       setError(t("password_too_short"));
       return;
     }
 
-    register(email, password);
+    register(email.trim(), password);
   };
 
   return (

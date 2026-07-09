@@ -32,7 +32,7 @@
   "register_title": "Crea una nueva cuenta",
   "confirm_password_label": "Confirmar Contraseña",
   "passwords_do_not_match": "Las contraseñas no coinciden",
-  "password_too_short": "La contraseña debe tener al menos 6 caracteres",
+  "password_too_short": "La contraseña debe tener al menos 8 caracteres",
   "creating_account": "Creando cuenta...",
   "already_have_account": "¿Ya tienes una cuenta?",
   "registration_failed": "Error en el registro: No se recibió ningún token.",

@@ -16,15 +16,15 @@ export default function Login() {
         setError(errors[0].message);
         return;
       }
+      // Session is the HttpOnly authToken cookie set by the server.
       if (response.login?.user) {
-        // Check for user presence to confirm successful login
         navigate("/projects");
       } else {
         setError(t("login_failed"));
       }
     },
     onError: (err) => {
-      setError(t("login_error"));
+      setError(err.message || t("login_error"));
       console.error(err);
     },
   });
@@ -32,7 +32,7 @@ export default function Login() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    login(email, password);
+    login(email.trim(), password);
   };
 
   return (

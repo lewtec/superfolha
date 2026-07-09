@@ -1,0 +1,15 @@
+.git
+data
+tmp
+superfolha
+server
+**/node_modules
+frontend/node_modules
+internal/server/web/dist
+web/dist
+**/*.test
+**/*_test.go
+.vscode
+.idea
+*.md
+!README.md

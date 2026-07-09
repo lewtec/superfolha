@@ -5,7 +5,7 @@ RETURNING *;
 
 -- name: GetUserByEmail :one
 SELECT * FROM users
-WHERE email = $1;
+WHERE lower(email) = lower($1);
 
 -- name: GetUserByID :one
 SELECT * FROM users

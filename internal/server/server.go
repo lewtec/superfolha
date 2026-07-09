@@ -3,17 +3,19 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"fmt" // Added fmt import
+	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"os"
+	"time"
 
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/lewtec/superfolha/internal/auth"
 	"github.com/lewtec/superfolha/internal/compiler"
 	"github.com/lewtec/superfolha/internal/db"
-	"github.com/lewtec/superfolha/internal/project" // Import project package
+	"github.com/lewtec/superfolha/internal/project"
 )
 
 type Server struct {
@@ -67,10 +69,28 @@ func (s *Server) Handler() http.Handler {
 	// Download file endpoint
 	mux.Handle("/api/projects/{projectId}/download/{filePath...}", auth.Middleware(http.HandlerFunc(s.handleDownloadFile)))
 
+	// Logout clears the HttpOnly session cookie (must be done server-side).
+	mux.HandleFunc("POST /api/logout", s.handleLogout)
+
 	// Serve Web App
 	mux.Handle("/", GetWebApp())
 
 	return mux
+}
+
+func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
+	secure := os.Getenv("GO_ENV") != "development"
+	http.SetCookie(w, &http.Cookie{
+		Name:     "authToken",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		Expires:  time.Unix(0, 0),
+		HttpOnly: true,
+		Secure:   secure,
+		SameSite: http.SameSiteLaxMode,
+	})
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) handleCompile(w http.ResponseWriter, r *http.Request) {

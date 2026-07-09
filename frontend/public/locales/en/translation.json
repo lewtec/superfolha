@@ -32,7 +32,7 @@
   "register_title": "Create a new account",
   "confirm_password_label": "Confirm Password",
   "passwords_do_not_match": "Passwords do not match",
-  "password_too_short": "Password must be at least 6 characters",
+  "password_too_short": "Password must be at least 8 characters",
   "creating_account": "Creating account...",
   "already_have_account": "Already have an account?",
   "registration_failed": "Registration failed: No token received.",

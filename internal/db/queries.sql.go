@@ -91,7 +91,7 @@ func (q *Queries) GetProject(ctx context.Context, id pgtype.UUID) (Project, erro
 
 const getUserByEmail = `-- name: GetUserByEmail :one
 SELECT id, email, password_hash, created_at FROM users
-WHERE email = $1
+WHERE lower(email) = lower($1)
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {

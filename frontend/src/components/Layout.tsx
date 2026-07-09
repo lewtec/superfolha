@@ -19,8 +19,15 @@ export default function Layout({ children }: LayoutProps) {
     setTheme((prevTheme) => (prevTheme === "light" ? "dark" : "light"));
   };
 
-  const logout = () => {
-    localStorage.removeItem("token");
+  const logout = async () => {
+    try {
+      await fetch("/api/logout", {
+        method: "POST",
+        credentials: "same-origin",
+      });
+    } catch {
+      // Still leave the app even if the network call fails.
+    }
     navigate("/login");
   };
 
@@ -33,11 +40,9 @@ export default function Layout({ children }: LayoutProps) {
           </a>
         </div>
         <div className="navbar-end">
-          {localStorage.getItem("token") && (
-            <button className="btn btn-ghost" onClick={logout}>
-              Logout
-            </button>
-          )}
+          <button className="btn btn-ghost" onClick={logout}>
+            Logout
+          </button>
           <button onClick={toggleTheme} className="btn btn-ghost btn-circle">
             {theme === "light" ? <Moon size={20} /> : <Sun size={20} />}
           </button>

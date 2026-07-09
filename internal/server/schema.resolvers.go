@@ -34,15 +34,7 @@ func (r *mutationResolver) Register(ctx context.Context, email string, password 
 		return nil, errors.New("internal server error: response writer not available")
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     "authToken",
-		Value:    authResp.Token,
-		Expires:  time.Now().Add(7 * 24 * time.Hour), // Match token expiration
-		HttpOnly: true,
-		Secure:   true, // Set to true in production for HTTPS
-		Path:     "/",  // Make cookie available to all paths
-	})
-	// --- END NEW ---
+	setAuthCookie(w, authResp.Token)
 
 	return &AuthPayload{
 		User: &User{
@@ -66,15 +58,7 @@ func (r *mutationResolver) Login(ctx context.Context, email string, password str
 		return nil, errors.New("internal server error: response writer not available")
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     "authToken",
-		Value:    authResp.Token,
-		Expires:  time.Now().Add(7 * 24 * time.Hour), // Match token expiration
-		HttpOnly: true,
-		Secure:   true, // Set to true in production for HTTPS
-		Path:     "/",  // Make cookie available to all paths
-	})
-	// --- END NEW ---
+	setAuthCookie(w, authResp.Token)
 
 	return &AuthPayload{
 		User: &User{
@@ -82,6 +66,20 @@ func (r *mutationResolver) Login(ctx context.Context, email string, password str
 			Email: authResp.User.Email,
 		},
 	}, nil
+}
+
+func setAuthCookie(w http.ResponseWriter, token string) {
+	// Secure only when not in development so local HTTP can set the cookie.
+	secure := os.Getenv("GO_ENV") != "development"
+	http.SetCookie(w, &http.Cookie{
+		Name:     "authToken",
+		Value:    token,
+		Expires:  time.Now().Add(7 * 24 * time.Hour),
+		HttpOnly: true,
+		Secure:   secure,
+		SameSite: http.SameSiteLaxMode,
+		Path:     "/",
+	})
 }
 
 // CreateProject is the resolver for the createProject field.

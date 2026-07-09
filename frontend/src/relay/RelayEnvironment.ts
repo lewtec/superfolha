@@ -7,13 +7,13 @@ import {
 } from "relay-runtime";
 
 const fetchQuery: FetchFunction = async (operation, variables) => {
-  const token = localStorage.getItem("token");
-
+  // Auth is cookie-based (HttpOnly authToken). Same-origin fetch sends cookies
+  // by default; credentials: "same-origin" makes that explicit.
   const response = await fetch("/api/graphql", {
     method: "POST",
+    credentials: "same-origin",
     headers: {
       "Content-Type": "application/json",
-      ...(token && { Authorization: `Bearer ${token}` }),
     },
     body: JSON.stringify({
       query: operation.text,
