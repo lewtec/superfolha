@@ -8,7 +8,7 @@ Construa um editor LaTeX web completo seguindo esta especificação.
 ### Backend
 - Go com stdlib HTTP router (ServeMux)
 - GraphQL via gqlgen
-- PostgreSQL com sqlc para queries
+- SQLite (modernc.org/sqlite) com sqlc para queries
 - dbmate para migrations (rodar no boot)
 - libgit2 para operações Git
 - cobra para CLI
@@ -29,12 +29,12 @@ Construa um editor LaTeX web completo seguindo esta especificação.
 ## Configuração CLI
 
 ```bash
-./server --state-dir=/var/superfolha --db="postgres://..."
+./server --state-dir=/var/superfolha --db="./data/superfolha.db"
 ```
 
 Argumentos via cobra, suportam variáveis de ambiente:
 - `--state-dir` (env: STATE_DIR) - diretório para repositórios Git
-- `--db` (env: DATABASE_URL) - connection string PostgreSQL
+- `--db` (env: DATABASE_URL) - caminho SQLite ou DSN file:
 
 ## Arquitetura Backend
 
@@ -177,7 +177,7 @@ Operações necessárias:
 ### Inicialização
 
 1. Parse CLI args com cobra
-2. Conecta PostgreSQL
+2. Conecta SQLite
 3. Roda migrations dbmate
 4. Inicia servidor HTTP
 5. Serve bundle embedded em `/`
@@ -412,7 +412,7 @@ cd frontend && npm install && npm run dev
 
 # Backend
 cd backend && go mod download
-go run cmd/server/main.go --state-dir=./tmp --db="postgres://..."
+go run cmd/server/main.go --state-dir=./tmp --db="./data/superfolha.db"
 ```
 
 ### Production Build
@@ -427,7 +427,7 @@ cd backend && go build -o server cmd/server/main.go
 docker build -t superfolha .
 docker run -v /data:/data -p 8080:8080 superfolha \
   --state-dir=/data/repos \
-  --db="postgres://user:pass@host/db"
+  --db="./data/superfolha.db"
 ```
 
 ### Dockerfile

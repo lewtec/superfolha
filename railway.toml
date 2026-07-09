@@ -1,29 +1,23 @@
 # Superfolha — Railway config as code (single service).
 # https://docs.railway.com/config-as-code
 #
-# Not covered here (set in the Railway dashboard / CLI):
-#   - Postgres plugin → wire DATABASE_URL into this service
-#   - Volume attached at /data (requiredMountPath enforces it)
-#   - JWT_SECRET (generate a long random value)
-#   - STATE_DIR=/data  (optional; Dockerfile already defaults to /data)
-#   - Public HTTP domain
+# Default persistence: SQLite on the volume (DB_DRIVER=sqlite).
+# Optional Postgres: add Railway Postgres plugin, set
+#   DB_DRIVER=postgres
+#   DATABASE_URL=${{Postgres.DATABASE_URL}}  (or link variable)
 #
-# PORT is injected by Railway; the app reads it automatically.
+# Always: volume at /data, JWT_SECRET, public domain.
+# PORT is injected by Railway.
 
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-# Matches Dockerfile ENTRYPOINT; omit to rely on the image entrypoint alone.
 startCommand = "/app/server"
 healthcheckPath = "/"
-# Large TeX Live image + cold start can be slow.
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 5
-# Git project repos live under {STATE_DIR}/repos/{uuid}; STATE_DIR defaults to /data.
-# Attach a volume mounted at /data in the service settings.
 requiredMountPath = "/data"
-# Single instance only: volumes are not shared across replicas.
 numReplicas = 1

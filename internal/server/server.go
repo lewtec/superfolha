@@ -19,18 +19,18 @@ import (
 )
 
 type Server struct {
-	db             db.DBTX
+	repo           db.Repository
 	stateDir       string
 	resolver       *Resolver
 	projectService *project.Service // Added projectService
 	authService    *auth.Service
 }
 
-func NewServer(db db.DBTX, stateDir string, projectService *project.Service, authService *auth.Service) *Server {
+func NewServer(repo db.Repository, stateDir string, projectService *project.Service, authService *auth.Service) *Server {
 	return &Server{
-		db:             db,
+		repo:           repo,
 		stateDir:       stateDir,
-		resolver:       NewResolver(db, stateDir, projectService, authService), // Pass projectService and authService here
+		resolver:       NewResolver(repo, stateDir, projectService, authService),
 		projectService: projectService,
 		authService:    authService,
 	}

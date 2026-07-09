@@ -2,7 +2,7 @@
 // versions:
 //   sqlc v1.31.1
 
-package db
+package postgres
 
 import (
 	"context"
@@ -13,6 +13,7 @@ import (
 type Querier interface {
 	CreateProject(ctx context.Context, arg CreateProjectParams) (Project, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	CreateUserWithID(ctx context.Context, arg CreateUserWithIDParams) (User, error)
 	DeleteProject(ctx context.Context, id pgtype.UUID) error
 	GetProject(ctx context.Context, id pgtype.UUID) (Project, error)
 	GetUserByEmail(ctx context.Context, lower string) (User, error)

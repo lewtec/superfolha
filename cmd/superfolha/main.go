@@ -1,27 +1,27 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
-	"path/filepath" // Added import for filepath
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/lewtec/superfolha/internal/auth"
-	"github.com/lewtec/superfolha/internal/project"
-
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/lewtec/superfolha/internal/db"
+	"github.com/lewtec/superfolha/internal/db/postgres"
+	"github.com/lewtec/superfolha/internal/db/sqlite"
+	"github.com/lewtec/superfolha/internal/project"
 	"github.com/lewtec/superfolha/internal/server"
 	"github.com/spf13/cobra"
 )
 
 var (
 	stateDir string
-	dbURL    string
+	dbDriver string
+	dbDSN    string
 	port     string
 )
 
@@ -33,8 +33,9 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.Flags().StringVar(&stateDir, "state-dir", getEnv("STATE_DIR", "./data"), "Directory for Git repositories")
-	rootCmd.Flags().StringVar(&dbURL, "db", getEnv("DATABASE_URL", ""), "PostgreSQL connection string")
+	rootCmd.Flags().StringVar(&stateDir, "state-dir", getEnv("STATE_DIR", "./data"), "Directory for Git repositories (and default SQLite path)")
+	rootCmd.Flags().StringVar(&dbDriver, "db-driver", firstEnv("DB_DRIVER", "DATABASE_DRIVER"), "Database driver: sqlite (default) or postgres")
+	rootCmd.Flags().StringVar(&dbDSN, "db", firstEnv("DATABASE_URL", "DATABASE_DSN"), "Database DSN (sqlite path or postgres:// URL)")
 	rootCmd.Flags().StringVar(&port, "port", getEnv("PORT", "8080"), "Server port")
 }
 
@@ -45,57 +46,72 @@ func getEnv(key, defaultValue string) string {
 	return defaultValue
 }
 
+func firstEnv(keys ...string) string {
+	for _, key := range keys {
+		if value := os.Getenv(key); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func openRepository(driver, dsn, stateDir string) (db.Repository, error) {
+	driver = strings.ToLower(strings.TrimSpace(driver))
+	dsn = strings.TrimSpace(dsn)
+	if driver == "" {
+		driver = db.InferDriver(dsn)
+	}
+
+	switch driver {
+	case "postgres", "postgresql":
+		if dsn == "" {
+			return nil, fmt.Errorf("postgres driver requires a DSN (--db / DATABASE_URL)")
+		}
+		return postgres.NewRepository(dsn)
+	case "sqlite", "sqlite3":
+		if dsn == "" {
+			dsn = filepath.Join(stateDir, "superfolha.db")
+		}
+		return sqlite.NewRepository(dsn)
+	default:
+		return nil, fmt.Errorf("unknown database driver %q (want sqlite or postgres)", driver)
+	}
+}
+
 func runServer(cmd *cobra.Command, args []string) {
-	if dbURL == "" {
-		log.Fatal("Database URL is required (--db or DATABASE_URL)")
-	}
-
-	// Connect to database
-	dbpool, err := pgxpool.New(context.Background(), dbURL)
-	if err != nil {
-		log.Fatalf("Unable to connect to database: %v\n", err)
-	}
-	defer dbpool.Close()
-
-	if err := dbpool.Ping(context.Background()); err != nil {
-		log.Fatalf("Failed to ping database: %v", err)
-	}
-
-	log.Println("Connected to database")
-
-	// Run migrations with golang-migrate
-	log.Println("Running database migrations...")
-	sqlDB := stdlib.OpenDBFromPool(dbpool)
-	if err := db.RunMigrations(sqlDB); err != nil {
-		panic(fmt.Sprintf("Error: Failed to run migrations: %v", err))
-	}
-
-	// Create state directory
 	absStateDir, err := filepath.Abs(stateDir)
 	if err != nil {
 		log.Fatalf("Failed to get absolute path for state directory %s: %v", stateDir, err)
 	}
 	stateDir = absStateDir
 
-	if err := os.MkdirAll(stateDir, 0755); err != nil {
+	if err := os.MkdirAll(stateDir, 0o755); err != nil {
 		log.Fatalf("Failed to create state directory: %v", err)
 	}
 
-	// Create server
-	projectService := project.NewService(stateDir)
-	authService := auth.NewService(dbpool)
-	srv := server.NewServer(dbpool, stateDir, projectService, authService)
+	repo, err := openRepository(dbDriver, dbDSN, stateDir)
+	if err != nil {
+		log.Fatalf("Unable to open database: %v", err)
+	}
+	defer repo.Close()
 
-	// Start HTTP server
+	driver := dbDriver
+	if driver == "" {
+		driver = db.InferDriver(dbDSN)
+	}
+	log.Printf("Connected to database (driver=%s)", driver)
+
+	projectService := project.NewService(stateDir)
+	authService := auth.NewService(repo)
+	srv := server.NewServer(repo, stateDir, projectService, authService)
+
 	addr := fmt.Sprintf(":%s", port)
 	log.Printf("Starting server on http://localhost%s", addr)
-	log.Printf("GraphQL Playground: http://localhost%s/playground", addr)
 
 	httpServer := &http.Server{
-		Addr:        addr,
-		Handler:     srv.Handler(),
-		ReadTimeout: 15 * time.Second,
-		// LaTeX compilation can take well over 15s for real documents.
+		Addr:         addr,
+		Handler:      srv.Handler(),
+		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 5 * time.Minute,
 		IdleTimeout:  60 * time.Second,
 	}

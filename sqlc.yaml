@@ -1,14 +1,24 @@
 version: "2"
 sql:
-  - engine: "postgresql"
-    queries: "internal/db/queries.sql"
-    schema: "internal/db/migrations"
+  - engine: "sqlite"
+    queries: "internal/db/sqlite/queries.sql"
+    schema: "internal/db/sqlite/migrations"
     gen:
       go:
-        package: "db"
-        out: "internal/db"
+        package: "sqlite"
+        out: "internal/db/sqlite"
+        sql_package: "database/sql"
+        emit_json_tags: true
+        emit_interface: true
+        emit_empty_slices: true
+  - engine: "postgresql"
+    queries: "internal/db/postgres/queries.sql"
+    schema: "internal/db/postgres/migrations"
+    gen:
+      go:
+        package: "postgres"
+        out: "internal/db/postgres"
         sql_package: "pgx/v5"
         emit_json_tags: true
-        emit_prepared_queries: false
         emit_interface: true
-        emit_exact_table_names: false
+        emit_empty_slices: true

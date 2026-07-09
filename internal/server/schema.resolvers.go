@@ -14,7 +14,6 @@ import (
 	"os"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/lewtec/superfolha/internal/auth"
 	"github.com/lewtec/superfolha/internal/db"
 )
@@ -26,7 +25,6 @@ func (r *mutationResolver) Register(ctx context.Context, email string, password 
 		return nil, err
 	}
 
-	// --- NEW: Set token as HTTP-only cookie ---
 	w, ok := ctx.Value(ResponseWriterContextKey).(http.ResponseWriter)
 	if !ok {
 		log.Println("Register Resolver: http.ResponseWriter not found in context.")
@@ -37,7 +35,7 @@ func (r *mutationResolver) Register(ctx context.Context, email string, password 
 
 	return &AuthPayload{
 		User: &User{
-			ID:    uuid.UUID(authResp.User.ID.Bytes).String(),
+			ID:    authResp.User.ID,
 			Email: authResp.User.Email,
 		},
 	}, nil
@@ -50,7 +48,6 @@ func (r *mutationResolver) Login(ctx context.Context, email string, password str
 		return nil, err
 	}
 
-	// --- NEW: Set token as HTTP-only cookie ---
 	w, ok := ctx.Value(ResponseWriterContextKey).(http.ResponseWriter)
 	if !ok {
 		log.Println("Login Resolver: http.ResponseWriter not found in context.")
@@ -61,7 +58,7 @@ func (r *mutationResolver) Login(ctx context.Context, email string, password str
 
 	return &AuthPayload{
 		User: &User{
-			ID:    uuid.UUID(authResp.User.ID.Bytes).String(),
+			ID:    authResp.User.ID,
 			Email: authResp.User.Email,
 		},
 	}, nil
@@ -74,8 +71,7 @@ func (r *mutationResolver) CreateProject(ctx context.Context, name string) (*Pro
 		return nil, errors.New("not authenticated")
 	}
 
-	userID, err := uuid.Parse(user.UserID)
-	if err != nil {
+	if _, err := uuid.Parse(user.UserID); err != nil {
 		return nil, fmt.Errorf("invalid user ID: %w", err)
 	}
 
@@ -84,12 +80,11 @@ func (r *mutationResolver) CreateProject(ctx context.Context, name string) (*Pro
 		return nil, fmt.Errorf("failed to generate project ID: %w", err)
 	}
 	projectID := projectUUID.String()
-	projectPath := r.projectService.GetProjectPath(projectID) // Use projectService
+	projectPath := r.projectService.GetProjectPath(projectID)
 
-	// Create project in database
-	q := db.New(r.DB)
-	dbProject, err := q.CreateProject(ctx, db.CreateProjectParams{
-		UserID:  pgtype.UUID{Bytes: userID, Valid: true},
+	dbProject, err := r.Repo.CreateProject(ctx, db.CreateProjectParams{
+		ID:      projectID,
+		UserID:  user.UserID,
 		Name:    name,
 		GitPath: projectPath,
 	})
@@ -98,10 +93,10 @@ func (r *mutationResolver) CreateProject(ctx context.Context, name string) (*Pro
 	}
 
 	return &Project{
-		ID:        uuid.UUID(dbProject.ID.Bytes).String(),
+		ID:        dbProject.ID,
 		Name:      dbProject.Name,
-		CreatedAt: dbProject.CreatedAt.Time,
-		UpdatedAt: dbProject.UpdatedAt.Time,
+		CreatedAt: dbProject.CreatedAt,
+		UpdatedAt: dbProject.UpdatedAt,
 	}, nil
 }
 
@@ -112,13 +107,10 @@ func (r *mutationResolver) DeleteProject(ctx context.Context, id string) (bool, 
 		return false, err
 	}
 
-	// Delete project from database
-	q := db.New(r.DB)
-	if err := q.DeleteProject(ctx, project.ID); err != nil {
+	if err := r.Repo.DeleteProject(ctx, project.ID); err != nil {
 		return false, fmt.Errorf("failed to delete project from db: %w", err)
 	}
 
-	// Delete git repository
 	if err := os.RemoveAll(projectPath); err != nil {
 		return false, fmt.Errorf("failed to delete git repository: %w", err)
 	}
@@ -133,21 +125,16 @@ func (r *mutationResolver) SaveFile(ctx context.Context, projectID string, path 
 		return nil, err
 	}
 
-	// Write file to git repository
 	if err := r.projectService.SaveFile(projectID, path, content); err != nil {
 		return nil, fmt.Errorf("failed to write file: %w", err)
 	}
 
-	// Return the file with content, size, and isTooBig.
-	// For SaveFile, we assume the saved content is not too big and not binary for direct return.
-	// The actual size and binary status would be determined by a subsequent fetch.
-	// Here, we're just reflecting the saved state.
-	contentPtr := &content // Convert string to *string
+	contentPtr := &content
 	isBinary := HasBinary([]byte(content), path)
 	return &File{
 		Path:     path,
 		Content:  contentPtr,
-		Size:     len(content), // Approximate size for the saved content
+		Size:     len(content),
 		IsTooBig: len(content) > MaxGraphQLFileSize,
 		IsBinary: isBinary,
 	}, nil
@@ -160,7 +147,6 @@ func (r *mutationResolver) DeleteFile(ctx context.Context, projectID string, pat
 		return false, err
 	}
 
-	// Delete file from git repository
 	if err := r.projectService.DeleteFile(projectID, path); err != nil {
 		return false, fmt.Errorf("failed to delete file: %w", err)
 	}
@@ -175,16 +161,12 @@ func (r *mutationResolver) Commit(ctx context.Context, projectID string, message
 		return nil, err
 	}
 
-	// Commit changes
 	commit, err := r.projectService.CommitChanges(projectID, user.Email, message)
 	if err != nil {
 		return nil, fmt.Errorf("failed to commit changes: %w", err)
 	}
 
-	// Update project timestamp
-	q := db.New(r.DB)
-	if err := q.UpdateProjectTimestamp(ctx, project.ID); err != nil {
-		// Log error but don't fail the operation
+	if err := r.Repo.UpdateProjectTimestamp(ctx, project.ID); err != nil {
 		fmt.Printf("Warning: failed to update project timestamp: %v\n", err)
 	}
 
@@ -198,7 +180,6 @@ func (r *mutationResolver) Commit(ctx context.Context, projectID string, message
 
 // Files is the resolver for the files field.
 func (r *projectResolver) Files(ctx context.Context, obj *Project) ([]*File, error) {
-	// Get files from git repository
 	gitFiles, err := r.projectService.ListFiles(obj.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list files: %w", err)
@@ -221,7 +202,7 @@ func (r *projectResolver) Files(ctx context.Context, obj *Project) ([]*File, err
 
 		files[i] = &File{
 			Path:     f.Path,
-			Content:  nil, // Content is not provided in this listing
+			Content:  nil,
 			Size:     int(f.Size),
 			IsTooBig: isTooBig,
 			IsBinary: isBinary,
@@ -233,26 +214,22 @@ func (r *projectResolver) Files(ctx context.Context, obj *Project) ([]*File, err
 
 // File is the resolver for the file field.
 func (r *projectResolver) File(ctx context.Context, obj *Project, path string) (*File, error) {
-	// Read file from git repository
 	fileReader, fileSize, err := r.projectService.ReadFile(obj.ID, path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file: %w", err)
 	}
-	defer fileReader.Close() // Ensure the file reader is closed
+	defer fileReader.Close()
 
 	isTooBig := fileSize > MaxGraphQLFileSize
-	var content *string // Use pointer to string for nullable content
+	var content *string
 
-	// Read a small buffer to detect content type for binary check
 	var buf [512]byte
 	n, _ := io.ReadFull(fileReader, buf[:])
 	isBinary := HasBinary(buf[:n], path)
 
-	// Reset the reader to the beginning for full content reading if needed
 	if seeker, ok := fileReader.(io.ReadSeeker); ok {
 		seeker.Seek(0, io.SeekStart)
 	} else {
-		// This case should ideally not be hit for os.File
 		log.Printf("Warning: fileReader is not seekable for %s in GraphQL resolver", path)
 	}
 
@@ -276,7 +253,6 @@ func (r *projectResolver) File(ctx context.Context, obj *Project, path string) (
 
 // History is the resolver for the history field.
 func (r *projectResolver) History(ctx context.Context, obj *Project) ([]*Commit, error) {
-	// Get commit history from git repository
 	gitCommits, err := r.projectService.GetHistory(obj.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get history: %w", err)
@@ -302,21 +278,17 @@ func (r *queryResolver) Me(ctx context.Context) (*User, error) {
 		return nil, nil
 	}
 
-	userID, err := uuid.Parse(user.UserID)
-	if err != nil {
+	if _, err := uuid.Parse(user.UserID); err != nil {
 		return nil, fmt.Errorf("invalid user ID: %w", err)
 	}
 
-	pgUserID := pgtype.UUID{Bytes: userID, Valid: true}
-
-	q := db.New(r.DB)
-	dbUser, err := q.GetUserByID(ctx, pgUserID)
+	dbUser, err := r.Repo.GetUserByID(ctx, user.UserID)
 	if err != nil {
 		return nil, fmt.Errorf("user not found")
 	}
 
 	return &User{
-		ID:    uuid.UUID(dbUser.ID.Bytes).String(),
+		ID:    dbUser.ID,
 		Email: dbUser.Email,
 	}, nil
 }
@@ -328,15 +300,11 @@ func (r *queryResolver) Projects(ctx context.Context) ([]*Project, error) {
 		return nil, errors.New("not authenticated")
 	}
 
-	userID, err := uuid.Parse(user.UserID)
-	if err != nil {
+	if _, err := uuid.Parse(user.UserID); err != nil {
 		return nil, fmt.Errorf("invalid user ID: %w", err)
 	}
 
-	pgUserID := pgtype.UUID{Bytes: userID, Valid: true}
-
-	q := db.New(r.DB)
-	dbProjects, err := q.GetUserProjects(ctx, pgUserID)
+	dbProjects, err := r.Repo.GetUserProjects(ctx, user.UserID)
 	if err != nil {
 		return nil, err
 	}
@@ -344,10 +312,10 @@ func (r *queryResolver) Projects(ctx context.Context) ([]*Project, error) {
 	projects := make([]*Project, len(dbProjects))
 	for i, p := range dbProjects {
 		projects[i] = &Project{
-			ID:        uuid.UUID(p.ID.Bytes).String(),
+			ID:        p.ID,
 			Name:      p.Name,
-			CreatedAt: p.CreatedAt.Time,
-			UpdatedAt: p.UpdatedAt.Time,
+			CreatedAt: p.CreatedAt,
+			UpdatedAt: p.UpdatedAt,
 		}
 	}
 
@@ -362,10 +330,10 @@ func (r *queryResolver) Project(ctx context.Context, id string) (*Project, error
 	}
 
 	return &Project{
-		ID:        uuid.UUID(project.ID.Bytes).String(),
+		ID:        project.ID,
 		Name:      project.Name,
-		CreatedAt: project.CreatedAt.Time,
-		UpdatedAt: project.UpdatedAt.Time,
+		CreatedAt: project.CreatedAt,
+		UpdatedAt: project.UpdatedAt,
 	}, nil
 }
 

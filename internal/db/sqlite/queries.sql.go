@@ -3,28 +3,33 @@
 //   sqlc v1.31.1
 // source: queries.sql
 
-package db
+package sqlite
 
 import (
 	"context"
-
-	"github.com/jackc/pgx/v5/pgtype"
+	"database/sql"
 )
 
 const createProject = `-- name: CreateProject :one
-INSERT INTO projects (user_id, name, git_path)
-VALUES ($1, $2, $3)
+INSERT INTO projects (id, user_id, name, git_path)
+VALUES (?, ?, ?, ?)
 RETURNING id, user_id, name, git_path, created_at, updated_at
 `
 
 type CreateProjectParams struct {
-	UserID  pgtype.UUID `json:"user_id"`
-	Name    string      `json:"name"`
-	GitPath string      `json:"git_path"`
+	ID      string         `json:"id"`
+	UserID  sql.NullString `json:"user_id"`
+	Name    string         `json:"name"`
+	GitPath string         `json:"git_path"`
 }
 
 func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (Project, error) {
-	row := q.db.QueryRow(ctx, createProject, arg.UserID, arg.Name, arg.GitPath)
+	row := q.db.QueryRowContext(ctx, createProject,
+		arg.ID,
+		arg.UserID,
+		arg.Name,
+		arg.GitPath,
+	)
 	var i Project
 	err := row.Scan(
 		&i.ID,
@@ -38,18 +43,19 @@ func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (P
 }
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (email, password_hash)
-VALUES ($1, $2)
+INSERT INTO users (id, email, password_hash)
+VALUES (?, ?, ?)
 RETURNING id, email, password_hash, created_at
 `
 
 type CreateUserParams struct {
+	ID           string `json:"id"`
 	Email        string `json:"email"`
 	PasswordHash string `json:"password_hash"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
-	row := q.db.QueryRow(ctx, createUser, arg.Email, arg.PasswordHash)
+	row := q.db.QueryRowContext(ctx, createUser, arg.ID, arg.Email, arg.PasswordHash)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -62,21 +68,21 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 
 const deleteProject = `-- name: DeleteProject :exec
 DELETE FROM projects
-WHERE id = $1
+WHERE id = ?
 `
 
-func (q *Queries) DeleteProject(ctx context.Context, id pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, deleteProject, id)
+func (q *Queries) DeleteProject(ctx context.Context, id string) error {
+	_, err := q.db.ExecContext(ctx, deleteProject, id)
 	return err
 }
 
 const getProject = `-- name: GetProject :one
 SELECT id, user_id, name, git_path, created_at, updated_at FROM projects
-WHERE id = $1
+WHERE id = ?
 `
 
-func (q *Queries) GetProject(ctx context.Context, id pgtype.UUID) (Project, error) {
-	row := q.db.QueryRow(ctx, getProject, id)
+func (q *Queries) GetProject(ctx context.Context, id string) (Project, error) {
+	row := q.db.QueryRowContext(ctx, getProject, id)
 	var i Project
 	err := row.Scan(
 		&i.ID,
@@ -91,11 +97,11 @@ func (q *Queries) GetProject(ctx context.Context, id pgtype.UUID) (Project, erro
 
 const getUserByEmail = `-- name: GetUserByEmail :one
 SELECT id, email, password_hash, created_at FROM users
-WHERE lower(email) = lower($1)
+WHERE lower(email) = lower(?)
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, lower string) (User, error) {
-	row := q.db.QueryRow(ctx, getUserByEmail, lower)
+	row := q.db.QueryRowContext(ctx, getUserByEmail, lower)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -108,11 +114,11 @@ func (q *Queries) GetUserByEmail(ctx context.Context, lower string) (User, error
 
 const getUserByID = `-- name: GetUserByID :one
 SELECT id, email, password_hash, created_at FROM users
-WHERE id = $1
+WHERE id = ?
 `
 
-func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error) {
-	row := q.db.QueryRow(ctx, getUserByID, id)
+func (q *Queries) GetUserByID(ctx context.Context, id string) (User, error) {
+	row := q.db.QueryRowContext(ctx, getUserByID, id)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -125,17 +131,17 @@ func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 
 const getUserProjects = `-- name: GetUserProjects :many
 SELECT id, user_id, name, git_path, created_at, updated_at FROM projects
-WHERE user_id = $1
+WHERE user_id = ?
 ORDER BY updated_at DESC
 `
 
-func (q *Queries) GetUserProjects(ctx context.Context, userID pgtype.UUID) ([]Project, error) {
-	rows, err := q.db.Query(ctx, getUserProjects, userID)
+func (q *Queries) GetUserProjects(ctx context.Context, userID sql.NullString) ([]Project, error) {
+	rows, err := q.db.QueryContext(ctx, getUserProjects, userID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Project
+	items := []Project{}
 	for rows.Next() {
 		var i Project
 		if err := rows.Scan(
@@ -150,6 +156,9 @@ func (q *Queries) GetUserProjects(ctx context.Context, userID pgtype.UUID) ([]Pr
 		}
 		items = append(items, i)
 	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -158,11 +167,11 @@ func (q *Queries) GetUserProjects(ctx context.Context, userID pgtype.UUID) ([]Pr
 
 const updateProjectTimestamp = `-- name: UpdateProjectTimestamp :exec
 UPDATE projects
-SET updated_at = NOW()
-WHERE id = $1
+SET updated_at = datetime('now')
+WHERE id = ?
 `
 
-func (q *Queries) UpdateProjectTimestamp(ctx context.Context, id pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, updateProjectTimestamp, id)
+func (q *Queries) UpdateProjectTimestamp(ctx context.Context, id string) error {
+	_, err := q.db.ExecContext(ctx, updateProjectTimestamp, id)
 	return err
 }

@@ -30,3 +30,8 @@ Thumbs.db
 
 # Build artifacts
 *.tar.gz
+
+# SQLite
+*.db
+*.db-shm
+*.db-wal

@@ -5,7 +5,9 @@ go = "1.25.5"
 tinytex = "2026.02"
 
 [env]
-DATABASE_URL = "postgres://admin:admin@localhost:5423/admin?sslmode=disable"
+# Default: SQLite under ./data (ciborg-style). For Postgres 18+ (uuidv7()):
+# DB_DRIVER=postgres DATABASE_URL=postgres://admin:admin@localhost:5423/superfolha?sslmode=disable
+DATABASE_URL = "./data/superfolha.db"
 JWT_SECRET = "paçoca"
 
 [tasks."install:frontend"]
@@ -83,4 +85,5 @@ depends = ["lint:*"]
 depends = ["lint", "fmt", "test"]
 
 [tasks."devdb:up"]
-run = " docker run --rm -e POSTGRES_PASSWORD=admin -e POSTGRES_USER=admin -e POSTGRES_DATABASE=admin -d -p 5423:5432 postgres"
+description = "Start disposable Postgres 18 (uuidv7()) for dual-backend local testing"
+run = "docker run --rm --name superfolha-pg -e POSTGRES_PASSWORD=admin -e POSTGRES_USER=admin -e POSTGRES_DB=superfolha -d -p 5423:5432 postgres:18"

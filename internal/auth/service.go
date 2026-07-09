@@ -2,26 +2,24 @@ package auth
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/lewtec/superfolha/internal/db"
 )
 
 var (
-	ErrEmailTaken         = errors.New("email already registered")
-	ErrInvalidCredentials = errors.New("invalid credentials")
+	ErrEmailTaken         = fmt.Errorf("email already registered")
+	ErrInvalidCredentials = fmt.Errorf("invalid credentials")
 )
 
 type Service struct {
-	db db.DBTX
+	repo db.Repository
 }
 
-func NewService(db db.DBTX) *Service {
-	return &Service{db: db}
+func NewService(repo db.Repository) *Service {
+	return &Service{repo: repo}
 }
 
 type AuthResponse struct {
@@ -33,68 +31,58 @@ func normalizeEmail(email string) string {
 	return strings.ToLower(strings.TrimSpace(email))
 }
 
-func isUniqueViolation(err error) bool {
-	var pgErr *pgconn.PgError
-	return errors.As(err, &pgErr) && pgErr.Code == "23505"
-}
-
 func (s *Service) Register(ctx context.Context, email, password string) (*AuthResponse, error) {
 	email = normalizeEmail(email)
 
-	// Hash password
 	hashedPassword, err := HashPassword(password)
 	if err != nil {
 		return nil, err
 	}
 
-	// Insert user into database
-	q := db.New(s.db)
-	dbUser, err := q.CreateUser(ctx, db.CreateUserParams{
+	// Generate id in app so SQLite (no uuidv7 default) and Postgres stay aligned.
+	// Postgres still accepts explicit UUID inserts on tables with DEFAULT uuidv7().
+	id, err := uuid.NewV7()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate user id: %w", err)
+	}
+
+	user, err := s.repo.CreateUser(ctx, db.CreateUserParams{
+		ID:           id.String(),
 		Email:        email,
 		PasswordHash: hashedPassword,
 	})
 	if err != nil {
-		if isUniqueViolation(err) {
+		if s.repo.IsUniqueViolation(err) {
 			return nil, ErrEmailTaken
 		}
 		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
 
-	// Generate token
-	token, err := GenerateToken(uuid.UUID(dbUser.ID.Bytes).String(), email)
+	// Always use the row returned from the DB (covers DEFAULT uuidv7() path).
+	token, err := GenerateToken(user.ID, user.Email)
 	if err != nil {
 		return nil, err
 	}
 
-	return &AuthResponse{
-		User:  &dbUser,
-		Token: token,
-	}, nil
+	return &AuthResponse{User: &user, Token: token}, nil
 }
 
 func (s *Service) Login(ctx context.Context, email, password string) (*AuthResponse, error) {
 	email = normalizeEmail(email)
 
-	// Get user from database
-	q := db.New(s.db)
-	dbUser, err := q.GetUserByEmail(ctx, email)
+	user, err := s.repo.GetUserByEmail(ctx, email)
 	if err != nil {
 		return nil, ErrInvalidCredentials
 	}
 
-	// Check password
-	if !CheckPasswordHash(password, dbUser.PasswordHash) {
+	if !CheckPasswordHash(password, user.PasswordHash) {
 		return nil, ErrInvalidCredentials
 	}
 
-	// Generate token
-	token, err := GenerateToken(uuid.UUID(dbUser.ID.Bytes).String(), dbUser.Email)
+	token, err := GenerateToken(user.ID, user.Email)
 	if err != nil {
 		return nil, err
 	}
 
-	return &AuthResponse{
-		User:  &dbUser,
-		Token: token,
-	}, nil
+	return &AuthResponse{User: &user, Token: token}, nil
 }

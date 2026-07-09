@@ -1,11 +1,10 @@
-# Superfolha on Render: project-scoped web service + Postgres + disk for Git repos
-# https://render.com/docs/blueprint-spec#projects-and-environments
+# Superfolha on Render — default: SQLite on the volume (no managed Postgres).
+# For Postgres: drop DATABASE_URL file path, add a databases: entry, and set
+# DB_DRIVER=postgres + DATABASE_URL fromDatabase connectionString.
 projects:
   - name: superfolha
     environments:
       - name: production
-        # Resources live under project "superfolha" / environment "production".
-        # Do not also list them at the root — that keeps them ungrouped.
         services:
           - type: web
             name: superfolha
@@ -15,23 +14,15 @@ projects:
             dockerfilePath: ./Dockerfile
             healthCheckPath: /
             disk:
-              name: superfolha-repos
+              name: superfolha-data
               mountPath: /data
               sizeGB: 2
             envVars:
-              - key: DATABASE_URL
-                fromDatabase:
-                  name: superfolha-db
-                  property: connectionString
               - key: JWT_SECRET
                 generateValue: true
               - key: STATE_DIR
                 value: /data
-              # PORT is injected by Render; the app reads it automatically.
-              # Do not set GO_ENV=development in production.
-
-        databases:
-          - name: superfolha-db
-            plan: basic-256mb
-            databaseName: superfolha
-            user: superfolha
+              - key: DB_DRIVER
+                value: sqlite
+              - key: DATABASE_URL
+                value: /data/superfolha.db
