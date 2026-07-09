@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	ErrEmailTaken        = errors.New("email already registered")
+	ErrEmailTaken         = errors.New("email already registered")
 	ErrInvalidCredentials = errors.New("invalid credentials")
 )
 
