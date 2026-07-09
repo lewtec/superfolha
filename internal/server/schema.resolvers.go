@@ -12,7 +12,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -66,20 +65,6 @@ func (r *mutationResolver) Login(ctx context.Context, email string, password str
 			Email: authResp.User.Email,
 		},
 	}, nil
-}
-
-func setAuthCookie(w http.ResponseWriter, token string) {
-	// Secure only when not in development so local HTTP can set the cookie.
-	secure := os.Getenv("GO_ENV") != "development"
-	http.SetCookie(w, &http.Cookie{
-		Name:     "authToken",
-		Value:    token,
-		Expires:  time.Now().Add(7 * 24 * time.Hour),
-		HttpOnly: true,
-		Secure:   secure,
-		SameSite: http.SameSiteLaxMode,
-		Path:     "/",
-	})
 }
 
 // CreateProject is the resolver for the createProject field.
