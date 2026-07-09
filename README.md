@@ -117,6 +117,10 @@ docker run -v /var/lib/superfolha:/data -p 8080:8080 \
 
 Deploy with the root `render.yaml` Blueprint (Docker web service + Postgres + 2 GB disk at `/data`). The image builds the SPA, embeds it with `-tags release`, and includes TeX Live for compilation.
 
+### Railway
+
+Use root `railway.toml` for build/deploy settings (Dockerfile, healthcheck, volume mount path `/data`). In the Railway project still add: Postgres (`DATABASE_URL`), a volume at `/data`, and `JWT_SECRET`.
+
 ## Configuration
 
 ### Environment Variables
