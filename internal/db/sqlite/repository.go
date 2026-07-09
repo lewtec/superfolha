@@ -17,8 +17,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/lewtec/superfolha/internal/db"
 	"modernc.org/sqlite"
-	sqlite3 "modernc.org/sqlite/lib"
 	_ "modernc.org/sqlite"
+	sqlite3 "modernc.org/sqlite/lib"
 )
 
 //go:embed migrations/*.sql
