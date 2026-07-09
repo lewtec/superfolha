@@ -5,9 +5,9 @@ go = "1.25.5"
 tinytex = "2026.02"
 
 [env]
-# Default: SQLite under ./data (ciborg-style). For Postgres 18+ (uuidv7()):
+# SQLite defaults to {STATE_DIR}/superfolha.db when DATABASE_URL is unset.
+# For Postgres 18+ (uuidv7()):
 # DB_DRIVER=postgres DATABASE_URL=postgres://admin:admin@localhost:5423/superfolha?sslmode=disable
-DATABASE_URL = "./data/superfolha.db"
 JWT_SECRET = "paçoca"
 
 [tasks."install:frontend"]
@@ -83,6 +83,11 @@ depends = ["lint:*"]
 
 [tasks.ci]
 depends = ["lint", "fmt", "test"]
+
+[tasks.start]
+description = "Start the server with gitignored ./data (repos + SQLite at ./data/superfolha.db)"
+env = { GO_ENV = "development" }
+run = "mkdir -p data && go run ./cmd/superfolha --state-dir=./data"
 
 [tasks."devdb:up"]
 description = "Start disposable Postgres 18 (uuidv7()) for dual-backend local testing"
