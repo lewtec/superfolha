@@ -212,11 +212,12 @@ func (r *projectResolver) Files(ctx context.Context, obj *Project) ([]*File, err
 		if err != nil {
 			return nil, fmt.Errorf("failed to read file for binary check: %w", err)
 		}
-		defer fileReader.Close()
 
 		var buf [512]byte
 		n, _ := io.ReadFull(fileReader, buf[:])
 		isBinary := HasBinary(buf[:n], f.Path)
+
+		fileReader.Close()
 
 		files[i] = &File{
 			Path:     f.Path,
