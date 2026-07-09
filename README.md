@@ -106,10 +106,16 @@ go build -o server cmd/server/main.go
 ```bash
 mise run docker
 
-docker run -v /data:/data -p 8080:8080 \
-  -e DATABASE_URL="postgres://..." \
+docker run -v /var/lib/superfolha:/data -p 8080:8080 \
+  -e DATABASE_URL="postgres://user:pass@host:5432/superfolha?sslmode=require" \
+  -e JWT_SECRET="your-secure-random-secret" \
+  -e STATE_DIR=/data \
   superfolha
 ```
+
+### Render
+
+Deploy with the root `render.yaml` Blueprint (Docker web service + Postgres + 2 GB disk at `/data`). The image builds the SPA, embeds it with `-tags release`, and includes TeX Live for compilation.
 
 ## Configuration
 

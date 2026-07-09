@@ -27,14 +27,14 @@ dir = "frontend"
 run = "bun run build"
 
 [tasks."build:backend"]
-description = "Build backend binary"
+description = "Build backend binary (embeds frontend via -tags release)"
 depends = ["build:frontend"]
-run = "go build -o superfolha cmd/superfolha"
+run = "go build -tags release -o superfolha ./cmd/superfolha"
 
 [tasks.build]
 description = "Build complete application"
-depends = ["build:*"]
-run = "echo 'Build complete! Binary: ./server'"
+depends = ["build:backend"]
+run = "echo 'Build complete! Binary: ./superfolha'"
 
 [tasks."gen:sqlc"]
 run = "sqlc generate"

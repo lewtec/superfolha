@@ -14,7 +14,8 @@ export default defineConfig({
     relay,
   ],
   build: {
-    outDir: "../web/dist",
+    // Must land under internal/server for //go:embed in web_release.go
+    outDir: "../internal/server/web/dist",
     emptyOutDir: true,
   },
   server: {

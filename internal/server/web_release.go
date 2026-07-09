@@ -6,6 +6,7 @@ import (
 	"embed"
 	"io/fs"
 	"net/http"
+	"strings"
 )
 
 //go:embed all:web/dist
@@ -16,5 +17,17 @@ func GetWebApp() http.Handler {
 	if err != nil {
 		panic(err)
 	}
-	return http.FileServer(http.FS(dist))
+	fileServer := http.FileServer(http.FS(dist))
+
+	// SPA fallback: serve index.html for client-side routes (e.g. /login, /projects).
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimPrefix(r.URL.Path, "/")
+		if path != "" {
+			if _, err := fs.Stat(dist, path); err != nil {
+				r = r.Clone(r.Context())
+				r.URL.Path = "/"
+			}
+		}
+		fileServer.ServeHTTP(w, r)
+	})
 }

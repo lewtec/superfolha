@@ -95,7 +95,8 @@ func runServer(cmd *cobra.Command, args []string) {
 		Addr:         addr,
 		Handler:      srv.Handler(),
 		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
+		// LaTeX compilation can take well over 15s for real documents.
+		WriteTimeout: 5 * time.Minute,
 		IdleTimeout:  60 * time.Second,
 	}
 

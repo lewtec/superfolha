@@ -1,44 +1,46 @@
-# Stage 1: Build Go binary
-FROM golang:1.25-bookworm@sha256:e17419604b6d1f9bc245694425f0ec9b1b53685c80850900a376fb10cb0f70cb AS builder
+# Stage 1: build frontend (SPA assets embedded into Go binary)
+FROM oven/bun:1.3.8-debian AS frontend
+
+WORKDIR /src/frontend
+
+COPY frontend/package.json frontend/bun.lock ./
+RUN bun install --frozen-lockfile
+
+COPY frontend/ ./
+# vite outDir: ../internal/server/web/dist → /src/internal/server/web/dist
+RUN bun run build
+
+# Stage 2: build Go binary with release tag (embeds SPA)
+FROM golang:1.25-bookworm AS builder
 
 WORKDIR /build
 
-# Copy go mod files
 COPY go.mod go.sum ./
-
-# Download dependencies
 RUN go mod download
 
-# Copy source code
 COPY . .
+COPY --from=frontend /src/internal/server/web/dist ./internal/server/web/dist
 
-# Build the binary
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o server ./cmd/server
+RUN CGO_ENABLED=0 GOOS=linux go build -tags release -trimpath -ldflags="-s -w" -o /build/server ./cmd/superfolha
 
-# Stage 2: Final image with texlive
-FROM texlive/texlive:latest@sha256:d68a3312b23872b8cd02d6a982d5e6702f406fc8c0b5673626b8bdf263c49654
+# Stage 3: runtime with TeX Live + latexmk
+FROM texlive/texlive:latest
 
-# Install dependencies
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Create app directory
 WORKDIR /app
 
-# Copy binary from builder stage
 COPY --from=builder /build/server /app/server
 
-# Expose port
 EXPOSE 8080
 
-# Set environment variables
-ENV STATE_DIR=/data/repos
+# Match render.yaml: disk mounted at /data, repos under {STATE_DIR}/repos/{uuid}
+ENV STATE_DIR=/data
 ENV PORT=8080
 
-# Create data directory
-RUN mkdir -p /data/repos
+RUN mkdir -p /data
 
-# Set entrypoint
 ENTRYPOINT ["/app/server"]

@@ -13,7 +13,9 @@
 node_modules/
 dist/
 web/dist/
+internal/server/web/dist/
 *.log
+/superfolha
 
 # Editor
 .vscode/
