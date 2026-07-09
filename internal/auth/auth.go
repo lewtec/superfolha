@@ -35,7 +35,7 @@ type Claims struct {
 // getJWTSecret retrieves the JWT secret from environment variable
 func getJWTSecret() ([]byte, error) {
 	secret := os.Getenv("JWT_SECRET")
-	goEnv := os.Getenv("GO_ENV")                                                                   // Get GO_ENV as well
+	goEnv := os.Getenv("GO_ENV")                                                                          // Get GO_ENV as well
 	log.Printf("Auth: getJWTSecret called. JWT_SECRET is set: %t, GO_ENV env: '%s'", secret != "", goEnv) // Log env vars securely
 
 	if secret == "" {
