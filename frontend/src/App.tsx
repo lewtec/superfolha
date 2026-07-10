@@ -6,7 +6,7 @@ import EditorPage from "./pages/EditorPage";
 import Landing from "./pages/Landing";
 
 import Layout from "./components/Layout";
-import { useAuthStatus } from "./hooks/useAuthStatus"; // Import the new hook
+import { useAuthStatus } from "./hooks/useAuthStatus";
 
 function App() {
   return (
@@ -28,9 +28,7 @@ function App() {
           path="/editor/:id"
           element={
             <ProtectedRoute>
-              <Layout>
-                <EditorPage />
-              </Layout>
+              <EditorPage />
             </ProtectedRoute>
           }
         />
@@ -41,7 +39,7 @@ function App() {
 }
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuthStatus(); // Use the new hook
+  const { isAuthenticated } = useAuthStatus();
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;

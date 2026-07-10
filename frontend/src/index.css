@@ -203,12 +203,26 @@ h3 {
 }
 
 .editor-container {
+  height: 100%;
+  min-height: 0;
+}
+
+.editor-workspace {
   height: calc(100dvh - var(--shell-height));
 }
 
 .file-tree {
-  height: calc(100dvh - var(--shell-height));
-  overflow-y: auto;
+  min-height: 0;
+}
+
+.editor-sidebar {
+  /* drawer slides; md static width toggled via classes */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .editor-sidebar {
+    transition: none !important;
+  }
 }
 
 .pdf-viewer {

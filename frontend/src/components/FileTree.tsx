@@ -185,7 +185,7 @@ export default function FileTree({
   };
 
   return (
-    <div className="file-tree bg-base-200 p-4">
+    <div className="file-tree flex-1 min-h-0 flex flex-col bg-base-200 p-3 overflow-hidden">
       <div className="flex justify-between items-center mb-4">
         <h3 className="font-bold">Files</h3>
         <div className="flex gap-2">
@@ -204,7 +204,7 @@ export default function FileTree({
         onChange={handleFileChange}
         accept="*/*" // Accept all file types
       />
-      <ul className="menu bg-base-100 rounded-box w-full">
+      <ul className="menu bg-base-100 rounded-box w-full flex-1 overflow-y-auto">
         {tree.map((node) => (
           <FileTreeItem
             key={node.path}

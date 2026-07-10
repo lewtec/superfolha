@@ -1,11 +1,26 @@
 import { Link, useNavigate } from "react-router-dom";
+import type { ReactNode } from "react";
 import ThemeToggle from "./ThemeToggle";
 
 interface LayoutProps {
-  children: React.ReactNode;
+  children: ReactNode;
+  /** Left of brand (e.g. hamburger) */
+  navStart?: ReactNode;
+  /** Center of navbar */
+  navCenter?: ReactNode;
+  /** Before logout / theme (e.g. status + compile) */
+  navEnd?: ReactNode;
+  /** Brand link target */
+  brandTo?: string;
 }
 
-export default function Layout({ children }: LayoutProps) {
+export default function Layout({
+  children,
+  navStart,
+  navCenter,
+  navEnd,
+  brandTo = "/projects",
+}: LayoutProps) {
   const navigate = useNavigate();
 
   const logout = async () => {
@@ -22,19 +37,24 @@ export default function Layout({ children }: LayoutProps) {
 
   return (
     <div className="app-shell bg-base-100 text-base-content">
-      <header className="navbar app-navbar px-2 sm:px-4">
-        <div className="navbar-start">
+      <header className="navbar app-navbar px-1 sm:px-3 gap-1">
+        <div className="navbar-start gap-0.5 min-w-0 shrink">
+          {navStart}
           <Link
-            to="/projects"
-            className="btn btn-ghost text-lg font-semibold tracking-tight normal-case min-h-[var(--touch-min)]"
+            to={brandTo}
+            className="btn btn-ghost text-base sm:text-lg font-semibold tracking-tight normal-case min-h-[var(--touch-min)] px-2"
           >
             superfolha
           </Link>
         </div>
-        <div className="navbar-end gap-1">
+        {navCenter ? (
+          <div className="navbar-center">{navCenter}</div>
+        ) : null}
+        <div className="navbar-end gap-1 flex-nowrap shrink-0">
+          {navEnd}
           <button
             type="button"
-            className="btn btn-ghost min-h-[var(--touch-min)]"
+            className="btn btn-ghost min-h-[var(--touch-min)] px-2 sm:px-4"
             onClick={logout}
           >
             Logout
@@ -42,7 +62,7 @@ export default function Layout({ children }: LayoutProps) {
           <ThemeToggle />
         </div>
       </header>
-      <main className="app-main">{children}</main>
+      <main className="app-main flex flex-col min-h-0">{children}</main>
     </div>
   );
 }

@@ -6,38 +6,50 @@ import { useDebounce } from "../hooks/useDebounce";
 import { useParams } from "react-router-dom";
 import { useGetProjectQuery } from "../hooks/useGetProjectQuery";
 import { useCallback, useEffect, useState } from "react";
+import {
+  Menu,
+  X,
+  Code,
+  FileText,
+  Terminal,
+} from "feather-icons-react";
 import FileTree from "../components/FileTree";
 import Editor from "../components/Editor";
 import PDFViewer from "../components/PDFViewer";
-import BinaryFileViewer from "../components/BinaryFileViewer"; // Import BinaryFileViewer
-import { isBinaryContent } from "../utils/fileUtils"; // Import isBinaryContent
+import BinaryFileViewer from "../components/BinaryFileViewer";
+import Layout from "../components/Layout";
+import { isBinaryContent } from "../utils/fileUtils";
 
 interface File {
   path: string;
-  content: string | null; // Content can be null now
+  content: string | null;
   isDirty: boolean;
-  isBinary: boolean; // Added isBinary property
-  size: number; // Added size property
-  isTooBig: boolean; // Added isTooBig property
+  isBinary: boolean;
+  size: number;
+  isTooBig: boolean;
 }
+
+type EditorTab = "code" | "pdf" | "logs";
 
 export default function EditorPage() {
   const { id } = useParams<{ id: string }>();
 
-  // All hooks must be called unconditionally before any returns
   const { project } = useGetProjectQuery({ id: id! });
   const fetchedFiles = project?.files;
   const { getFileContent } = useGetFileContent();
 
   const [files, setFiles] = useState<File[]>([]);
   const [currentFile, setCurrentFile] = useState<File | null>(null);
-  const [activeTab, setActiveTab] = useState<"code" | "pdf" | "logs">("code");
+  const [activeTab, setActiveTab] = useState<EditorTab>("code");
   const [pdfData, setPdfData] = useState<string | null>(null);
   const [logs, setLogs] = useState("");
   const [compiling, setCompiling] = useState(false);
   const [editorStatus, setEditorStatus] = useState<
     "clean" | "dirty" | "saving" | "saved" | "committed" | "error"
   >("clean");
+  const [sidebarOpen, setSidebarOpen] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia("(min-width: 768px)").matches : true,
+  );
 
   const { saveFile } = useSaveFileMutation();
   const { deleteFile } = useDeleteFileMutation();
@@ -51,7 +63,6 @@ export default function EditorPage() {
             console.error("Auto-commit failed:", errors[0].message);
             return;
           }
-          console.log("Auto-commit successful:", response);
           setEditorStatus("committed");
         },
         onError: (err) => {
@@ -74,6 +85,11 @@ export default function EditorPage() {
         } else {
           setCurrentFile(file);
         }
+        setActiveTab("code");
+        // Collapse drawer on small screens after pick
+        if (window.matchMedia("(max-width: 767px)").matches) {
+          setSidebarOpen(false);
+        }
       }
     },
     [files, getFileContent, id],
@@ -89,13 +105,11 @@ export default function EditorPage() {
       };
 
       const initialFiles: File[] = (fetchedFiles as FetchedFile[]).map(
-        (file) => {
-          return {
-            ...file,
-            content: null,
-            isDirty: false,
-          };
-        },
+        (file) => ({
+          ...file,
+          content: null,
+          isDirty: false,
+        }),
       );
       setFiles(initialFiles);
       if (initialFiles.length > 0) {
@@ -104,12 +118,11 @@ export default function EditorPage() {
         setCurrentFile(null);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-seed when server file list changes
   }, [fetchedFiles]);
 
-  // Commit on page close
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      // Check if any file is dirty
       const anyDirty = files.some((file) => file.isDirty);
       if (anyDirty) {
         event.preventDefault();
@@ -127,13 +140,9 @@ export default function EditorPage() {
     };
 
     window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [files, commitProject, id]);
 
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-    };
-  }, [files, commitProject, id]); // Added files to dependency array
-
-  // Trigger auto-commit when status changes to 'saved'
   useEffect(() => {
     if (editorStatus === "saved") {
       debouncedCommit();
@@ -145,14 +154,13 @@ export default function EditorPage() {
       if (currentFile) {
         setEditorStatus("saving");
         saveFile(id!, currentFile.path, content, {
-          onCompleted: (response, errors) => {
+          onCompleted: (_response, errors) => {
             if (errors) {
               setEditorStatus("error");
               alert(errors[0].message);
               return;
             }
             setEditorStatus("saved");
-            // Update the isDirty status of the saved file
             setFiles((prevFiles) =>
               prevFiles.map((file) =>
                 file.path === currentFile.path
@@ -178,14 +186,13 @@ export default function EditorPage() {
   const memoizedOnDeleteFile = useCallback(
     (path: string) => {
       deleteFile(id!, path, {
-        onCompleted: (response, errors) => {
+        onCompleted: (_response, errors) => {
           if (errors) {
             alert(errors[0].message);
             return;
           }
           setFiles((prev) => prev.filter((f) => f.path !== path));
           if (currentFile?.path === path) {
-            // Try to select the first file if the current one was deleted
             setCurrentFile(files.filter((f) => f.path !== path)[0] || null);
           }
         },
@@ -201,9 +208,17 @@ export default function EditorPage() {
   const handleNewFile = useCallback(() => {
     const fileName = prompt("Enter file name:");
     if (fileName) {
-      const newFile: File = { path: fileName, content: "", isDirty: true }; // New files are dirty
+      const newFile: File = {
+        path: fileName,
+        content: "",
+        isDirty: true,
+        isBinary: false,
+        size: 0,
+        isTooBig: false,
+      };
       setFiles((prev) => [...prev, newFile]);
       setCurrentFile(newFile);
+      setActiveTab("code");
     }
   }, []);
 
@@ -216,16 +231,6 @@ export default function EditorPage() {
       if (content !== null) {
         isBinary = isBinaryContent(content, fileName);
         size = content.length;
-        // For client-side loaded files, we assume they are not "too big" if content is provided
-        // The backend determines "isTooBig" for fetched files.
-        isTooBig = false;
-      } else {
-        // If content is null, we can't determine binary status or size client-side.
-        // We might assume it's binary or too big if it came from a context that implies it.
-        // For now, we'll default to not binary and size 0 if content is null.
-        // This might need refinement based on how `handleLoadFile` is called for null content.
-        isBinary = false;
-        size = 0;
         isTooBig = false;
       }
 
@@ -248,15 +253,17 @@ export default function EditorPage() {
           };
           return updatedFiles;
         }
-        const newFile: File = {
-          path: fileName,
-          content: content !== null ? content : null,
-          isDirty: true,
-          isBinary,
-          size,
-          isTooBig,
-        };
-        return [...prev, newFile];
+        return [
+          ...prev,
+          {
+            path: fileName,
+            content: content !== null ? content : null,
+            isDirty: true,
+            isBinary,
+            size,
+            isTooBig,
+          },
+        ];
       });
       setCurrentFile((prev) => {
         if (prev && prev.path === fileName) {
@@ -269,8 +276,16 @@ export default function EditorPage() {
             isTooBig,
           };
         }
-        const loadedFile = files.find((file) => file.path === fileName);
-        return loadedFile || null;
+        return (
+          files.find((file) => file.path === fileName) || {
+            path: fileName,
+            content,
+            isDirty: true,
+            isBinary,
+            size,
+            isTooBig,
+          }
+        );
       });
 
       if (content !== null && !isBinary) {
@@ -300,24 +315,19 @@ export default function EditorPage() {
   const compile = useCallback(async () => {
     if (!currentFile || !currentFile.path) {
       setLogs("Error: No file selected for compilation.");
+      setActiveTab("logs");
       return;
     }
 
     setCompiling(true);
     setLogs("Compiling...\n");
 
-    // No explicit authToken check here, as it's expected in a cookie
-    // No Authorization header needed, as the token is in a cookie
-
     try {
       const response = await fetch(
-        `/api/compile?project=${id}&file=${currentFile.path}`,
+        `/api/compile?project=${id}&file=${encodeURIComponent(currentFile.path)}`,
         {
           method: "GET",
-          headers: {
-            "Content-Type": "application/json", // Keep this if sending a body, but for GET it's often optional
-          },
-          credentials: "include", // Essential for sending cookies
+          credentials: "include",
         },
       );
 
@@ -329,108 +339,195 @@ export default function EditorPage() {
       const data = await response.json();
       setLogs(data.logs || "Compilation completed");
       if (data.pdf) {
-        // Changed from data.pdfData to data.pdf
         setPdfData(data.pdf);
+        setActiveTab("pdf");
       } else if (!data.success) {
-        // If compilation failed and no PDF, ensure error is shown
         setLogs(
           data.logs || "Compilation failed with no specific error message.",
         );
+        setActiveTab("logs");
       }
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       setLogs(`Error: ${errorMessage}`);
+      setActiveTab("logs");
     } finally {
       setCompiling(false);
     }
-  }, [id, currentFile]); // Added currentFile to dependencies
+  }, [id, currentFile]);
 
   const getStatusBadge = () => {
-    // Check if any file is dirty
     const anyDirty = files.some((file) => file.isDirty);
 
     if (anyDirty) {
-      return <span className="badge badge-error gap-2">Unsaved</span>;
+      return (
+        <span className="badge badge-soft badge-error whitespace-nowrap">
+          Unsaved
+        </span>
+      );
     }
 
     switch (editorStatus) {
       case "saving":
-        return <span className="badge badge-warning gap-2">Saving...</span>;
+        return (
+          <span className="badge badge-soft badge-warning whitespace-nowrap">
+            Saving…
+          </span>
+        );
       case "saved":
-        return <span className="badge badge-success gap-2">Saved</span>;
+        return (
+          <span className="badge badge-soft badge-success whitespace-nowrap">
+            Saved
+          </span>
+        );
+      case "error":
+        return (
+          <span className="badge badge-soft badge-error whitespace-nowrap">
+            Error
+          </span>
+        );
       case "committed":
       case "clean":
-        return <span className="badge badge-info gap-2">Committed</span>;
-      case "error":
-        return <span className="badge badge-error gap-2">Error</span>;
       default:
-        return <span className="badge badge-info gap-2">Committed</span>;
+        return (
+          <span className="badge badge-soft badge-info whitespace-nowrap">
+            Committed
+          </span>
+        );
     }
   };
 
-  return (
-    <div className="h-screen flex flex-col">
-      <div className="flex flex-1 overflow-hidden">
-        {/* File Tree Sidebar */}
-        <div className="w-64 border-r border-base-300">
-          <FileTree
-            files={files}
-            currentFile={currentFile?.path || null}
-            onFileSelect={handleFileSelect}
-            onNewFile={handleNewFile}
-            onDeleteFile={memoizedOnDeleteFile}
-            onLoadFile={handleLoadFile}
-            projectId={id!} // Pass projectId here
-          />
-        </div>
+  const viewRows: { id: EditorTab; label: string; icon: typeof Code }[] = [
+    { id: "code", label: "Code", icon: Code },
+    { id: "pdf", label: "PDF", icon: FileText },
+    { id: "logs", label: "Logs", icon: Terminal },
+  ];
 
-        {/* Main Content Area */}
-        <div className="flex-1 flex flex-col">
-          {/* Toolbar */}
-          <div className="flex items-center justify-between bg-base-200 p-2 gap-4">
-            <div className="tabs tabs-boxed">
-              <a
-                className={`tab ${activeTab === "code" ? "tab-active" : ""}`}
-                onClick={() => setActiveTab("code")}
-              >
-                Code
-              </a>
-              <a
-                className={`tab ${activeTab === "pdf" ? "tab-active" : ""}`}
-                onClick={() => setActiveTab("pdf")}
-              >
-                PDF
-              </a>
-              <a
-                className={`tab ${activeTab === "logs" ? "tab-active" : ""}`}
-                onClick={() => setActiveTab("logs")}
-              >
-                Logs
-              </a>
-            </div>
+  const selectView = (tab: EditorTab) => {
+    setActiveTab(tab);
+    if (window.matchMedia("(max-width: 767px)").matches) {
+      setSidebarOpen(false);
+    }
+  };
 
-            <div className="flex items-center gap-3">
-              {getStatusBadge()}
+  const sidebar = (
+    <aside
+      className={`
+        editor-sidebar bg-base-200 border-r border-base-300 flex flex-col
+        fixed md:static inset-y-0 left-0 z-40 w-[min(18rem,85vw)]
+        transition-transform duration-150 ease-out
+        ${sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
+        ${sidebarOpen ? "md:w-64" : "md:w-0 md:border-0 md:overflow-hidden"}
+      `}
+      style={{ top: "var(--shell-height)", height: "calc(100dvh - var(--shell-height))" }}
+      aria-hidden={!sidebarOpen}
+    >
+      <div className="flex items-center justify-between px-3 py-2 border-b border-base-300 md:hidden shrink-0">
+        <span className="font-semibold text-sm">Menu</span>
+        <button
+          type="button"
+          className="btn btn-ghost btn-square btn-sm min-h-[var(--touch-min)] min-w-[var(--touch-min)]"
+          onClick={() => setSidebarOpen(false)}
+          aria-label="Close sidebar"
+        >
+          <X size={20} />
+        </button>
+      </div>
+
+      <nav className="p-2 border-b border-base-300 shrink-0" aria-label="View">
+        <p className="px-2 pb-1 text-xs font-medium uppercase tracking-wide text-base-content/60">
+          View
+        </p>
+        <ul className="menu menu-md bg-transparent rounded-box w-full p-0 gap-0.5">
+          {viewRows.map(({ id: tabId, label, icon: Icon }) => (
+            <li key={tabId}>
               <button
-                className={`btn btn-sm ${compiling ? "btn-disabled" : "btn-primary"}`}
-                onClick={compile}
-                disabled={compiling}
+                type="button"
+                className={`min-h-[var(--touch-min)] ${activeTab === tabId ? "active" : ""}`}
+                onClick={() => selectView(tabId)}
               >
-                {compiling ? (
-                  <>
-                    <span className="loading loading-spinner loading-xs"></span>
-                    Compiling...
-                  </>
-                ) : (
-                  "Compile"
-                )}
+                <Icon size={18} />
+                {label}
               </button>
-            </div>
-          </div>
+            </li>
+          ))}
+        </ul>
+      </nav>
 
-          {/* Content Area based on activeTab */}
-          <div className="flex-1 overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+        <FileTree
+          files={files as { path: string; content: string; isDirty: boolean }[]}
+          currentFile={currentFile?.path || null}
+          onFileSelect={handleFileSelect}
+          onNewFile={handleNewFile}
+          onDeleteFile={memoizedOnDeleteFile}
+          onLoadFile={handleLoadFile}
+          projectId={id!}
+        />
+      </div>
+    </aside>
+  );
+
+  return (
+    <Layout
+      navStart={
+        <button
+          type="button"
+          className="btn btn-ghost btn-square min-h-[var(--touch-min)] min-w-[var(--touch-min)]"
+          onClick={() => setSidebarOpen((o) => !o)}
+          aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
+          aria-expanded={sidebarOpen}
+        >
+          {sidebarOpen ? <X size={22} /> : <Menu size={22} />}
+        </button>
+      }
+      navEnd={
+        <>
+          {getStatusBadge()}
+          <button
+            type="button"
+            className={`btn btn-primary btn-sm sm:btn-md min-h-[var(--touch-min)] ${compiling ? "btn-disabled" : ""}`}
+            onClick={compile}
+            disabled={compiling}
+          >
+            {compiling ? (
+              <>
+                <span className="loading loading-spinner loading-xs" />
+                <span className="hidden sm:inline">Compiling…</span>
+              </>
+            ) : (
+              "Compile"
+            )}
+          </button>
+        </>
+      }
+    >
+      <div className="editor-workspace relative flex flex-1 min-h-0 overflow-hidden">
+        {/* Backdrop (mobile) */}
+        {sidebarOpen ? (
+          <button
+            type="button"
+            className="fixed inset-0 z-30 bg-neutral/40 md:hidden"
+            style={{ top: "var(--shell-height)" }}
+            aria-label="Close sidebar"
+            onClick={() => setSidebarOpen(false)}
+          />
+        ) : null}
+
+        {sidebar}
+
+        <div className="flex-1 flex flex-col min-w-0 min-h-0 bg-base-100">
+          {currentFile ? (
+            <div className="px-3 py-1.5 text-sm border-b border-base-300 truncate text-base-content/80 shrink-0">
+              {currentFile.path}
+              {currentFile.isDirty ? (
+                <span className="text-warning ml-1">•</span>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div className="flex-1 overflow-hidden min-h-0">
             {activeTab === "code" && currentFile && currentFile.isBinary ? (
               <BinaryFileViewer fileName={currentFile.path} projectId={id!} />
             ) : activeTab === "code" && currentFile ? (
@@ -445,13 +542,13 @@ export default function EditorPage() {
             ) : activeTab === "logs" ? (
               <Editor value={logs} onChange={() => null} onSave={() => null} />
             ) : (
-              <div className="flex items-center justify-center h-full text-base-content/70">
-                Select a file or tab to view content.
+              <div className="flex items-center justify-center h-full text-base-content/70 page-pad">
+                Select a file from the sidebar.
               </div>
             )}
           </div>
         </div>
       </div>
-    </div>
+    </Layout>
   );
 }
