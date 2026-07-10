@@ -115,7 +115,7 @@ Use root `railway.toml`. Attach a volume at `/data`, set `JWT_SECRET`. SQLite de
 - `DATABASE_URL` / `DATABASE_DSN`: SQLite path/`file:` DSN, or `postgres://...` URL
 - `JWT_SECRET`: Secret key for JWT token signing (required in production)
 - `STATE_DIR`: Root for Git repositories (default: `./data`; Docker: `/data`). Projects live at `{STATE_DIR}/repos/{uuid}`
-- `PORT`: Server port (default: `8080`)
+- `PORT`: Used as listen port when `--addr` is not set (platforms like Railway inject this)
 - `GO_ENV`: Set to `development` for dev mode only (allows JWT_SECRET fallback)
 
 ### CLI Flags
@@ -123,7 +123,7 @@ Use root `railway.toml`. Attach a volume at `/data`, set `JWT_SECRET`. SQLite de
 - `--db-driver`: `sqlite` or `postgres` (overrides `DB_DRIVER`)
 - `--db`: DSN/path (overrides `DATABASE_URL`)
 - `--state-dir`: State directory (overrides `STATE_DIR`)
-- `--port`: Server port (overrides `PORT`)
+- `--addr`: Listen address (default: `:$PORT` if `PORT` is set, else `127.0.0.1:8080`)
 
 ### Example Configuration
 
@@ -131,9 +131,10 @@ Use root `railway.toml`. Attach a volume at `/data`, set `JWT_SECRET`. SQLite de
 export JWT_SECRET="your-secure-random-secret-key-min-32-chars"
 export STATE_DIR="/var/superfolha"
 export DATABASE_URL="/var/superfolha/superfolha.db"
-export PORT="8080"
+# optional; default is 127.0.0.1:8080 without PORT
+# export PORT=8080
 
-./superfolha
+./superfolha --addr=0.0.0.0:8080
 ```
 
 ## Security Features

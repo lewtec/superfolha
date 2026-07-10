@@ -19,10 +19,10 @@ import (
 )
 
 var (
-	stateDir string
-	dbDriver string
-	dbDSN    string
-	port     string
+	stateDir    string
+	dbDriver    string
+	dbDSN       string
+	listenAddr  string
 )
 
 var rootCmd = &cobra.Command{
@@ -36,7 +36,8 @@ func init() {
 	rootCmd.Flags().StringVar(&stateDir, "state-dir", getEnv("STATE_DIR", "./data"), "Directory for Git repositories (and default SQLite path)")
 	rootCmd.Flags().StringVar(&dbDriver, "db-driver", firstEnv("DB_DRIVER", "DATABASE_DRIVER"), "Database driver: sqlite (default) or postgres")
 	rootCmd.Flags().StringVar(&dbDSN, "db", firstEnv("DATABASE_URL", "DATABASE_DSN"), "Database DSN (sqlite path or postgres:// URL)")
-	rootCmd.Flags().StringVar(&port, "port", getEnv("PORT", "8080"), "Server port")
+	// Empty default: resolveAddr picks $PORT or 127.0.0.1:8080.
+	rootCmd.Flags().StringVar(&listenAddr, "addr", "", "Listen address (default: :$PORT if set, else 127.0.0.1:8080)")
 }
 
 func getEnv(key, defaultValue string) string {
@@ -53,6 +54,24 @@ func firstEnv(keys ...string) string {
 		}
 	}
 	return ""
+}
+
+// resolveAddr picks the listen address:
+//  1. --addr if set
+//  2. else PORT env (":$PORT" if PORT is only a port number)
+//  3. else loopback 127.0.0.1:8080
+func resolveAddr(addr string) string {
+	addr = strings.TrimSpace(addr)
+	if addr != "" {
+		return addr
+	}
+	if port := strings.TrimSpace(os.Getenv("PORT")); port != "" {
+		if strings.Contains(port, ":") {
+			return port
+		}
+		return ":" + port
+	}
+	return "127.0.0.1:8080"
 }
 
 func openRepository(driver, dsn, stateDir string) (db.Repository, error) {
@@ -105,8 +124,8 @@ func runServer(cmd *cobra.Command, args []string) {
 	authService := auth.NewService(repo)
 	srv := server.NewServer(repo, stateDir, projectService, authService)
 
-	addr := fmt.Sprintf(":%s", port)
-	log.Printf("Starting server on http://localhost%s", addr)
+	addr := resolveAddr(listenAddr)
+	log.Printf("Starting server on %s", addr)
 
 	httpServer := &http.Server{
 		Addr:         addr,
