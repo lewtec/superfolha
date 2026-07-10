@@ -43,12 +43,18 @@ func NewRepository(path string) (*Repository, error) {
 	conn.SetMaxIdleConns(1)
 
 	if err := conn.Ping(); err != nil {
-		_ = conn.Close()
-		return nil, fmt.Errorf("ping sqlite: %w", err)
+		if closeErr := conn.Close(); closeErr != nil {
+			err = fmt.Errorf("ping sqlite: %w (and close error: %v)", err, closeErr)
+		} else {
+			err = fmt.Errorf("ping sqlite: %w", err)
+		}
+		return nil, err
 	}
 
 	if err := runMigrations(conn); err != nil {
-		_ = conn.Close()
+		if closeErr := conn.Close(); closeErr != nil {
+			err = fmt.Errorf("migrate sqlite: %w (and close error: %v)", err, closeErr)
+		}
 		return nil, err
 	}
 

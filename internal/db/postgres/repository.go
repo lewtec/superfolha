@@ -33,10 +33,14 @@ func NewRepository(dsn string) (*Repository, error) {
 		return nil, fmt.Errorf("open migration database: %w", err)
 	}
 	if err := runMigrations(migrationDB); err != nil {
-		_ = migrationDB.Close()
+		if closeErr := migrationDB.Close(); closeErr != nil {
+			err = fmt.Errorf("migrate postgres: %w (and close error: %v)", err, closeErr)
+		}
 		return nil, err
 	}
-	_ = migrationDB.Close()
+	if err := migrationDB.Close(); err != nil {
+		return nil, fmt.Errorf("close migration database: %w", err)
+	}
 
 	pool, err := pgxpool.New(context.Background(), dsn)
 	if err != nil {

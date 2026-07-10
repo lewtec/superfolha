@@ -25,7 +25,8 @@ export default function Layout({ children }: LayoutProps) {
         method: "POST",
         credentials: "same-origin",
       });
-    } catch {
+    } catch (error) {
+      console.error("Logout request failed:", error);
       // Still leave the app even if the network call fails.
     }
     navigate("/login");
