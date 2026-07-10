@@ -11,14 +11,18 @@ const query = graphql`
 `;
 
 export function useAuthStatus() {
-  // Relay já faz suspense + error boundary. Não inventa estado.
   const data = useLazyLoadQuery<UseAuthStatusQueryType>(
     query,
     {},
-    { fetchPolicy: "network-only" },
+    { fetchPolicy: "store-or-network" },
   );
 
-  const isAuthenticated = Boolean(data?.me?.id);
+  const me = data?.me ?? null;
+  const isAuthenticated = Boolean(me?.id);
 
-  return { isAuthenticated };
+  return {
+    isAuthenticated,
+    userId: me?.id ?? null,
+    email: me?.email ?? null,
+  };
 }

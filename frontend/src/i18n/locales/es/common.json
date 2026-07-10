@@ -10,5 +10,10 @@
   "open": "Abrir",
   "save": "Guardar",
   "loading": "Cargando…",
-  "or": "O"
+  "or": "O",
+  "account_menu": "Menú de la cuenta",
+  "signed_in_as": "Sesión iniciada como",
+  "theme": "Tema",
+  "leave": "Salir",
+  "my_projects": "Mis proyectos"
 }

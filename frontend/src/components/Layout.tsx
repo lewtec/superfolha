@@ -1,8 +1,8 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import ThemeToggle from "./ThemeToggle";
-import LanguageSwitcher from "./LanguageSwitcher";
+import UserMenu from "./UserMenu";
+import { useAuthStatus } from "../hooks/useAuthStatus";
 
 interface LayoutProps {
   children: ReactNode;
@@ -19,20 +19,8 @@ export default function Layout({
   navEnd,
   brandTo = "/projects",
 }: LayoutProps) {
-  const navigate = useNavigate();
   const { t } = useTranslation("common");
-
-  const logout = async () => {
-    try {
-      await fetch("/api/logout", {
-        method: "POST",
-        credentials: "same-origin",
-      });
-    } catch {
-      // Still leave the app even if the network call fails.
-    }
-    navigate("/login");
-  };
+  const { email } = useAuthStatus();
 
   return (
     <div className="app-shell bg-base-100 text-base-content">
@@ -47,20 +35,13 @@ export default function Layout({
           </Link>
         </div>
         {navCenter ? <div className="navbar-center">{navCenter}</div> : null}
-        <div className="navbar-end gap-1 flex-nowrap shrink-0">
+        <div className="navbar-end gap-1 flex-nowrap shrink-0 items-center">
           {navEnd}
-          <LanguageSwitcher />
-          <button
-            type="button"
-            className="btn btn-ghost min-h-[var(--touch-min)] px-2 sm:px-4"
-            onClick={logout}
-          >
-            {t("logout")}
-          </button>
-          <ThemeToggle />
+          {/* Avatar is always rightmost */}
+          <UserMenu email={email} showLogout />
         </div>
       </header>
-      <main className="app-main flex flex-col min-h-0">{children}</main>
+      <main className="app-main">{children}</main>
     </div>
   );
 }

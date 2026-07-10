@@ -83,7 +83,7 @@ export default function Projects() {
   };
 
   return (
-    <div className="min-h-full bg-base-200">
+    <div className="page-fill bg-base-200">
       <div className="container mx-auto page-pad py-8">
         <div className="flex justify-between items-center mb-6 gap-2 flex-wrap">
           <h1 className="text-3xl font-bold">{t("projects:title")}</h1>

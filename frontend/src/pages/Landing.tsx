@@ -10,11 +10,11 @@ const Landing: React.FC = () => {
   const { t } = useTranslation("landing");
 
   return (
-    <div className="bg-base-100 text-base-content">
+    <div className="min-h-dvh flex flex-col bg-base-100 text-base-content">
       <Header />
 
       {/* Hero Section */}
-      <section className="hero min-h-screen bg-base-200">
+      <section className="hero min-h-[calc(100dvh-var(--shell-height))] flex-1 bg-base-200">
         <div className="hero-content text-center">
           <div className="max-w-md">
             <h2 className="text-5xl font-bold">{t("landing_title")}</h2>

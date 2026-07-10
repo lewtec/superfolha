@@ -116,18 +116,28 @@
 html {
   font-family: var(--font-sans);
   font-size: 16px;
+  height: 100%;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 body {
   margin: 0;
+  min-height: 100%;
   min-height: 100dvh;
   font-family: var(--font-sans);
   font-size: var(--text-body);
   line-height: 1.5;
   background-color: var(--color-base-100);
   color: var(--color-base-content);
+}
+
+/* Always at least one viewport tall; flex column so children can stretch */
+#root {
+  min-height: 100%;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
 }
 
 code,
@@ -142,14 +152,17 @@ h3 {
   text-wrap: balance;
 }
 
-/* App shell */
+/* App shell — fill at least the viewport (short pages like Projects) */
 .app-shell {
+  flex: 1 1 auto;
   min-height: 100dvh;
+  width: 100%;
   display: flex;
   flex-direction: column;
 }
 
 .app-navbar {
+  flex-shrink: 0;
   min-height: var(--shell-height);
   border-bottom: 1px solid var(--color-base-300);
   background-color: var(--color-base-100);
@@ -160,9 +173,25 @@ h3 {
   min-width: var(--touch-min);
 }
 
+/* Main grows under the navbar and is always at least remaining viewport */
 .app-main {
-  flex: 1;
-  min-height: 0;
+  flex: 1 1 auto;
+  min-height: calc(100dvh - var(--shell-height));
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+/* Page surfaces: stretch to fill main (or full viewport when used alone) */
+.page-fill {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 100%;
+}
+
+/* Inside the shell, pin to remaining viewport even if flex free-space fails */
+.app-main > .page-fill {
+  min-height: calc(100dvh - var(--shell-height));
 }
 
 .page-pad {

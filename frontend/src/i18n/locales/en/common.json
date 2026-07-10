@@ -1,6 +1,6 @@
 {
   "app_name": "superfolha",
-  "logout": "Logout",
+  "logout": "Leave",
   "theme_light": "Light theme",
   "theme_dark": "Dark theme",
   "language": "Language",
@@ -10,5 +10,10 @@
   "open": "Open",
   "save": "Save",
   "loading": "Loading…",
-  "or": "OR"
+  "or": "OR",
+  "account_menu": "Account menu",
+  "signed_in_as": "Signed in as",
+  "theme": "Theme",
+  "leave": "Leave",
+  "my_projects": "My projects"
 }

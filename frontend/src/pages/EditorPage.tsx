@@ -531,25 +531,64 @@ export default function EditorPage() {
             </div>
           ) : null}
 
-          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-            {activeTab === "code" && currentFile && currentFile.isBinary ? (
-              <BinaryFileViewer fileName={currentFile.path} projectId={id!} />
-            ) : activeTab === "code" && currentFile ? (
-              <Editor
-                key={currentFile.path}
-                value={currentFile.content}
-                onChange={handleEditorChange}
-                onSave={memoizedOnSave}
-              />
-            ) : activeTab === "pdf" ? (
+          {/*
+            Keep all panes mounted so tab switches do not remount CodeMirror
+            or reload the PDF iframe. Inactive panes are only hidden.
+          */}
+          <div className="relative flex-1 min-h-0">
+            <div
+              className={`absolute inset-0 min-h-0 flex flex-col ${
+                activeTab === "code"
+                  ? "z-10"
+                  : "z-0 invisible pointer-events-none"
+              }`}
+              aria-hidden={activeTab !== "code"}
+            >
+              {currentFile && currentFile.isBinary ? (
+                <BinaryFileViewer
+                  fileName={currentFile.path}
+                  projectId={id!}
+                />
+              ) : currentFile ? (
+                <Editor
+                  key={currentFile.path}
+                  value={currentFile.content}
+                  onChange={handleEditorChange}
+                  onSave={memoizedOnSave}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full text-base-content/70 page-pad">
+                  {t("editor:select_file")}
+                </div>
+              )}
+            </div>
+
+            <div
+              className={`absolute inset-0 min-h-0 flex flex-col ${
+                activeTab === "pdf"
+                  ? "z-10"
+                  : "z-0 invisible pointer-events-none"
+              }`}
+              aria-hidden={activeTab !== "pdf"}
+            >
               <PDFViewer pdfData={pdfData} />
-            ) : activeTab === "logs" ? (
-              <Editor value={logs} onChange={() => null} onSave={() => null} />
-            ) : (
-              <div className="flex items-center justify-center h-full text-base-content/70 page-pad">
-                {t("editor:select_file")}
-              </div>
-            )}
+            </div>
+
+            <div
+              className={`absolute inset-0 min-h-0 flex flex-col ${
+                activeTab === "logs"
+                  ? "z-10"
+                  : "z-0 invisible pointer-events-none"
+              }`}
+              aria-hidden={activeTab !== "logs"}
+            >
+              <Editor
+                key="__logs__"
+                value={logs}
+                onChange={() => null}
+                onSave={() => null}
+              />
+            </div>
           </div>
         </div>
       </div>

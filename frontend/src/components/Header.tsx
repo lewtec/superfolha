@@ -1,7 +1,6 @@
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import ThemeToggle from "./ThemeToggle";
-import LanguageSwitcher from "./LanguageSwitcher";
+import UserMenu from "./UserMenu";
 
 export default function Header() {
   const { t } = useTranslation(["common", "auth"]);
@@ -17,8 +16,7 @@ export default function Header() {
             Superfolha
           </Link>
         </div>
-        <div className="navbar-end gap-1">
-          <LanguageSwitcher />
+        <div className="navbar-end gap-1 items-center">
           <Link to="/login" className="btn btn-ghost min-h-[var(--touch-min)]">
             {t("auth:login_button")}
           </Link>
@@ -28,7 +26,7 @@ export default function Header() {
           >
             {t("auth:register_button")}
           </Link>
-          <ThemeToggle />
+          <UserMenu showLogout={false} />
         </div>
       </div>
     </header>
