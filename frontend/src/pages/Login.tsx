@@ -2,9 +2,10 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useLoginMutation } from "../hooks/useLoginMutation";
+import { translateError, translateGraphQLErrors } from "../i18n/translateError";
 
 export default function Login() {
-  const { t } = useTranslation();
+  const { t } = useTranslation(["auth", "common", "errors"]);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -13,18 +14,18 @@ export default function Login() {
   const { login, isInFlight } = useLoginMutation({
     onCompleted: (response, errors) => {
       if (errors) {
-        setError(errors[0].message);
+        setError(translateGraphQLErrors(t, errors));
         return;
       }
       // Session is the HttpOnly authToken cookie set by the server.
       if (response.login?.user) {
         navigate("/projects");
       } else {
-        setError(t("login_failed"));
+        setError(t("auth:login_failed"));
       }
     },
     onError: (err) => {
-      setError(err.message || t("login_error"));
+      setError(translateError(t, err));
       console.error(err);
     },
   });
@@ -43,7 +44,7 @@ export default function Login() {
             Superfolha
           </h2>
           <p className="text-center text-base-content/70 mb-4">
-            {t("login_title")}
+            {t("auth:login_title")}
           </p>
 
           {error && (
@@ -55,7 +56,7 @@ export default function Login() {
           <form onSubmit={handleSubmit}>
             <div className="form-control">
               <label className="label">
-                <span className="label-text">{t("email_label")}</span>
+                <span className="label-text">{t("auth:email_label")}</span>
               </label>
               <input
                 type="email"
@@ -69,7 +70,7 @@ export default function Login() {
 
             <div className="form-control mt-4">
               <label className="label">
-                <span className="label-text">{t("password_label")}</span>
+                <span className="label-text">{t("auth:password_label")}</span>
               </label>
               <input
                 type="password"
@@ -87,17 +88,17 @@ export default function Login() {
                 className={`btn btn-primary ${isInFlight ? "loading" : ""}`}
                 disabled={isInFlight}
               >
-                {isInFlight ? t("signing_in") : t("login_button")}
+                {isInFlight ? t("auth:signing_in") : t("auth:login_button")}
               </button>
             </div>
           </form>
 
-          <div className="divider">OR</div>
+          <div className="divider">{t("common:or")}</div>
 
           <p className="text-center">
-            {t("no_account")}{" "}
+            {t("auth:no_account")}{" "}
             <Link to="/register" className="link link-primary">
-              {t("register_button")}
+              {t("auth:register_button")}
             </Link>
           </p>
         </div>

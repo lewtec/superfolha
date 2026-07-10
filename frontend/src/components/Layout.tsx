@@ -1,16 +1,14 @@
 import { Link, useNavigate } from "react-router-dom";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import ThemeToggle from "./ThemeToggle";
+import LanguageSwitcher from "./LanguageSwitcher";
 
 interface LayoutProps {
   children: ReactNode;
-  /** Left of brand (e.g. hamburger) */
   navStart?: ReactNode;
-  /** Center of navbar */
   navCenter?: ReactNode;
-  /** Before logout / theme (e.g. status + compile) */
   navEnd?: ReactNode;
-  /** Brand link target */
   brandTo?: string;
 }
 
@@ -22,6 +20,7 @@ export default function Layout({
   brandTo = "/projects",
 }: LayoutProps) {
   const navigate = useNavigate();
+  const { t } = useTranslation("common");
 
   const logout = async () => {
     try {
@@ -44,20 +43,19 @@ export default function Layout({
             to={brandTo}
             className="btn btn-ghost text-base sm:text-lg font-semibold tracking-tight normal-case min-h-[var(--touch-min)] px-2"
           >
-            superfolha
+            {t("app_name")}
           </Link>
         </div>
-        {navCenter ? (
-          <div className="navbar-center">{navCenter}</div>
-        ) : null}
+        {navCenter ? <div className="navbar-center">{navCenter}</div> : null}
         <div className="navbar-end gap-1 flex-nowrap shrink-0">
           {navEnd}
+          <LanguageSwitcher />
           <button
             type="button"
             className="btn btn-ghost min-h-[var(--touch-min)] px-2 sm:px-4"
             onClick={logout}
           >
-            Logout
+            {t("logout")}
           </button>
           <ThemeToggle />
         </div>

@@ -1,9 +1,10 @@
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import ThemeToggle from "./ThemeToggle";
+import LanguageSwitcher from "./LanguageSwitcher";
 
 export default function Header() {
-  const { t } = useTranslation();
+  const { t } = useTranslation(["common", "auth"]);
 
   return (
     <header className="app-navbar">
@@ -17,17 +18,15 @@ export default function Header() {
           </Link>
         </div>
         <div className="navbar-end gap-1">
-          <Link
-            to="/login"
-            className="btn btn-ghost min-h-[var(--touch-min)]"
-          >
-            {t("login_button")}
+          <LanguageSwitcher />
+          <Link to="/login" className="btn btn-ghost min-h-[var(--touch-min)]">
+            {t("auth:login_button")}
           </Link>
           <Link
             to="/register"
             className="btn btn-primary min-h-[var(--touch-min)]"
           >
-            {t("register_button")}
+            {t("auth:register_button")}
           </Link>
           <ThemeToggle />
         </div>

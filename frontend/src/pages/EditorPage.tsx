@@ -4,6 +4,8 @@ import { useDeleteFileMutation } from "../hooks/useDeleteFileMutation";
 import { useCommitProjectMutation } from "../hooks/useCommitProjectMutation";
 import { useDebounce } from "../hooks/useDebounce";
 import { useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import { translateError } from "../i18n/translateError";
 import { useGetProjectQuery } from "../hooks/useGetProjectQuery";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -33,6 +35,7 @@ type EditorTab = "code" | "pdf" | "logs";
 
 export default function EditorPage() {
   const { id } = useParams<{ id: string }>();
+  const { t } = useTranslation(["editor", "common", "errors"]);
 
   const { project } = useGetProjectQuery({ id: id! });
   const fetchedFiles = project?.files;
@@ -174,7 +177,7 @@ export default function EditorPage() {
           },
           onError: (err) => {
             setEditorStatus("error");
-            alert("Failed to save file");
+            alert(t("editor:save_failed"));
             console.error(err);
           },
         });
@@ -197,7 +200,7 @@ export default function EditorPage() {
           }
         },
         onError: (err) => {
-          alert("Failed to delete file");
+          alert(t("editor:delete_file_failed"));
           console.error(err);
         },
       });
@@ -206,7 +209,7 @@ export default function EditorPage() {
   );
 
   const handleNewFile = useCallback(() => {
-    const fileName = prompt("Enter file name:");
+    const fileName = prompt(t("editor:enter_file_name"));
     if (fileName) {
       const newFile: File = {
         path: fileName,
@@ -220,7 +223,7 @@ export default function EditorPage() {
       setCurrentFile(newFile);
       setActiveTab("code");
     }
-  }, []);
+  }, [t]);
 
   const handleLoadFile = useCallback(
     (fileName: string, content: string | null) => {
@@ -314,7 +317,7 @@ export default function EditorPage() {
 
   const compile = useCallback(async () => {
     if (!currentFile || !currentFile.path) {
-      setLogs("Error: No file selected for compilation.");
+      setLogs(t("editor:no_file_compile"));
       setActiveTab("logs");
       return;
     }
@@ -332,8 +335,9 @@ export default function EditorPage() {
       );
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Compilation failed");
+        const errorData = await response.json().catch(() => ({}));
+        const msg = translateError(t, errorData);
+        throw Object.assign(new Error(msg), { code: errorData.code });
       }
 
       const data = await response.json();
@@ -355,7 +359,7 @@ export default function EditorPage() {
     } finally {
       setCompiling(false);
     }
-  }, [id, currentFile]);
+  }, [id, currentFile, t]);
 
   const getStatusBadge = () => {
     const anyDirty = files.some((file) => file.isDirty);
@@ -363,7 +367,7 @@ export default function EditorPage() {
     if (anyDirty) {
       return (
         <span className="badge badge-soft badge-error whitespace-nowrap">
-          Unsaved
+          {t("editor:status_unsaved")}
         </span>
       );
     }
@@ -372,19 +376,19 @@ export default function EditorPage() {
       case "saving":
         return (
           <span className="badge badge-soft badge-warning whitespace-nowrap">
-            Saving…
+            {t("editor:status_saving")}
           </span>
         );
       case "saved":
         return (
           <span className="badge badge-soft badge-success whitespace-nowrap">
-            Saved
+            {t("editor:status_saved")}
           </span>
         );
       case "error":
         return (
           <span className="badge badge-soft badge-error whitespace-nowrap">
-            Error
+            {t("editor:status_error")}
           </span>
         );
       case "committed":
@@ -392,16 +396,16 @@ export default function EditorPage() {
       default:
         return (
           <span className="badge badge-soft badge-info whitespace-nowrap">
-            Committed
+            {t("editor:status_committed")}
           </span>
         );
     }
   };
 
   const viewRows: { id: EditorTab; label: string; icon: typeof Code }[] = [
-    { id: "code", label: "Code", icon: Code },
-    { id: "pdf", label: "PDF", icon: FileText },
-    { id: "logs", label: "Logs", icon: Terminal },
+    { id: "code", label: t("editor:code"), icon: Code },
+    { id: "pdf", label: t("editor:pdf"), icon: FileText },
+    { id: "logs", label: t("editor:logs"), icon: Terminal },
   ];
 
   const selectView = (tab: EditorTab) => {
@@ -424,20 +428,20 @@ export default function EditorPage() {
       aria-hidden={!sidebarOpen}
     >
       <div className="flex items-center justify-between px-3 py-2 border-b border-base-300 md:hidden shrink-0">
-        <span className="font-semibold text-sm">Menu</span>
+        <span className="font-semibold text-sm">{t("editor:menu")}</span>
         <button
           type="button"
           className="btn btn-ghost btn-square btn-sm min-h-[var(--touch-min)] min-w-[var(--touch-min)]"
           onClick={() => setSidebarOpen(false)}
-          aria-label="Close sidebar"
+          aria-label={t("editor:close_sidebar")}
         >
           <X size={20} />
         </button>
       </div>
 
-      <nav className="p-2 border-b border-base-300 shrink-0" aria-label="View">
+      <nav className="p-2 border-b border-base-300 shrink-0" aria-label={t("editor:view")}>
         <p className="px-2 pb-1 text-xs font-medium uppercase tracking-wide text-base-content/60">
-          View
+          {t("editor:view")}
         </p>
         <ul className="menu menu-md bg-transparent rounded-box w-full p-0 gap-0.5">
           {viewRows.map(({ id: tabId, label, icon: Icon }) => (
@@ -476,7 +480,7 @@ export default function EditorPage() {
           type="button"
           className="btn btn-ghost btn-square min-h-[var(--touch-min)] min-w-[var(--touch-min)]"
           onClick={() => setSidebarOpen((o) => !o)}
-          aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
+          aria-label={sidebarOpen ? t("editor:close_sidebar") : t("editor:open_sidebar")}
           aria-expanded={sidebarOpen}
         >
           {sidebarOpen ? <X size={22} /> : <Menu size={22} />}
@@ -494,10 +498,10 @@ export default function EditorPage() {
             {compiling ? (
               <>
                 <span className="loading loading-spinner loading-xs" />
-                <span className="hidden sm:inline">Compiling…</span>
+                <span className="hidden sm:inline">{t("editor:compiling")}</span>
               </>
             ) : (
-              "Compile"
+              t("editor:compile")
             )}
           </button>
         </>
@@ -510,7 +514,7 @@ export default function EditorPage() {
             type="button"
             className="fixed inset-0 z-30 bg-neutral/40 md:hidden"
             style={{ top: "var(--shell-height)" }}
-            aria-label="Close sidebar"
+            aria-label={t("editor:close_sidebar")}
             onClick={() => setSidebarOpen(false)}
           />
         ) : null}
@@ -527,7 +531,7 @@ export default function EditorPage() {
             </div>
           ) : null}
 
-          <div className="flex-1 overflow-hidden min-h-0">
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
             {activeTab === "code" && currentFile && currentFile.isBinary ? (
               <BinaryFileViewer fileName={currentFile.path} projectId={id!} />
             ) : activeTab === "code" && currentFile ? (
@@ -543,7 +547,7 @@ export default function EditorPage() {
               <Editor value={logs} onChange={() => null} onSave={() => null} />
             ) : (
               <div className="flex items-center justify-center h-full text-base-content/70 page-pad">
-                Select a file from the sidebar.
+                {t("editor:select_file")}
               </div>
             )}
           </div>

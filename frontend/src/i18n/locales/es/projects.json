@@ -1,0 +1,14 @@
+{
+  "title": "Mis proyectos",
+  "new_project": "+ Nuevo proyecto",
+  "empty": "Aún no hay proyectos",
+  "create_first": "Crea tu primer proyecto",
+  "updated": "Actualizado: {{date}}",
+  "create_modal_title": "Crear nuevo proyecto",
+  "name_label": "Nombre del proyecto",
+  "name_placeholder": "Mi documento LaTeX",
+  "name_required": "El nombre del proyecto es obligatorio",
+  "delete_confirm": "¿Seguro que quieres eliminar este proyecto?",
+  "create_failed": "No se pudo crear el proyecto",
+  "delete_failed": "No se pudo eliminar el proyecto"
+}

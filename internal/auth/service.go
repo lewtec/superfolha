@@ -6,12 +6,8 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/lewtec/superfolha/internal/apierrors"
 	"github.com/lewtec/superfolha/internal/db"
-)
-
-var (
-	ErrEmailTaken         = fmt.Errorf("email already registered")
-	ErrInvalidCredentials = fmt.Errorf("invalid credentials")
 )
 
 type Service struct {
@@ -33,17 +29,21 @@ func normalizeEmail(email string) string {
 
 func (s *Service) Register(ctx context.Context, email, password string) (*AuthResponse, error) {
 	email = normalizeEmail(email)
+	if email == "" {
+		return nil, apierrors.New(apierrors.CodeInvalidInput, "email is required")
+	}
 
 	hashedPassword, err := HashPassword(password)
 	if err != nil {
-		return nil, err
+		if err == ErrPasswordTooShort {
+			return nil, apierrors.New(apierrors.CodePasswordTooShort, "password too short")
+		}
+		return nil, apierrors.Internal(err)
 	}
 
-	// Generate id in app so SQLite (no uuidv7 default) and Postgres stay aligned.
-	// Postgres still accepts explicit UUID inserts on tables with DEFAULT uuidv7().
 	id, err := uuid.NewV7()
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate user id: %w", err)
+		return nil, apierrors.Internal(fmt.Errorf("generate user id: %w", err))
 	}
 
 	user, err := s.repo.CreateUser(ctx, db.CreateUserParams{
@@ -53,15 +53,14 @@ func (s *Service) Register(ctx context.Context, email, password string) (*AuthRe
 	})
 	if err != nil {
 		if s.repo.IsUniqueViolation(err) {
-			return nil, ErrEmailTaken
+			return nil, apierrors.New(apierrors.CodeEmailTaken, "email already registered")
 		}
-		return nil, fmt.Errorf("failed to create user: %w", err)
+		return nil, apierrors.Internal(err)
 	}
 
-	// Always use the row returned from the DB (covers DEFAULT uuidv7() path).
 	token, err := GenerateToken(user.ID, user.Email)
 	if err != nil {
-		return nil, err
+		return nil, apierrors.Internal(err)
 	}
 
 	return &AuthResponse{User: &user, Token: token}, nil
@@ -72,16 +71,16 @@ func (s *Service) Login(ctx context.Context, email, password string) (*AuthRespo
 
 	user, err := s.repo.GetUserByEmail(ctx, email)
 	if err != nil {
-		return nil, ErrInvalidCredentials
+		return nil, apierrors.New(apierrors.CodeInvalidCredentials, "invalid credentials")
 	}
 
 	if !CheckPasswordHash(password, user.PasswordHash) {
-		return nil, ErrInvalidCredentials
+		return nil, apierrors.New(apierrors.CodeInvalidCredentials, "invalid credentials")
 	}
 
 	token, err := GenerateToken(user.ID, user.Email)
 	if err != nil {
-		return nil, err
+		return nil, apierrors.Internal(err)
 	}
 
 	return &AuthResponse{User: &user, Token: token}, nil

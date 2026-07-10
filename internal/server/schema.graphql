@@ -1,52 +1,73 @@
 scalar Time
 
+"""
+Stable error codes for clients. GraphQL errors include extensions.code with these values.
+REST APIs return JSON { "code": ErrorCode, "message": "..." }.
+UI maps codes via i18n (errors.<CODE>).
+"""
+enum ErrorCode {
+  UNKNOWN
+  UNAUTHENTICATED
+  UNAUTHORIZED
+  EMAIL_TAKEN
+  INVALID_CREDENTIALS
+  PASSWORD_TOO_SHORT
+  NOT_FOUND
+  PROJECT_NOT_FOUND
+  FILE_NOT_FOUND
+  INVALID_INPUT
+  INTERNAL
+  COMPILE_FAILED
+  COMPILE_TOOL_MISSING
+}
+
 type User {
-    id: ID!
-    email: String!
+  id: ID!
+  email: String!
 }
 
 type Project {
-    id: ID!
-    name: String!
-    createdAt: Time!
-    updatedAt: Time!
+  id: ID!
+  name: String!
+  createdAt: Time!
+  updatedAt: Time!
 
-    files: [File!]!
-    file(path: String!): File
-    history: [Commit!]!
+  files: [File!]!
+  file(path: String!): File
+  history: [Commit!]!
 }
 
 type File {
-    path: String!
-    content: String
-    size: Int!
-    isTooBig: Boolean!
-    isBinary: Boolean!
+  path: String!
+  content: String
+  size: Int!
+  isTooBig: Boolean!
+  isBinary: Boolean!
 }
 
 type Commit {
-    hash: String!
-    message: String!
-    author: String!
-    date: Time!
+  hash: String!
+  message: String!
+  author: String!
+  date: Time!
 }
 
 type Query {
-    me: User
-    projects: [Project!]!
-    project(id: ID!): Project
+  me: User
+  projects: [Project!]!
+  project(id: ID!): Project
 }
 
 type Mutation {
-    register(email: String!, password: String!): AuthPayload!
-    login(email: String!, password: String!): AuthPayload!
-    createProject(name: String!): Project!
-    deleteProject(id: ID!): Boolean!
-    saveFile(projectId: ID!, path: String!, content: String!): File!
-    deleteFile(projectId: ID!, path: String!): Boolean!
-    commit(projectId: ID!, message: String!): Commit!
+  register(email: String!, password: String!): AuthPayload!
+  login(email: String!, password: String!): AuthPayload!
+  createProject(name: String!): Project!
+  deleteProject(id: ID!): Boolean!
+  saveFile(projectId: ID!, path: String!, content: String!): File!
+  deleteFile(projectId: ID!, path: String!): Boolean!
+  commit(projectId: ID!, message: String!): Commit!
 }
 
 type AuthPayload {
-    user: User!
+  user: User!
 }

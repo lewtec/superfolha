@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"embed"
-	"errors"
 	"fmt"
 	"io/fs"
 	"log"
@@ -12,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/lewtec/superfolha/internal/apierrors"
 	"github.com/lewtec/superfolha/internal/auth"
 	"github.com/lewtec/superfolha/internal/db"
 	"github.com/lewtec/superfolha/internal/project"
@@ -56,26 +56,26 @@ func (r *Resolver) getProjectPath(projectID string) string {
 func (r *Resolver) getAndCheckProject(ctx context.Context, projectID string) (*db.Project, string, *auth.UserContext, error) {
 	user, ok := auth.GetUserFromContext(ctx)
 	if !ok {
-		return nil, "", nil, errors.New("not authenticated")
+		return nil, "", nil, apierrors.WithStatus(apierrors.CodeUnauthenticated, "not authenticated", 401)
 	}
 
 	if _, err := uuid.Parse(projectID); err != nil {
-		return nil, "", nil, fmt.Errorf("invalid project ID: %w", err)
+		return nil, "", nil, apierrors.New(apierrors.CodeInvalidInput, "invalid project ID")
 	}
 
 	project, err := r.Repo.GetProject(ctx, projectID)
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("project not found")
+		return nil, "", nil, apierrors.New(apierrors.CodeProjectNotFound, "project not found")
 	}
 
 	if project.UserID != user.UserID {
-		return nil, "", nil, fmt.Errorf("not authorized")
+		return nil, "", nil, apierrors.WithStatus(apierrors.CodeUnauthorized, "not authorized", 403)
 	}
 
 	projectPath := r.projectService.GetProjectPath(projectID)
 	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
 		if err := r.projectService.InitProjectRepo(projectID); err != nil {
-			return nil, "", nil, fmt.Errorf("failed to init git repo: %w", err)
+			return nil, "", nil, apierrors.Internal(err)
 		}
 
 		templateDir := "templates/simple"
@@ -99,11 +99,11 @@ func (r *Resolver) getAndCheckProject(ctx context.Context, projectID string) (*d
 			return nil
 		})
 		if err != nil {
-			return nil, "", nil, fmt.Errorf("failed to copy template files: %w", err)
+			return nil, "", nil, apierrors.Internal(err)
 		}
 		_, err = r.projectService.CommitChanges(projectID, user.Email, "Initial commit")
 		if err != nil {
-			return nil, "", nil, fmt.Errorf("failed to create initial commit: %w", err)
+			return nil, "", nil, apierrors.Internal(err)
 		}
 	}
 

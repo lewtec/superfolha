@@ -1,0 +1,14 @@
+{
+  "app_name": "superfolha",
+  "logout": "Cerrar sesión",
+  "theme_light": "Tema claro",
+  "theme_dark": "Tema oscuro",
+  "language": "Idioma",
+  "cancel": "Cancelar",
+  "create": "Crear",
+  "delete": "Eliminar",
+  "open": "Abrir",
+  "save": "Guardar",
+  "loading": "Cargando…",
+  "or": "O"
+}

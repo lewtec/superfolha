@@ -6,7 +6,6 @@ package server
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -14,6 +13,7 @@ import (
 	"os"
 
 	"github.com/google/uuid"
+	"github.com/lewtec/superfolha/internal/apierrors"
 	"github.com/lewtec/superfolha/internal/auth"
 	"github.com/lewtec/superfolha/internal/db"
 )
@@ -28,7 +28,7 @@ func (r *mutationResolver) Register(ctx context.Context, email string, password 
 	w, ok := ctx.Value(ResponseWriterContextKey).(http.ResponseWriter)
 	if !ok {
 		log.Println("Register Resolver: http.ResponseWriter not found in context.")
-		return nil, errors.New("internal server error: response writer not available")
+		return nil, apierrors.New(apierrors.CodeInternal, "response writer not available")
 	}
 
 	setAuthCookie(w, authResp.Token)
@@ -51,7 +51,7 @@ func (r *mutationResolver) Login(ctx context.Context, email string, password str
 	w, ok := ctx.Value(ResponseWriterContextKey).(http.ResponseWriter)
 	if !ok {
 		log.Println("Login Resolver: http.ResponseWriter not found in context.")
-		return nil, errors.New("internal server error: response writer not available")
+		return nil, apierrors.New(apierrors.CodeInternal, "response writer not available")
 	}
 
 	setAuthCookie(w, authResp.Token)
@@ -68,16 +68,16 @@ func (r *mutationResolver) Login(ctx context.Context, email string, password str
 func (r *mutationResolver) CreateProject(ctx context.Context, name string) (*Project, error) {
 	user, ok := auth.GetUserFromContext(ctx)
 	if !ok {
-		return nil, errors.New("not authenticated")
+		return nil, apierrors.WithStatus(apierrors.CodeUnauthenticated, "not authenticated", 401)
 	}
 
 	if _, err := uuid.Parse(user.UserID); err != nil {
-		return nil, fmt.Errorf("invalid user ID: %w", err)
+		return nil, apierrors.New(apierrors.CodeInvalidInput, "invalid user ID")
 	}
 
 	projectUUID, err := uuid.NewV7()
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate project ID: %w", err)
+		return nil, apierrors.Internal(err)
 	}
 	projectID := projectUUID.String()
 	projectPath := r.projectService.GetProjectPath(projectID)
@@ -89,7 +89,7 @@ func (r *mutationResolver) CreateProject(ctx context.Context, name string) (*Pro
 		GitPath: projectPath,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create project in db: %w", err)
+		return nil, apierrors.Internal(err)
 	}
 
 	return &Project{
@@ -108,11 +108,11 @@ func (r *mutationResolver) DeleteProject(ctx context.Context, id string) (bool, 
 	}
 
 	if err := r.Repo.DeleteProject(ctx, project.ID); err != nil {
-		return false, fmt.Errorf("failed to delete project from db: %w", err)
+		return false, apierrors.Internal(err)
 	}
 
 	if err := os.RemoveAll(projectPath); err != nil {
-		return false, fmt.Errorf("failed to delete git repository: %w", err)
+		return false, apierrors.Internal(err)
 	}
 
 	return true, nil
@@ -126,7 +126,7 @@ func (r *mutationResolver) SaveFile(ctx context.Context, projectID string, path 
 	}
 
 	if err := r.projectService.SaveFile(projectID, path, content); err != nil {
-		return nil, fmt.Errorf("failed to write file: %w", err)
+		return nil, apierrors.Internal(err)
 	}
 
 	contentPtr := &content
@@ -148,7 +148,7 @@ func (r *mutationResolver) DeleteFile(ctx context.Context, projectID string, pat
 	}
 
 	if err := r.projectService.DeleteFile(projectID, path); err != nil {
-		return false, fmt.Errorf("failed to delete file: %w", err)
+		return false, apierrors.Internal(err)
 	}
 
 	return true, nil
@@ -163,7 +163,7 @@ func (r *mutationResolver) Commit(ctx context.Context, projectID string, message
 
 	commit, err := r.projectService.CommitChanges(projectID, user.Email, message)
 	if err != nil {
-		return nil, fmt.Errorf("failed to commit changes: %w", err)
+		return nil, apierrors.Internal(err)
 	}
 
 	if err := r.Repo.UpdateProjectTimestamp(ctx, project.ID); err != nil {
@@ -182,7 +182,7 @@ func (r *mutationResolver) Commit(ctx context.Context, projectID string, message
 func (r *projectResolver) Files(ctx context.Context, obj *Project) ([]*File, error) {
 	gitFiles, err := r.projectService.ListFiles(obj.ID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list files: %w", err)
+		return nil, apierrors.Internal(err)
 	}
 
 	files := make([]*File, len(gitFiles))
@@ -191,7 +191,7 @@ func (r *projectResolver) Files(ctx context.Context, obj *Project) ([]*File, err
 
 		fileReader, _, err := r.projectService.ReadFile(obj.ID, f.Path)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read file for binary check: %w", err)
+			return nil, apierrors.Internal(err)
 		}
 
 		var buf [512]byte
@@ -216,7 +216,7 @@ func (r *projectResolver) Files(ctx context.Context, obj *Project) ([]*File, err
 func (r *projectResolver) File(ctx context.Context, obj *Project, path string) (*File, error) {
 	fileReader, fileSize, err := r.projectService.ReadFile(obj.ID, path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read file: %w", err)
+		return nil, apierrors.Internal(err)
 	}
 	defer fileReader.Close()
 
@@ -236,7 +236,7 @@ func (r *projectResolver) File(ctx context.Context, obj *Project, path string) (
 	if !isTooBig && !isBinary {
 		contentBytes, err := io.ReadAll(fileReader)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read file content: %w", err)
+			return nil, apierrors.Internal(err)
 		}
 		c := string(contentBytes)
 		content = &c
@@ -255,7 +255,7 @@ func (r *projectResolver) File(ctx context.Context, obj *Project, path string) (
 func (r *projectResolver) History(ctx context.Context, obj *Project) ([]*Commit, error) {
 	gitCommits, err := r.projectService.GetHistory(obj.ID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get history: %w", err)
+		return nil, apierrors.Internal(err)
 	}
 
 	commits := make([]*Commit, len(gitCommits))
@@ -279,12 +279,12 @@ func (r *queryResolver) Me(ctx context.Context) (*User, error) {
 	}
 
 	if _, err := uuid.Parse(user.UserID); err != nil {
-		return nil, fmt.Errorf("invalid user ID: %w", err)
+		return nil, apierrors.New(apierrors.CodeInvalidInput, "invalid user ID")
 	}
 
 	dbUser, err := r.Repo.GetUserByID(ctx, user.UserID)
 	if err != nil {
-		return nil, fmt.Errorf("user not found")
+		return nil, apierrors.New(apierrors.CodeNotFound, "user not found")
 	}
 
 	return &User{
@@ -297,11 +297,11 @@ func (r *queryResolver) Me(ctx context.Context) (*User, error) {
 func (r *queryResolver) Projects(ctx context.Context) ([]*Project, error) {
 	user, ok := auth.GetUserFromContext(ctx)
 	if !ok {
-		return nil, errors.New("not authenticated")
+		return nil, apierrors.WithStatus(apierrors.CodeUnauthenticated, "not authenticated", 401)
 	}
 
 	if _, err := uuid.Parse(user.UserID); err != nil {
-		return nil, fmt.Errorf("invalid user ID: %w", err)
+		return nil, apierrors.New(apierrors.CodeInvalidInput, "invalid user ID")
 	}
 
 	dbProjects, err := r.Repo.GetUserProjects(ctx, user.UserID)

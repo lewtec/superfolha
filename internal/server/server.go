@@ -8,14 +8,18 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
+	"github.com/lewtec/superfolha/internal/apierrors"
 	"github.com/lewtec/superfolha/internal/auth"
 	"github.com/lewtec/superfolha/internal/compiler"
 	"github.com/lewtec/superfolha/internal/db"
 	"github.com/lewtec/superfolha/internal/project"
+	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
 type Server struct {
@@ -55,7 +59,8 @@ func (s *Server) Handler() http.Handler {
 
 	// GraphQL endpoint
 	srv := handler.NewDefaultServer(NewExecutableSchema(Config{Resolvers: s.resolver}))
-	mux.Handle("/api/graphql", ResponseWriterMiddleware(auth.Middleware(srv))) // Apply new middleware
+	srv.SetErrorPresenter(codedErrorPresenter)
+	mux.Handle("/api/graphql", ResponseWriterMiddleware(auth.Middleware(srv)))
 
 	// GraphQL Playground (for development)
 	mux.Handle("/api/graphiql", playground.Handler("GraphQL playground", "/api/graphql"))
@@ -97,39 +102,36 @@ func (s *Server) handleCompile(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	if r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		json.NewEncoder(w).Encode(map[string]string{"message": "Method not allowed"})
+		writeAPIError(w, apierrors.WithStatus(apierrors.CodeInvalidInput, "method not allowed", http.StatusMethodNotAllowed))
 		return
 	}
 
 	projectId := r.URL.Query().Get("project")
 	if projectId == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"message": "Missing project query parameter"})
+		writeAPIError(w, apierrors.New(apierrors.CodeInvalidInput, "missing project query parameter"))
 		return
 	}
 
 	_, _, user, err := s.resolver.getAndCheckProject(r.Context(), projectId)
 	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized) // getAndCheckProject returns "not authenticated" or "not authorized"
-		json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
+		writeAPIError(w, err)
 		return
 	}
 
 	filePath := r.URL.Query().Get("file")
 	if filePath == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"message": "Missing file query parameter"})
+		writeAPIError(w, apierrors.New(apierrors.CodeInvalidInput, "missing file query parameter"))
 		return
 	}
 
-	// Compile
-	// The compiler.Compile function needs to be updated to accept projectID, filePath, and projectService
 	result, err := compiler.Compile(s.projectService, projectId, filePath)
 	if err != nil {
 		log.Printf("Error compiling project %s file %s for user %s: %v", projectId, filePath, user.UserID, err)
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
+		if strings.Contains(err.Error(), "latexmk command not found") {
+			writeAPIError(w, apierrors.Wrap(apierrors.CodeCompileToolMissing, "latexmk not found", err))
+			return
+		}
+		writeAPIError(w, apierrors.Wrap(apierrors.CodeCompileFailed, err.Error(), err))
 		return
 	}
 
@@ -141,64 +143,54 @@ func (s *Server) handleUploadFile(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		json.NewEncoder(w).Encode(map[string]string{"message": "Method not allowed"})
+		writeAPIError(w, apierrors.WithStatus(apierrors.CodeInvalidInput, "method not allowed", http.StatusMethodNotAllowed))
 		return
 	}
 
 	projectIdStr := r.PathValue("projectId")
 	if projectIdStr == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"message": "Missing project ID"})
+		writeAPIError(w, apierrors.New(apierrors.CodeInvalidInput, "missing project ID"))
 		return
 	}
 
 	_, _, _, err := s.resolver.getAndCheckProject(r.Context(), projectIdStr)
 	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized) // getAndCheckProject returns "not authenticated" or "not authorized"
-		json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
+		writeAPIError(w, err)
 		return
 	}
 
 	err = r.ParseMultipartForm(32 << 20) // 32 MB max
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"message": "Failed to parse form"})
+		writeAPIError(w, apierrors.New(apierrors.CodeInvalidInput, "failed to parse form"))
 		return
 	}
 
 	file, header, err := r.FormFile("file")
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"message": "Missing file"})
+		writeAPIError(w, apierrors.New(apierrors.CodeInvalidInput, "missing file"))
 		return
 	}
 	defer file.Close()
 
 	fileContent, err := io.ReadAll(file)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"message": "Failed to read file content"})
+		writeAPIError(w, apierrors.Internal(err))
 		return
 	}
 
-	filePath := header.Filename // Use original filename as path for now
+	filePath := header.Filename
 
-	// Use ProjectService to save the file
 	err = s.projectService.SaveFile(projectIdStr, filePath, string(fileContent))
 	if err != nil {
 		log.Printf("Error saving file %s to project %s: %v", filePath, projectIdStr, err)
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"message": "Failed to save uploaded file"})
+		writeAPIError(w, apierrors.Internal(err))
 		return
 	}
 
-	// Use ProjectService to commit the change
-	_, err = s.projectService.CommitChanges(projectIdStr, "System", "Uploaded file: "+filePath) // Use a placeholder author
+	_, err = s.projectService.CommitChanges(projectIdStr, "System", "Uploaded file: "+filePath)
 	if err != nil {
 		log.Printf("Error committing file %s to project %s: %v", filePath, projectIdStr, err)
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"message": "Failed to commit uploaded file"})
+		writeAPIError(w, apierrors.Internal(err))
 		return
 	}
 
@@ -207,22 +199,19 @@ func (s *Server) handleUploadFile(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleDownloadFile(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		json.NewEncoder(w).Encode(map[string]string{"message": "Method not allowed"})
+		writeAPIError(w, apierrors.WithStatus(apierrors.CodeInvalidInput, "method not allowed", http.StatusMethodNotAllowed))
 		return
 	}
 
 	projectIdStr := r.PathValue("projectId")
 	if projectIdStr == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"message": "Missing project ID"})
+		writeAPIError(w, apierrors.New(apierrors.CodeInvalidInput, "missing project ID"))
 		return
 	}
 
 	_, _, _, err := s.resolver.getAndCheckProject(r.Context(), projectIdStr)
 	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized) // getAndCheckProject returns "not authenticated" or "not authorized"
-		json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
+		writeAPIError(w, err)
 		return
 	}
 	// filePath will be everything after /api/projects/{projectId}/download/
@@ -230,27 +219,23 @@ func (s *Server) handleDownloadFile(w http.ResponseWriter, r *http.Request) {
 	encodedFilePath := r.URL.Path[len("/api/projects/"+projectIdStr+"/download/"):]
 	filePath, err := project.DecodeFilePath(encodedFilePath)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"message": "Invalid file path"})
+		writeAPIError(w, apierrors.New(apierrors.CodeInvalidInput, "invalid file path"))
 		return
 	}
 
 	if filePath == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"message": "Missing file path"})
+		writeAPIError(w, apierrors.New(apierrors.CodeInvalidInput, "missing file path"))
 		return
 	}
 
 	fileReader, fileSize, err := s.projectService.ReadFile(projectIdStr, filePath)
 	if err != nil {
 		if err == project.ErrFileNotFound {
-			w.WriteHeader(http.StatusNotFound)
-			json.NewEncoder(w).Encode(map[string]string{"message": "File not found"})
+			writeAPIError(w, apierrors.New(apierrors.CodeFileNotFound, "file not found"))
 			return
 		}
 		log.Printf("Error reading file %s from project %s: %v", filePath, projectIdStr, err)
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"message": "Failed to read file"})
+		writeAPIError(w, apierrors.Internal(err))
 		return
 	}
 	defer fileReader.Close() // Ensure the file is closed
@@ -283,4 +268,37 @@ func (s *Server) handleDownloadFile(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Error writing file content to response for %s: %v", filePath, err)
 		// No need to set status code again, as headers might have been sent
 	}
+}
+
+func codedErrorPresenter(ctx context.Context, e error) *gqlerror.Error {
+	err := graphql.DefaultErrorPresenter(ctx, e)
+	if coded, ok := apierrors.As(e); ok {
+		if err.Extensions == nil {
+			err.Extensions = map[string]interface{}{}
+		}
+		err.Extensions["code"] = string(coded.Code)
+		err.Message = coded.Message
+		return err
+	}
+	if err.Extensions == nil {
+		err.Extensions = map[string]interface{}{}
+	}
+	if _, has := err.Extensions["code"]; !has {
+		err.Extensions["code"] = string(apierrors.CodeUnknown)
+	}
+	return err
+}
+
+func writeAPIError(w http.ResponseWriter, err error) {
+	w.Header().Set("Content-Type", "application/json")
+	if coded, ok := apierrors.As(err); ok {
+		w.WriteHeader(coded.Status())
+		_ = json.NewEncoder(w).Encode(coded.RESTBody())
+		return
+	}
+	w.WriteHeader(http.StatusInternalServerError)
+	_ = json.NewEncoder(w).Encode(apierrors.RESTBody{
+		Code:    string(apierrors.CodeInternal),
+		Message: err.Error(),
+	})
 }

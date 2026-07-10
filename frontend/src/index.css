@@ -227,5 +227,12 @@ h3 {
 
 .pdf-viewer {
   height: 100%;
-  overflow-y: auto;
+  min-height: 0;
 }
+
+
+.pdf-viewer .react-pdf__Page__canvas {
+  max-width: 100%;
+  height: auto !important;
+}
+

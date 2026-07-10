@@ -1,0 +1,15 @@
+{
+  "UNKNOWN": "Algo deu errado. Tente novamente.",
+  "UNAUTHENTICATED": "Você precisa entrar.",
+  "UNAUTHORIZED": "Você não tem permissão para isso.",
+  "EMAIL_TAKEN": "Este email já está cadastrado.",
+  "INVALID_CREDENTIALS": "Email ou senha inválidos.",
+  "PASSWORD_TOO_SHORT": "A senha deve ter pelo menos 8 caracteres.",
+  "NOT_FOUND": "Não encontrado.",
+  "PROJECT_NOT_FOUND": "Projeto não encontrado.",
+  "FILE_NOT_FOUND": "Arquivo não encontrado.",
+  "INVALID_INPUT": "Requisição inválida.",
+  "INTERNAL": "Erro interno do servidor. Tente mais tarde.",
+  "COMPILE_FAILED": "Falha na compilação.",
+  "COMPILE_TOOL_MISSING": "Ferramentas LaTeX não estão disponíveis neste servidor."
+}

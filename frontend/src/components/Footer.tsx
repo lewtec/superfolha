@@ -1,9 +1,7 @@
-// src/components/Footer.tsx
-import React from "react";
 import { useTranslation } from "react-i18next";
 
-const Footer: React.FC = () => {
-  const { t } = useTranslation();
+export default function Footer() {
+  const { t } = useTranslation("landing");
 
   return (
     <footer className="bg-base-300 text-base-content">
@@ -12,6 +10,4 @@ const Footer: React.FC = () => {
       </div>
     </footer>
   );
-};
-
-export default Footer;
+}

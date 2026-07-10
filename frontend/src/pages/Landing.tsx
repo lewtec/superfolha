@@ -7,7 +7,7 @@ import Footer from "../components/Footer";
 import AnimatedSection from "../components/AnimatedSection";
 
 const Landing: React.FC = () => {
-  const { t } = useTranslation();
+  const { t } = useTranslation("landing");
 
   return (
     <div className="bg-base-100 text-base-content">

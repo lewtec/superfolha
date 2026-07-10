@@ -19,22 +19,5 @@
   "final_cta_title": "¿Listo para Optimizar Tu Flujo de Trabajo?",
   "final_cta_subtitle": "Únete a miles de desarrolladores y académicos que ya están usando Superfolha.",
   "final_cta_button": "Crea Tu Cuenta Gratuita",
-  "login_button": "Iniciar Sesión",
-  "register_button": "Registrarse",
-  "email_label": "Correo Electrónico",
-  "password_label": "Contraseña",
-  "login_failed": "Error de inicio de sesión: No se recibieron datos del usuario.",
-  "login_error": "No se pudo iniciar sesión. Por favor, inténtalo de nuevo.",
-  "signing_in": "Iniciando sesión...",
-  "login_title": "Inicia sesión en tu cuenta",
-  "no_account": "¿No tienes una cuenta?",
-  "footer_text": "© 2024 Superfolha. Todos los derechos reservados.",
-  "register_title": "Crea una nueva cuenta",
-  "confirm_password_label": "Confirmar Contraseña",
-  "passwords_do_not_match": "Las contraseñas no coinciden",
-  "password_too_short": "La contraseña debe tener al menos 8 caracteres",
-  "creating_account": "Creando cuenta...",
-  "already_have_account": "¿Ya tienes una cuenta?",
-  "registration_failed": "Error en el registro: No se recibió ningún token.",
-  "registration_error": "No se pudo registrar. Por favor, inténtalo de nuevo."
+  "footer_text": "© Superfolha. Todos los derechos reservados."
 }

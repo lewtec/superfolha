@@ -19,22 +19,5 @@
   "final_cta_title": "Ready to Optimize Your Workflow?",
   "final_cta_subtitle": "Join thousands of developers and academics who are already using Superfolha.",
   "final_cta_button": "Create Your Free Account",
-  "login_button": "Sign In",
-  "register_button": "Sign Up",
-  "email_label": "Email",
-  "password_label": "Password",
-  "login_failed": "Login failed: No user data received.",
-  "login_error": "Failed to login. Please try again.",
-  "signing_in": "Signing in...",
-  "login_title": "Sign in to your account",
-  "no_account": "Don't have an account?",
-  "footer_text": "© 2024 Superfolha. All rights reserved.",
-  "register_title": "Create a new account",
-  "confirm_password_label": "Confirm Password",
-  "passwords_do_not_match": "Passwords do not match",
-  "password_too_short": "Password must be at least 8 characters",
-  "creating_account": "Creating account...",
-  "already_have_account": "Already have an account?",
-  "registration_failed": "Registration failed: No token received.",
-  "registration_error": "Failed to register. Please try again."
+  "footer_text": "© Superfolha. All rights reserved."
 }

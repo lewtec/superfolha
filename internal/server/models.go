@@ -3,6 +3,9 @@
 package server
 
 import (
+	"fmt"
+	"io"
+	"strconv"
 	"time"
 )
 
@@ -34,4 +37,70 @@ type Query struct {
 type User struct {
 	ID    string `json:"id"`
 	Email string `json:"email"`
+}
+
+// Stable error codes for clients. GraphQL errors include extensions.code with these values.
+// REST APIs return JSON { "code": ErrorCode, "message": "..." }.
+// UI maps codes via i18n (errors.<CODE>).
+type ErrorCode string
+
+const (
+	ErrorCodeUnknown            ErrorCode = "UNKNOWN"
+	ErrorCodeUnauthenticated    ErrorCode = "UNAUTHENTICATED"
+	ErrorCodeUnauthorized       ErrorCode = "UNAUTHORIZED"
+	ErrorCodeEmailTaken         ErrorCode = "EMAIL_TAKEN"
+	ErrorCodeInvalidCredentials ErrorCode = "INVALID_CREDENTIALS"
+	ErrorCodePasswordTooShort   ErrorCode = "PASSWORD_TOO_SHORT"
+	ErrorCodeNotFound           ErrorCode = "NOT_FOUND"
+	ErrorCodeProjectNotFound    ErrorCode = "PROJECT_NOT_FOUND"
+	ErrorCodeFileNotFound       ErrorCode = "FILE_NOT_FOUND"
+	ErrorCodeInvalidInput       ErrorCode = "INVALID_INPUT"
+	ErrorCodeInternal           ErrorCode = "INTERNAL"
+	ErrorCodeCompileFailed      ErrorCode = "COMPILE_FAILED"
+	ErrorCodeCompileToolMissing ErrorCode = "COMPILE_TOOL_MISSING"
+)
+
+var AllErrorCode = []ErrorCode{
+	ErrorCodeUnknown,
+	ErrorCodeUnauthenticated,
+	ErrorCodeUnauthorized,
+	ErrorCodeEmailTaken,
+	ErrorCodeInvalidCredentials,
+	ErrorCodePasswordTooShort,
+	ErrorCodeNotFound,
+	ErrorCodeProjectNotFound,
+	ErrorCodeFileNotFound,
+	ErrorCodeInvalidInput,
+	ErrorCodeInternal,
+	ErrorCodeCompileFailed,
+	ErrorCodeCompileToolMissing,
+}
+
+func (e ErrorCode) IsValid() bool {
+	switch e {
+	case ErrorCodeUnknown, ErrorCodeUnauthenticated, ErrorCodeUnauthorized, ErrorCodeEmailTaken, ErrorCodeInvalidCredentials, ErrorCodePasswordTooShort, ErrorCodeNotFound, ErrorCodeProjectNotFound, ErrorCodeFileNotFound, ErrorCodeInvalidInput, ErrorCodeInternal, ErrorCodeCompileFailed, ErrorCodeCompileToolMissing:
+		return true
+	}
+	return false
+}
+
+func (e ErrorCode) String() string {
+	return string(e)
+}
+
+func (e *ErrorCode) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = ErrorCode(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid ErrorCode", str)
+	}
+	return nil
+}
+
+func (e ErrorCode) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
 }

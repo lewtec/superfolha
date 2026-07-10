@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { buildFileTree, FileTreeNode } from "../utils/fileTree";
 import {
   Folder,
@@ -124,6 +125,7 @@ export default function FileTree({
   onLoadFile,
   projectId,
 }: FileTreeProps) {
+  const { t } = useTranslation(["editor", "errors"]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const filePaths = files.map((file) => ({
     path: file.path,
@@ -170,7 +172,9 @@ export default function FileTree({
     } catch (error) {
       console.error("Error uploading file:", error);
       alert(
-        `Error uploading file: ${error instanceof Error ? error.message : String(error)}`,
+        t("editor:upload_failed", {
+          message: error instanceof Error ? error.message : String(error),
+        }),
       );
     } finally {
       // Clear the input so the same file can be selected again
@@ -187,13 +191,13 @@ export default function FileTree({
   return (
     <div className="file-tree flex-1 min-h-0 flex flex-col bg-base-200 p-3 overflow-hidden">
       <div className="flex justify-between items-center mb-4">
-        <h3 className="font-bold">Files</h3>
+        <h3 className="font-bold">{t("editor:files")}</h3>
         <div className="flex gap-2">
           <button className="btn btn-xs btn-primary" onClick={triggerFileInput}>
-            <Upload size={16} /> Load
+            <Upload size={16} /> {t("editor:load")}
           </button>
           <button className="btn btn-xs btn-primary" onClick={onNewFile}>
-            + New
+            + {t("editor:new_file")}
           </button>
         </div>
       </div>

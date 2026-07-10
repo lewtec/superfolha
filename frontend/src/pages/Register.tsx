@@ -2,9 +2,10 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useRegisterMutation } from "../hooks/useRegisterMutation";
+import { translateError, translateGraphQLErrors } from "../i18n/translateError";
 
 export default function Register() {
-  const { t } = useTranslation();
+  const { t } = useTranslation(["auth", "common", "errors"]);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -14,18 +15,18 @@ export default function Register() {
   const { register, isInFlight } = useRegisterMutation({
     onCompleted: (response, errors) => {
       if (errors) {
-        setError(errors[0].message);
+        setError(translateGraphQLErrors(t, errors));
         return;
       }
       // Session is the HttpOnly authToken cookie set by the server.
       if (response.register?.user) {
         navigate("/projects");
       } else {
-        setError(t("registration_failed"));
+        setError(t("auth:registration_failed"));
       }
     },
     onError: (err) => {
-      setError(err.message || t("registration_error"));
+      setError(translateError(t, err));
       console.error(err);
     },
   });
@@ -35,13 +36,13 @@ export default function Register() {
     setError("");
 
     if (password !== confirmPassword) {
-      setError(t("passwords_do_not_match"));
+      setError(t("auth:passwords_do_not_match"));
       return;
     }
 
     // Backend requires MinPasswordLength = 8
     if (password.length < 8) {
-      setError(t("password_too_short"));
+      setError(t("auth:password_too_short"));
       return;
     }
 
@@ -56,7 +57,7 @@ export default function Register() {
             Superfolha
           </h2>
           <p className="text-center text-base-content/70 mb-4">
-            {t("register_title")}
+            {t("auth:register_title")}
           </p>
 
           {error && (
@@ -68,7 +69,7 @@ export default function Register() {
           <form onSubmit={handleSubmit}>
             <div className="form-control">
               <label className="label">
-                <span className="label-text">{t("email_label")}</span>
+                <span className="label-text">{t("auth:email_label")}</span>
               </label>
               <input
                 type="email"
@@ -82,7 +83,7 @@ export default function Register() {
 
             <div className="form-control mt-4">
               <label className="label">
-                <span className="label-text">{t("password_label")}</span>
+                <span className="label-text">{t("auth:password_label")}</span>
               </label>
               <input
                 type="password"
@@ -97,7 +98,7 @@ export default function Register() {
             <div className="form-control mt-4">
               <label className="label">
                 <span className="label-text">
-                  {t("confirm_password_label")}
+                  {t("auth:confirm_password_label")}
                 </span>
               </label>
               <input
@@ -116,17 +117,17 @@ export default function Register() {
                 className={`btn btn-primary ${isInFlight ? "loading" : ""}`}
                 disabled={isInFlight}
               >
-                {isInFlight ? t("creating_account") : t("register_button")}
+                {isInFlight ? t("auth:creating_account") : t("auth:register_button")}
               </button>
             </div>
           </form>
 
-          <div className="divider">OR</div>
+          <div className="divider">{t("common:or")}</div>
 
           <p className="text-center">
-            {t("already_have_account")}{" "}
+            {t("auth:already_have_account")}{" "}
             <Link to="/login" className="link link-primary">
-              {t("login_button")}
+              {t("auth:login_button")}
             </Link>
           </p>
         </div>

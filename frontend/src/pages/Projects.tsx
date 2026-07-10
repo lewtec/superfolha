@@ -1,11 +1,17 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useProjectsQuery } from "../hooks/useProjectsQuery";
 import { useCreateProjectMutation } from "../hooks/useCreateProjectMutation";
 import { useDeleteProjectMutation } from "../hooks/useDeleteProjectMutation";
+import {
+  translateError,
+  translateGraphQLErrors,
+} from "../i18n/translateError";
 
 export default function Projects() {
   const navigate = useNavigate();
+  const { t, i18n } = useTranslation(["projects", "common", "errors"]);
   const [newProjectName, setNewProjectName] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [error, setError] = useState("");
@@ -16,7 +22,7 @@ export default function Projects() {
     useCreateProjectMutation({
       onCompleted: (response, errors) => {
         if (errors) {
-          setError(errors[0].message);
+          setError(translateGraphQLErrors(t, errors));
           return;
         }
         const newProject = response.createProject;
@@ -27,30 +33,30 @@ export default function Projects() {
         }
       },
       onError: (err) => {
-        setError("Failed to create project");
+        setError(translateError(t, err));
         console.error(err);
       },
     });
 
   const { deleteProject, isInFlight: isDeletingProject } =
     useDeleteProjectMutation({
-      onCompleted: (response, errors) => {
+      onCompleted: (_response, errors) => {
         if (errors) {
-          setError(errors[0].message);
+          setError(translateGraphQLErrors(t, errors));
           return;
         }
       },
       onError: (err) => {
-        setError("Failed to delete project");
+        setError(translateError(t, err));
         console.error(err);
       },
       updater: (store, response) => {
         if (response?.deleteProject?.id) {
           const deletedId = response.deleteProject.id;
           const root = store.getRoot();
-          const projects = root.getLinkedRecords("projects");
-          if (projects) {
-            const newProjects = projects.filter(
+          const projectsRec = root.getLinkedRecords("projects");
+          if (projectsRec) {
+            const newProjects = projectsRec.filter(
               (project) => project.getValue("id") !== deletedId,
             );
             root.setLinkedRecords(newProjects, "projects");
@@ -61,7 +67,7 @@ export default function Projects() {
 
   const handleCreateProject = () => {
     if (!newProjectName.trim()) {
-      setError("Project name is required");
+      setError(t("projects:name_required"));
       return;
     }
     setError("");
@@ -69,7 +75,7 @@ export default function Projects() {
   };
 
   const handleDeleteProject = (id: string) => {
-    if (!confirm("Are you sure you want to delete this project?")) {
+    if (!confirm(t("projects:delete_confirm"))) {
       return;
     }
     setError("");
@@ -77,17 +83,16 @@ export default function Projects() {
   };
 
   return (
-    <div className="min-h-screen bg-base-200">
-      {/* Content */}
-      <div className="container mx-auto p-8">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold">My Projects</h1>
+    <div className="min-h-full bg-base-200">
+      <div className="container mx-auto page-pad py-8">
+        <div className="flex justify-between items-center mb-6 gap-2 flex-wrap">
+          <h1 className="text-3xl font-bold">{t("projects:title")}</h1>
           <button
-            className="btn btn-primary"
+            className="btn btn-primary min-h-[var(--touch-min)]"
             onClick={() => setShowModal(true)}
             disabled={isCreatingProject}
           >
-            + New Project
+            {t("projects:new_project")}
           </button>
         </div>
 
@@ -99,13 +104,15 @@ export default function Projects() {
 
         {projects && projects.length === 0 ? (
           <div className="text-center py-16">
-            <p className="text-lg text-base-content/70 mb-4">No projects yet</p>
+            <p className="text-lg text-base-content/70 mb-4">
+              {t("projects:empty")}
+            </p>
             <button
-              className="btn btn-primary"
+              className="btn btn-primary min-h-[var(--touch-min)]"
               onClick={() => setShowModal(true)}
               disabled={isCreatingProject}
             >
-              Create your first project
+              {t("projects:create_first")}
             </button>
           </div>
         ) : (
@@ -116,22 +123,25 @@ export default function Projects() {
                   <div className="card-body">
                     <h2 className="card-title">{project.name}</h2>
                     <p className="text-sm text-base-content/70">
-                      Updated:{" "}
-                      {new Date(project.updatedAt).toLocaleDateString()}
+                      {t("projects:updated", {
+                        date: new Date(project.updatedAt).toLocaleDateString(
+                          i18n.language,
+                        ),
+                      })}
                     </p>
                     <div className="card-actions justify-end mt-4">
                       <button
-                        className="btn btn-primary btn-sm"
+                        className="btn btn-primary btn-sm min-h-[var(--touch-min)]"
                         onClick={() => navigate(`/editor/${project.id}`)}
                       >
-                        Open
+                        {t("common:open")}
                       </button>
                       <button
-                        className="btn btn-error btn-sm"
+                        className="btn btn-error btn-sm min-h-[var(--touch-min)]"
                         onClick={() => handleDeleteProject(project.id)}
                         disabled={isDeletingProject}
                       >
-                        Delete
+                        {t("common:delete")}
                       </button>
                     </div>
                   </div>
@@ -141,41 +151,42 @@ export default function Projects() {
         )}
       </div>
 
-      {/* Create Project Modal */}
       {showModal && (
         <div className="modal modal-open">
           <div className="modal-box">
-            <h3 className="font-bold text-lg mb-4">Create New Project</h3>
+            <h3 className="font-bold text-lg mb-4">
+              {t("projects:create_modal_title")}
+            </h3>
             <div className="form-control">
               <label className="label">
-                <span className="label-text">Project Name</span>
+                <span className="label-text">{t("projects:name_label")}</span>
               </label>
               <input
                 type="text"
-                placeholder="My LaTeX Document"
+                placeholder={t("projects:name_placeholder")}
                 className="input input-bordered"
                 value={newProjectName}
                 onChange={(e) => setNewProjectName(e.target.value)}
-                onKeyPress={(e) => e.key === "Enter" && handleCreateProject()}
+                onKeyDown={(e) => e.key === "Enter" && handleCreateProject()}
                 disabled={isCreatingProject}
               />
             </div>
             <div className="modal-action">
               <button
-                className="btn"
+                className="btn min-h-[var(--touch-min)]"
                 onClick={() => {
                   setShowModal(false);
                   setNewProjectName("");
                 }}
               >
-                Cancel
+                {t("common:cancel")}
               </button>
               <button
-                className="btn btn-primary"
+                className="btn btn-primary min-h-[var(--touch-min)]"
                 onClick={handleCreateProject}
                 disabled={isCreatingProject}
               >
-                Create
+                {t("common:create")}
               </button>
             </div>
           </div>
