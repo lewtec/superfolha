@@ -1,23 +1,12 @@
-import React, { useState, useEffect } from "react";
-import { Sun, Moon } from "feather-icons-react"; // Import Feather Icons
-import { useNavigate } from "react-router-dom"; // new import
+import { Link, useNavigate } from "react-router-dom";
+import ThemeToggle from "./ThemeToggle";
 
 interface LayoutProps {
   children: React.ReactNode;
 }
 
 export default function Layout({ children }: LayoutProps) {
-  const [theme, setTheme] = useState(localStorage.getItem("theme") || "light");
-  const navigate = useNavigate(); // new
-
-  useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-    localStorage.setItem("theme", theme);
-  }, [theme]);
-
-  const toggleTheme = () => {
-    setTheme((prevTheme) => (prevTheme === "light" ? "dark" : "light"));
-  };
+  const navigate = useNavigate();
 
   const logout = async () => {
     try {
@@ -32,23 +21,28 @@ export default function Layout({ children }: LayoutProps) {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <div className="navbar bg-base-100 shadow-md flex justify-between">
+    <div className="app-shell bg-base-100 text-base-content">
+      <header className="navbar app-navbar px-2 sm:px-4">
         <div className="navbar-start">
-          <a href="/" className="btn btn-ghost normal-case text-xl">
+          <Link
+            to="/projects"
+            className="btn btn-ghost text-lg font-semibold tracking-tight normal-case min-h-[var(--touch-min)]"
+          >
             superfolha
-          </a>
+          </Link>
         </div>
-        <div className="navbar-end">
-          <button className="btn btn-ghost" onClick={logout}>
+        <div className="navbar-end gap-1">
+          <button
+            type="button"
+            className="btn btn-ghost min-h-[var(--touch-min)]"
+            onClick={logout}
+          >
             Logout
           </button>
-          <button onClick={toggleTheme} className="btn btn-ghost btn-circle">
-            {theme === "light" ? <Moon size={20} /> : <Sun size={20} />}
-          </button>
+          <ThemeToggle />
         </div>
-      </div>
-      <main className="flex-1">{children}</main>
+      </header>
+      <main className="app-main">{children}</main>
     </div>
   );
 }
