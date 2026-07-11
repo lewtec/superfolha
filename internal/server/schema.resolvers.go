@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net/http"
 	"os"
 
 	"github.com/google/uuid"
@@ -24,21 +23,7 @@ func (r *mutationResolver) Register(ctx context.Context, email string, password 
 	if err != nil {
 		return nil, err
 	}
-
-	w, ok := ctx.Value(ResponseWriterContextKey).(http.ResponseWriter)
-	if !ok {
-		log.Println("Register Resolver: http.ResponseWriter not found in context.")
-		return nil, apierrors.New(apierrors.CodeInternal, "response writer not available")
-	}
-
-	setAuthCookie(w, authResp.Token)
-
-	return &AuthPayload{
-		User: &User{
-			ID:    authResp.User.ID,
-			Email: authResp.User.Email,
-		},
-	}, nil
+	return authPayloadFromResponse(ctx, authResp, "Register")
 }
 
 // Login is the resolver for the login field.
@@ -47,32 +32,14 @@ func (r *mutationResolver) Login(ctx context.Context, email string, password str
 	if err != nil {
 		return nil, err
 	}
-
-	w, ok := ctx.Value(ResponseWriterContextKey).(http.ResponseWriter)
-	if !ok {
-		log.Println("Login Resolver: http.ResponseWriter not found in context.")
-		return nil, apierrors.New(apierrors.CodeInternal, "response writer not available")
-	}
-
-	setAuthCookie(w, authResp.Token)
-
-	return &AuthPayload{
-		User: &User{
-			ID:    authResp.User.ID,
-			Email: authResp.User.Email,
-		},
-	}, nil
+	return authPayloadFromResponse(ctx, authResp, "Login")
 }
 
 // CreateProject is the resolver for the createProject field.
 func (r *mutationResolver) CreateProject(ctx context.Context, name string) (*Project, error) {
-	user, ok := auth.GetUserFromContext(ctx)
-	if !ok {
-		return nil, apierrors.WithStatus(apierrors.CodeUnauthenticated, "not authenticated", 401)
-	}
-
-	if _, err := uuid.Parse(user.UserID); err != nil {
-		return nil, apierrors.New(apierrors.CodeInvalidInput, "invalid user ID")
+	user, err := requireUser(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	projectUUID, err := uuid.NewV7()
@@ -92,12 +59,7 @@ func (r *mutationResolver) CreateProject(ctx context.Context, name string) (*Pro
 		return nil, apierrors.Internal(err)
 	}
 
-	return &Project{
-		ID:        dbProject.ID,
-		Name:      dbProject.Name,
-		CreatedAt: dbProject.CreatedAt,
-		UpdatedAt: dbProject.UpdatedAt,
-	}, nil
+	return toGraphQLProject(dbProject), nil
 }
 
 // DeleteProject is the resolver for the deleteProject field.
@@ -170,12 +132,7 @@ func (r *mutationResolver) Commit(ctx context.Context, projectID string, message
 		fmt.Printf("Warning: failed to update project timestamp: %v\n", err)
 	}
 
-	return &Commit{
-		Hash:    commit.Hash,
-		Message: commit.Message,
-		Author:  commit.Author,
-		Date:    commit.Date,
-	}, nil
+	return toGraphQLCommit(commit), nil
 }
 
 // Files is the resolver for the files field.
@@ -260,12 +217,7 @@ func (r *projectResolver) History(ctx context.Context, obj *Project) ([]*Commit,
 
 	commits := make([]*Commit, len(gitCommits))
 	for i, c := range gitCommits {
-		commits[i] = &Commit{
-			Hash:    c.Hash,
-			Message: c.Message,
-			Author:  c.Author,
-			Date:    c.Date,
-		}
+		commits[i] = toGraphQLCommit(c)
 	}
 
 	return commits, nil
@@ -287,21 +239,14 @@ func (r *queryResolver) Me(ctx context.Context) (*User, error) {
 		return nil, apierrors.New(apierrors.CodeNotFound, "user not found")
 	}
 
-	return &User{
-		ID:    dbUser.ID,
-		Email: dbUser.Email,
-	}, nil
+	return toGraphQLUser(dbUser.ID, dbUser.Email), nil
 }
 
 // Projects is the resolver for the projects field.
 func (r *queryResolver) Projects(ctx context.Context) ([]*Project, error) {
-	user, ok := auth.GetUserFromContext(ctx)
-	if !ok {
-		return nil, apierrors.WithStatus(apierrors.CodeUnauthenticated, "not authenticated", 401)
-	}
-
-	if _, err := uuid.Parse(user.UserID); err != nil {
-		return nil, apierrors.New(apierrors.CodeInvalidInput, "invalid user ID")
+	user, err := requireUser(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	dbProjects, err := r.Repo.GetUserProjects(ctx, user.UserID)
@@ -311,12 +256,7 @@ func (r *queryResolver) Projects(ctx context.Context) ([]*Project, error) {
 
 	projects := make([]*Project, len(dbProjects))
 	for i, p := range dbProjects {
-		projects[i] = &Project{
-			ID:        p.ID,
-			Name:      p.Name,
-			CreatedAt: p.CreatedAt,
-			UpdatedAt: p.UpdatedAt,
-		}
+		projects[i] = toGraphQLProject(p)
 	}
 
 	return projects, nil
@@ -329,12 +269,7 @@ func (r *queryResolver) Project(ctx context.Context, id string) (*Project, error
 		return nil, err
 	}
 
-	return &Project{
-		ID:        project.ID,
-		Name:      project.Name,
-		CreatedAt: project.CreatedAt,
-		UpdatedAt: project.UpdatedAt,
-	}, nil
+	return toGraphQLProject(*project), nil
 }
 
 // Mutation returns MutationResolver implementation.
