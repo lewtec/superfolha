@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/google/uuid"
@@ -24,13 +25,29 @@ var templatesFS embed.FS
 // MaxGraphQLFileSize defines the maximum file size (in bytes) for content to be returned directly via GraphQL.
 const MaxGraphQLFileSize = 1024 * 1024 * 5 // 5 MB
 
-// HasBinary checks if the file content appears to be binary using http.DetectContentType.
+// binaryExtensions lists well-known binary file extensions (lowercase, with dot).
+// Kept in sync with the idea behind frontend/src/utils/fileUtils.ts BINARY_EXTENSIONS.
+var binaryExtensions = map[string]struct{}{
+	".png": {}, ".jpg": {}, ".jpeg": {}, ".gif": {}, ".bmp": {}, ".webp": {}, ".ico": {},
+	".pdf": {},
+	".zip": {}, ".tar": {}, ".gz": {}, ".rar": {}, ".7z": {},
+	".exe": {}, ".dll": {}, ".bin": {}, ".out": {},
+	".mp3": {}, ".wav": {}, ".ogg": {}, ".flac": {},
+	".mp4": {}, ".avi": {}, ".mkv": {}, ".mov": {},
+	".woff": {}, ".woff2": {}, ".ttf": {}, ".otf": {},
+	".sqlite": {}, ".db": {},
+}
+
+// HasBinary reports whether content should be treated as binary.
+// Known binary extensions (from filename) win so short/empty blobs are not
+// misclassified; otherwise falls back to http.DetectContentType (text/* => not binary).
 func HasBinary(content []byte, filename string) bool {
-	contentType := http.DetectContentType(content)
-	if strings.HasPrefix(contentType, "text/") {
-		return false
+	ext := strings.ToLower(filepath.Ext(filename))
+	if _, ok := binaryExtensions[ext]; ok {
+		return true
 	}
-	return true
+	contentType := http.DetectContentType(content)
+	return !strings.HasPrefix(contentType, "text/")
 }
 
 type Resolver struct {
