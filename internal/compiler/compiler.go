@@ -2,6 +2,7 @@ package compiler
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -10,10 +11,15 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/lewtec/superfolha/internal/project"
 )
+
+// DefaultCompileTimeout is the maximum time a single latexmk run may take.
+// Client disconnect cancels earlier via the request context.
+const DefaultCompileTimeout = 3 * time.Minute
 
 // CompileResult represents the outcome of a LaTeX compilation process.
 type CompileResult struct {
@@ -29,31 +35,27 @@ type CompileResult struct {
 
 // Compile compiles a specific LaTeX file from a project into a PDF using latexmk.
 //
-// Ideally, this function orchestrates the compilation process in an isolated environment to ensure
-// reproducibility and prevent side effects on the source project.
-//
 // The process involves:
 // 1. Creating a unique, temporary directory for the compilation job.
 // 2. Retrieving all files from the project via ProjectService.
 // 3. Copying these files into the temporary directory, preserving the directory structure.
 // 4. Creating a dedicated cache directory for LaTeX auxiliary files.
 // 5. Executing `latexmk` with interaction disabled (batchmode) to generate the PDF.
-// 6. capturing the generated PDF, logs, and Synctex file.
-// 7. Cleaning up the temporary directory.
+// 6. Capturing the generated PDF, logs, and Synctex file.
+// 7. Cleaning up the temporary directory (also on cancel/timeout via defer).
 //
-// Parameters:
-//   - projectService: Service to access project files.
-//   - projectId: The ID of the project containing the file to compile.
-//   - filePath: The relative path of the LaTeX file to compile within the project (e.g., "main.tex").
+// ctx is bounded by DefaultCompileTimeout (whichever comes first if ctx already has a deadline).
+// Canceling ctx kills the latexmk process via CommandContext.
 //
 // Returns:
-//   - *CompileResult: A struct containing the compilation artifacts (PDF, logs, Synctex) and status.
-//   - error: An error if the compilation setup fails (e.g., missing latexmk, file system errors).
-//     Note that compilation errors (latexmk failure) are reported via the Success field and Logs, not as a returned error.
+//   - *CompileResult on setup success; latexmk non-zero exit is Success=false with Logs, not an error.
+//   - error for setup failures, missing latexmk, or context cancel/deadline during latexmk.
 //
-// Dependencies:
-//   - Requires `latexmk` to be installed and available in the system PATH.
-func Compile(projectService *project.Service, projectId string, filePath string) (*CompileResult, error) {
+// Requires latexmk on PATH.
+func Compile(ctx context.Context, projectService *project.Service, projectId string, filePath string) (*CompileResult, error) {
+	ctx, cancel := context.WithTimeout(ctx, DefaultCompileTimeout)
+	defer cancel()
+
 	// Check if latexmk command exists
 	_, err := exec.LookPath("latexmk")
 	if err != nil {
@@ -70,7 +72,7 @@ func Compile(projectService *project.Service, projectId string, filePath string)
 	if err := os.MkdirAll(tmpDir, 0755); err != nil {
 		return nil, err
 	}
-	defer os.RemoveAll(tmpDir) // Cleanup
+	defer os.RemoveAll(tmpDir) // Cleanup (runs on cancel/timeout too)
 
 	// Get all files from the project
 	projectFiles, err := projectService.ListFiles(projectId)
@@ -115,9 +117,8 @@ func Compile(projectService *project.Service, projectId string, filePath string)
 		return nil, err
 	}
 
-	// Compile with latexmk
-	// The main file to compile is now directly filePath
-	cmd := exec.Command("latexmk", "-f", "-interaction=batchmode", fmt.Sprintf("-aux-directory=%s", latexCacheDir), "-pdf", filePath)
+	// Compile with latexmk; cancel/timeout kills the process
+	cmd := exec.CommandContext(ctx, "latexmk", "-f", "-interaction=batchmode", fmt.Sprintf("-aux-directory=%s", latexCacheDir), "-pdf", filePath)
 	cmd.Dir = tmpDir // Run latexmk in the temporary project directory
 
 	var stdout, stderr bytes.Buffer
@@ -126,6 +127,11 @@ func Compile(projectService *project.Service, projectId string, filePath string)
 
 	err = cmd.Run()
 	logs := stdout.String() + stderr.String()
+
+	// Context cancel/deadline is a hard failure (not a latexmk compile error)
+	if err != nil && ctx.Err() != nil {
+		return nil, fmt.Errorf("latex compile timed out or was canceled (limit %s): %w", DefaultCompileTimeout, ctx.Err())
+	}
 
 	// Check if PDF was generated
 	pdfPath := filepath.Join(tmpDir, strings.TrimSuffix(filePath, ".tex")+".pdf")
