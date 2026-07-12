@@ -5,7 +5,7 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"strings"
@@ -93,7 +93,7 @@ func toGraphQLCommit(c *igit.Commit) *Commit {
 func authPayloadFromResponse(ctx context.Context, authResp *auth.AuthResponse, op string) (*AuthPayload, error) {
 	w, ok := ctx.Value(ResponseWriterContextKey).(http.ResponseWriter)
 	if !ok {
-		log.Printf("%s Resolver: http.ResponseWriter not found in context.", op)
+		slog.Error("http.ResponseWriter not found in context", "op", op)
 		return nil, apierrors.New(apierrors.CodeInternal, "response writer not available")
 	}
 	setAuthCookie(w, authResp.Token)
