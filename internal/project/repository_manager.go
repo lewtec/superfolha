@@ -12,12 +12,11 @@ import (
 	igit "github.com/lewtec/superfolha/internal/git"
 )
 
-// ProjectRepository wraps a git.Repository and provides thread-safe operations.
+// ProjectRepository provides thread-safe operations on a project git repository at repoPath.
 type ProjectRepository struct {
 	projectId  string
 	repoPath   string
-	repo       *git.Repository
-	sync.Mutex // Protects access to the underlying git.Repository
+	sync.Mutex // Protects concurrent file and git operations on this project
 }
 
 // RepositoryManager manages a collection of ProjectRepository instances.
@@ -63,22 +62,17 @@ func (rm *RepositoryManager) GetRepo(projectId string) (*ProjectRepository, erro
 		repoPath:  repoPath,
 	}
 
-	// Try to open the git repository
-	r, err := git.PlainOpen(repoPath)
+	// Open only to classify existence vs other open failures; operations use repoPath via igit.
+	_, err := git.PlainOpen(repoPath)
 	if err != nil {
-		// If the error is "repository does not exist", we still return the pr,
-		// but with pr.repo = nil, and the error.
-		// Other errors are critical.
 		if errors.Is(err, git.ErrRepositoryNotExists) {
-			rm.repos[projectId] = pr // Add to map even if repo doesn't exist yet
-			return pr, err           // Return pr and the specific error
+			rm.repos[projectId] = pr // usable after InitRepo even when missing
+			return pr, err
 		}
 		return nil, fmt.Errorf("failed to open git repository at %s: %w", repoPath, err)
 	}
 
-	pr.repo = r // Assign the opened repo
 	rm.repos[projectId] = pr
-
 	return pr, nil
 }
 
