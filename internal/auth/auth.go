@@ -21,6 +21,9 @@ const (
 
 	// MinPasswordLength is the minimum required password length
 	MinPasswordLength = 8
+
+	// TokenTTL is how long issued JWTs (and the matching auth cookie) remain valid.
+	TokenTTL = 7 * 24 * time.Hour
 )
 
 var (
@@ -99,7 +102,7 @@ func GenerateToken(userID, email string) (string, error) {
 		UserID: userID,
 		Email:  email,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(7 * 24 * time.Hour)), // 7 days
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(TokenTTL)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
