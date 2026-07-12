@@ -59,7 +59,10 @@ export default function EditorPage() {
       commitProject(id!, "Auto-commit: changes saved.", {
         onCompleted: (response, errors) => {
           if (errors) {
-            console.error("Auto-commit failed:", translateGraphQLErrors(t, errors));
+            console.error(
+              "Auto-commit failed:",
+              translateGraphQLErrors(t, errors),
+            );
             return;
           }
           setEditorStatus("committed");
