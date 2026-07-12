@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -35,7 +36,7 @@ func (s *Service) Register(ctx context.Context, email, password string) (*AuthRe
 
 	hashedPassword, err := HashPassword(password)
 	if err != nil {
-		if err == ErrPasswordTooShort {
+		if errors.Is(err, ErrPasswordTooShort) {
 			return nil, apierrors.New(apierrors.CodePasswordTooShort, "password too short")
 		}
 		return nil, apierrors.Internal(err)
