@@ -15,6 +15,7 @@ import (
 	"github.com/lewtec/superfolha/internal/apierrors"
 	"github.com/lewtec/superfolha/internal/auth"
 	"github.com/lewtec/superfolha/internal/db"
+	"github.com/lewtec/superfolha/internal/project"
 )
 
 // Register is the resolver for the register field.
@@ -88,6 +89,9 @@ func (r *mutationResolver) SaveFile(ctx context.Context, projectID string, path 
 	}
 
 	if err := r.projectService.SaveFile(projectID, path, content); err != nil {
+		if errors.Is(err, project.ErrInvalidPath) {
+			return nil, apierrors.New(apierrors.CodeInvalidInput, "invalid file path")
+		}
 		return nil, apierrors.Internal(err)
 	}
 
@@ -110,6 +114,9 @@ func (r *mutationResolver) DeleteFile(ctx context.Context, projectID string, pat
 	}
 
 	if err := r.projectService.DeleteFile(projectID, path); err != nil {
+		if errors.Is(err, project.ErrInvalidPath) {
+			return false, apierrors.New(apierrors.CodeInvalidInput, "invalid file path")
+		}
 		return false, apierrors.Internal(err)
 	}
 
