@@ -4,10 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useProjectsQuery } from "../hooks/useProjectsQuery";
 import { useCreateProjectMutation } from "../hooks/useCreateProjectMutation";
 import { useDeleteProjectMutation } from "../hooks/useDeleteProjectMutation";
-import {
-  translateError,
-  translateGraphQLErrors,
-} from "../i18n/translateError";
+import { translateError, translateGraphQLErrors } from "../i18n/translateError";
 
 export default function Projects() {
   const navigate = useNavigate();

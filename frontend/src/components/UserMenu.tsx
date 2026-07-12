@@ -93,11 +93,7 @@ export default function UserMenu({
         onClick={() => setOpen((v) => !v)}
       >
         <div className="bg-primary text-primary-content w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold">
-          {initials ? (
-            <span>{initials}</span>
-          ) : (
-            <User size={20} aria-hidden />
-          )}
+          {initials ? <span>{initials}</span> : <User size={20} aria-hidden />}
         </div>
       </button>
 
@@ -109,7 +105,9 @@ export default function UserMenu({
         >
           {email ? (
             <div className="px-3 py-2 border-b border-base-300 mb-2">
-              <p className="text-xs text-base-content/60">{t("signed_in_as")}</p>
+              <p className="text-xs text-base-content/60">
+                {t("signed_in_as")}
+              </p>
               <p className="text-sm font-medium truncate" title={email}>
                 {email}
               </p>

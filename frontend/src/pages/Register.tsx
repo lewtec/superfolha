@@ -117,7 +117,9 @@ export default function Register() {
                 className={`btn btn-primary ${isInFlight ? "loading" : ""}`}
                 disabled={isInFlight}
               >
-                {isInFlight ? t("auth:creating_account") : t("auth:register_button")}
+                {isInFlight
+                  ? t("auth:creating_account")
+                  : t("auth:register_button")}
               </button>
             </div>
           </form>

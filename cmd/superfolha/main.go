@@ -23,10 +23,10 @@ import (
 )
 
 var (
-	stateDir    string
-	dbDriver    string
-	dbDSN       string
-	listenAddr  string
+	stateDir   string
+	dbDriver   string
+	dbDSN      string
+	listenAddr string
 )
 
 var rootCmd = &cobra.Command{
