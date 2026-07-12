@@ -124,7 +124,7 @@ func (s *Server) handleCompile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := compiler.Compile(s.projectService, projectId, filePath)
+	result, err := compiler.Compile(r.Context(), s.projectService, projectId, filePath)
 	if err != nil {
 		log.Printf("Error compiling project %s file %s for user %s: %v", projectId, filePath, user.UserID, err)
 		if strings.Contains(err.Error(), "latexmk command not found") {
