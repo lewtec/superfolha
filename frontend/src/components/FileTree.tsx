@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { buildFileTree, FileTreeNode } from "../utils/fileTree";
+import { translateError } from "../i18n/translateError";
 import {
   Folder,
   File as FileIcon,
@@ -149,8 +150,11 @@ export default function FileTree({
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to upload file");
+        const errorData = await response.json().catch(() => ({}));
+        const msg = translateError(t, errorData);
+        throw Object.assign(new Error(msg), {
+          code: (errorData as { code?: string }).code,
+        });
       }
 
       const result = await response.json();
