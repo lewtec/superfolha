@@ -6,7 +6,6 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"log"
 	"os"
@@ -129,7 +128,7 @@ func (r *mutationResolver) Commit(ctx context.Context, projectID string, message
 	}
 
 	if err := r.Repo.UpdateProjectTimestamp(ctx, project.ID); err != nil {
-		fmt.Printf("Warning: failed to update project timestamp: %v\n", err)
+		log.Printf("Warning: failed to update project timestamp: %v", err)
 	}
 
 	return toGraphQLCommit(commit), nil
@@ -152,9 +151,12 @@ func (r *projectResolver) Files(ctx context.Context, obj *Project) ([]*File, err
 		}
 
 		var buf [512]byte
-		n, _ := io.ReadFull(fileReader, buf[:])
+		n, err := io.ReadFull(fileReader, buf[:])
+		if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+			fileReader.Close()
+			return nil, apierrors.Internal(err)
+		}
 		isBinary := HasBinary(buf[:n], f.Path)
-
 		fileReader.Close()
 
 		files[i] = &File{
@@ -181,11 +183,16 @@ func (r *projectResolver) File(ctx context.Context, obj *Project, path string) (
 	var content *string
 
 	var buf [512]byte
-	n, _ := io.ReadFull(fileReader, buf[:])
+	n, err := io.ReadFull(fileReader, buf[:])
+	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+		return nil, apierrors.Internal(err)
+	}
 	isBinary := HasBinary(buf[:n], path)
 
 	if seeker, ok := fileReader.(io.ReadSeeker); ok {
-		seeker.Seek(0, io.SeekStart)
+		if _, err := seeker.Seek(0, io.SeekStart); err != nil {
+			return nil, apierrors.Internal(err)
+		}
 	} else {
 		log.Printf("Warning: fileReader is not seekable for %s in GraphQL resolver", path)
 	}
