@@ -62,8 +62,10 @@ func (s *Server) Handler() http.Handler {
 	srv.SetErrorPresenter(codedErrorPresenter)
 	mux.Handle("/api/graphql", ResponseWriterMiddleware(auth.Middleware(srv)))
 
-	// GraphQL Playground (for development)
-	mux.Handle("/api/graphiql", playground.Handler("GraphQL playground", "/api/graphql"))
+	// GraphQL Playground — debug surface; only register in development
+	if os.Getenv("GO_ENV") == "development" {
+		mux.Handle("/api/graphiql", playground.Handler("GraphQL playground", "/api/graphql"))
+	}
 
 	// Compile endpoint
 	mux.Handle("/api/compile", auth.Middleware(http.HandlerFunc(s.handleCompile)))
