@@ -5,7 +5,7 @@ import { useCommitProjectMutation } from "../hooks/useCommitProjectMutation";
 import { useDebounce } from "../hooks/useDebounce";
 import { useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { translateError } from "../i18n/translateError";
+import { translateError, translateGraphQLErrors } from "../i18n/translateError";
 import { useGetProjectQuery } from "../hooks/useGetProjectQuery";
 import { useCallback, useEffect, useState } from "react";
 import { Menu, X, Code, FileText, Terminal } from "feather-icons-react";
@@ -59,13 +59,13 @@ export default function EditorPage() {
       commitProject(id!, "Auto-commit: changes saved.", {
         onCompleted: (response, errors) => {
           if (errors) {
-            console.error("Auto-commit failed:", errors[0].message);
+            console.error("Auto-commit failed:", translateGraphQLErrors(t, errors));
             return;
           }
           setEditorStatus("committed");
         },
         onError: (err) => {
-          console.error("Auto-commit failed:", err);
+          console.error("Auto-commit failed:", translateError(t, err));
         },
       });
     }
@@ -156,7 +156,7 @@ export default function EditorPage() {
           onCompleted: (_response, errors) => {
             if (errors) {
               setEditorStatus("error");
-              alert(errors[0].message);
+              alert(translateGraphQLErrors(t, errors));
               return;
             }
             setEditorStatus("saved");
@@ -179,7 +179,7 @@ export default function EditorPage() {
         });
       }
     },
-    [id, currentFile, saveFile],
+    [id, currentFile, saveFile, t],
   );
 
   const memoizedOnDeleteFile = useCallback(
@@ -187,7 +187,7 @@ export default function EditorPage() {
       deleteFile(id!, path, {
         onCompleted: (_response, errors) => {
           if (errors) {
-            alert(errors[0].message);
+            alert(translateGraphQLErrors(t, errors));
             return;
           }
           setFiles((prev) => prev.filter((f) => f.path !== path));
@@ -201,7 +201,7 @@ export default function EditorPage() {
         },
       });
     },
-    [id, deleteFile, currentFile, files],
+    [id, deleteFile, currentFile, files, t],
   );
 
   const handleNewFile = useCallback(() => {
