@@ -21,6 +21,12 @@ const fetchQuery: FetchFunction = async (operation, variables) => {
     }),
   });
 
+  if (!response.ok) {
+    throw new Error(
+      `GraphQL request failed: ${response.status} ${response.statusText}`,
+    );
+  }
+
   return response.json();
 };
 
