@@ -1,6 +1,7 @@
 package project
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -68,7 +69,7 @@ func (rm *RepositoryManager) GetRepo(projectId string) (*ProjectRepository, erro
 		// If the error is "repository does not exist", we still return the pr,
 		// but with pr.repo = nil, and the error.
 		// Other errors are critical.
-		if err == git.ErrRepositoryNotExists {
+		if errors.Is(err, git.ErrRepositoryNotExists) {
 			rm.repos[projectId] = pr // Add to map even if repo doesn't exist yet
 			return pr, err           // Return pr and the specific error
 		}
@@ -110,7 +111,10 @@ func (pr *ProjectRepository) SaveFile(filePath, content string) error {
 	pr.Lock()
 	defer pr.Unlock()
 
-	fullPath := filepath.Join(pr.repoPath, filePath)
+	fullPath, err := safeRepoPath(pr.repoPath, filePath)
+	if err != nil {
+		return err
+	}
 
 	// Ensure the directory exists
 	dir := filepath.Dir(fullPath)
@@ -130,7 +134,10 @@ func (pr *ProjectRepository) DeleteFile(filePath string) error {
 	pr.Lock()
 	defer pr.Unlock()
 
-	fullPath := filepath.Join(pr.repoPath, filePath)
+	fullPath, err := safeRepoPath(pr.repoPath, filePath)
+	if err != nil {
+		return err
+	}
 	return os.Remove(fullPath)
 }
 
@@ -139,7 +146,11 @@ func (pr *ProjectRepository) ReadFile(filePath string) (io.ReadCloser, int64, er
 	pr.Lock()
 	defer pr.Unlock()
 
-	return igit.ReadFile(pr.repoPath, filePath)
+	rel, err := validateRepoRelativePath(filePath)
+	if err != nil {
+		return nil, 0, err
+	}
+	return igit.ReadFile(pr.repoPath, rel)
 }
 
 // ListFiles lists all files in the repository.
