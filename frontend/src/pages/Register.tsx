@@ -4,6 +4,9 @@ import { useTranslation } from "react-i18next";
 import { useRegisterMutation } from "../hooks/useRegisterMutation";
 import { translateError, translateGraphQLErrors } from "../i18n/translateError";
 
+// Must match backend MinPasswordLength in internal/auth/auth.go.
+const MIN_PASSWORD_LENGTH = 8;
+
 export default function Register() {
   const { t } = useTranslation(["auth", "common", "errors"]);
   const [email, setEmail] = useState("");
@@ -40,8 +43,7 @@ export default function Register() {
       return;
     }
 
-    // Backend requires MinPasswordLength = 8
-    if (password.length < 8) {
+    if (password.length < MIN_PASSWORD_LENGTH) {
       setError(t("auth:password_too_short"));
       return;
     }
