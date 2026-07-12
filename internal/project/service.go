@@ -42,7 +42,8 @@ func (s *Service) InitProjectRepo(projectId string) error {
 	return pr.InitRepo()
 }
 
-// SaveFile writes content to a file within a project's repository and stages it.
+// SaveFile writes content to a file on disk in a project's repository.
+// It does not stage; CommitChanges (or AddAll) stages later.
 func (s *Service) SaveFile(projectId, filePath, content string) error {
 	pr, err := s.repoManager.GetRepo(projectId)
 	if err != nil {
@@ -51,7 +52,8 @@ func (s *Service) SaveFile(projectId, filePath, content string) error {
 	return pr.SaveFile(filePath, content)
 }
 
-// DeleteFile removes a file from a project's repository and stages the deletion.
+// DeleteFile removes a file on disk from a project's repository.
+// It does not stage; CommitChanges (or AddAll) stages later.
 func (s *Service) DeleteFile(projectId, filePath string) error {
 	pr, err := s.repoManager.GetRepo(projectId)
 	if err != nil {
