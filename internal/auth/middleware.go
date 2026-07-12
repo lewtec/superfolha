@@ -3,9 +3,10 @@ package auth
 import (
 	"context"
 	"net/http"
-	"os"
 	"strings"
 	"time"
+
+	"github.com/lewtec/superfolha/internal/appenv"
 )
 
 type contextKey string
@@ -52,7 +53,7 @@ func Middleware(next http.Handler) http.Handler {
 			} else if cookie != nil {
 				// Invalid cookie token: clear it with the same Secure/SameSite flags used on set/logout
 				// so local HTTP development can actually drop the cookie.
-				secure := os.Getenv("GO_ENV") != "development"
+				secure := !appenv.IsDevelopment()
 				http.SetCookie(w, &http.Cookie{
 					Name:     "authToken",
 					Value:    "",
