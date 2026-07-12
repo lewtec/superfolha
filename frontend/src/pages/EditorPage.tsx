@@ -130,14 +130,7 @@ export default function EditorPage() {
         event.preventDefault();
         event.returnValue = "";
 
-        commitProject(id!, "Auto-commit: changes before unload.", {
-          onCompleted: () => {
-            console.log("Final commit successful before unload.");
-          },
-          onError: (err) => {
-            console.error("Final commit failed before unload:", err);
-          },
-        });
+        commitProject(id!, "Auto-commit: changes before unload.");
       }
     };
 
