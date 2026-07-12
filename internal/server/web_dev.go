@@ -12,6 +12,10 @@ import (
 // Prefer: mise start (build:frontend + go run -tags release, embedded UI).
 // HMR: mise run start:vite  +  go run ./cmd/superfolha --state-dir=./data
 func GetWebApp() http.Handler {
-	remote, _ := url.Parse("http://127.0.0.1:5174")
+	remote, err := url.Parse("http://127.0.0.1:5174")
+	if err != nil {
+		// Constant URL; parse failure is a programming error.
+		panic(err)
+	}
 	return httputil.NewSingleHostReverseProxy(remote)
 }
