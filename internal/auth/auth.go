@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/lewtec/superfolha/internal/appenv"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -44,12 +45,12 @@ type Claims struct {
 func getJWTSecret() ([]byte, error) {
 	jwtSecretOnce.Do(func() {
 		secret := os.Getenv("JWT_SECRET")
-		goEnv := os.Getenv("GO_ENV")
-		slog.Info("resolving JWT secret", "jwt_secret_set", secret != "", "go_env", goEnv)
+		isDev := appenv.IsDevelopment()
+		slog.Info("resolving JWT secret", "jwt_secret_set", secret != "", "is_development", isDev)
 
 		if secret == "" {
 			// Fallback for development only - should never be used in production
-			if goEnv == "development" {
+			if isDev {
 				slog.Info("using development fallback JWT secret")
 				jwtSecret = []byte("dev-secret-change-in-production")
 				return
