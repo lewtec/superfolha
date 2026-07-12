@@ -1,12 +1,16 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/lewtec/superfolha/internal/auth"
@@ -135,8 +139,29 @@ func runServer(cmd *cobra.Command, args []string) {
 		IdleTimeout:  60 * time.Second,
 	}
 
-	if err := httpServer.ListenAndServe(); err != nil {
-		log.Fatalf("Server failed: %v", err)
+	serverErr := make(chan error, 1)
+	go func() {
+		serverErr <- httpServer.ListenAndServe()
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+
+	select {
+	case err := <-serverErr:
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("Server failed: %v", err)
+		}
+	case sig := <-quit:
+		log.Printf("Shutting down server (signal=%v)...", sig)
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := httpServer.Shutdown(ctx); err != nil {
+			log.Printf("HTTP server shutdown error: %v", err)
+		}
+		if err := <-serverErr; err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Printf("Server error after shutdown: %v", err)
+		}
 	}
 }
 
