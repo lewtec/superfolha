@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -20,6 +21,9 @@ import (
 // DefaultCompileTimeout is the maximum time a single latexmk run may take.
 // Client disconnect cancels earlier via the request context.
 const DefaultCompileTimeout = 3 * time.Minute
+
+// ErrLatexmkNotFound is returned when the latexmk binary is not on PATH.
+var ErrLatexmkNotFound = errors.New("latexmk command not found")
 
 // CompileResult represents the outcome of a LaTeX compilation process.
 type CompileResult struct {
@@ -59,7 +63,7 @@ func Compile(ctx context.Context, projectService *project.Service, projectId str
 	// Check if latexmk command exists
 	_, err := exec.LookPath("latexmk")
 	if err != nil {
-		return nil, fmt.Errorf("latexmk command not found: %w", err)
+		return nil, fmt.Errorf("%w: %v", ErrLatexmkNotFound, err)
 	}
 
 	// Create temporary directory for compilation

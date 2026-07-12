@@ -3,11 +3,11 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/99designs/gqlgen/graphql"
@@ -129,7 +129,7 @@ func (s *Server) handleCompile(w http.ResponseWriter, r *http.Request) {
 	result, err := compiler.Compile(r.Context(), s.projectService, projectId, filePath)
 	if err != nil {
 		slog.Error("error compiling project", "project", projectId, "file", filePath, "user", user.UserID, "err", err)
-		if strings.Contains(err.Error(), "latexmk command not found") {
+		if errors.Is(err, compiler.ErrLatexmkNotFound) {
 			writeAPIError(w, apierrors.Wrap(apierrors.CodeCompileToolMissing, "latexmk not found", err))
 			return
 		}
