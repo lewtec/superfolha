@@ -6,6 +6,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"os"
@@ -152,7 +153,7 @@ func (r *projectResolver) Files(ctx context.Context, obj *Project) ([]*File, err
 
 		var buf [512]byte
 		n, err := io.ReadFull(fileReader, buf[:])
-		if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+		if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
 			fileReader.Close()
 			return nil, apierrors.Internal(err)
 		}
@@ -184,7 +185,7 @@ func (r *projectResolver) File(ctx context.Context, obj *Project, path string) (
 
 	var buf [512]byte
 	n, err := io.ReadFull(fileReader, buf[:])
-	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+	if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
 		return nil, apierrors.Internal(err)
 	}
 	isBinary := HasBinary(buf[:n], path)
