@@ -26,7 +26,9 @@ export function extractErrorCode(err: unknown): string {
     const list =
       anyErr.source?.errors ||
       anyErr.errors ||
-      (Array.isArray((err as { graphQLErrors?: GraphQLLikeError[] }).graphQLErrors)
+      (Array.isArray(
+        (err as { graphQLErrors?: GraphQLLikeError[] }).graphQLErrors,
+      )
         ? (err as { graphQLErrors: GraphQLLikeError[] }).graphQLErrors
         : null);
     if (list?.[0]?.extensions?.code) {
@@ -65,7 +67,10 @@ export function translateError(t: TFunction, err: unknown): string {
 /** For Relay onCompleted errors array */
 export function translateGraphQLErrors(
   t: TFunction,
-  errors: ReadonlyArray<{ message: string; extensions?: { code?: string } }> | null | undefined,
+  errors:
+    | ReadonlyArray<{ message: string; extensions?: { code?: string } }>
+    | null
+    | undefined,
 ): string {
   if (!errors?.length) return t("errors:UNKNOWN");
   return translateError(t, errors[0]);

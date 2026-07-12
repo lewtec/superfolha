@@ -8,13 +8,7 @@ import { useTranslation } from "react-i18next";
 import { translateError } from "../i18n/translateError";
 import { useGetProjectQuery } from "../hooks/useGetProjectQuery";
 import { useCallback, useEffect, useState } from "react";
-import {
-  Menu,
-  X,
-  Code,
-  FileText,
-  Terminal,
-} from "feather-icons-react";
+import { Menu, X, Code, FileText, Terminal } from "feather-icons-react";
 import FileTree from "../components/FileTree";
 import Editor from "../components/Editor";
 import PDFViewer from "../components/PDFViewer";
@@ -51,7 +45,9 @@ export default function EditorPage() {
     "clean" | "dirty" | "saving" | "saved" | "committed" | "error"
   >("clean");
   const [sidebarOpen, setSidebarOpen] = useState(() =>
-    typeof window !== "undefined" ? window.matchMedia("(min-width: 768px)").matches : true,
+    typeof window !== "undefined"
+      ? window.matchMedia("(min-width: 768px)").matches
+      : true,
   );
 
   const { saveFile } = useSaveFileMutation();
@@ -424,7 +420,10 @@ export default function EditorPage() {
         ${sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
         ${sidebarOpen ? "md:w-64" : "md:w-0 md:border-0 md:overflow-hidden"}
       `}
-      style={{ top: "var(--shell-height)", height: "calc(100dvh - var(--shell-height))" }}
+      style={{
+        top: "var(--shell-height)",
+        height: "calc(100dvh - var(--shell-height))",
+      }}
       aria-hidden={!sidebarOpen}
     >
       <div className="flex items-center justify-between px-3 py-2 border-b border-base-300 md:hidden shrink-0">
@@ -439,7 +438,10 @@ export default function EditorPage() {
         </button>
       </div>
 
-      <nav className="p-2 border-b border-base-300 shrink-0" aria-label={t("editor:view")}>
+      <nav
+        className="p-2 border-b border-base-300 shrink-0"
+        aria-label={t("editor:view")}
+      >
         <p className="px-2 pb-1 text-xs font-medium uppercase tracking-wide text-base-content/60">
           {t("editor:view")}
         </p>
@@ -480,7 +482,9 @@ export default function EditorPage() {
           type="button"
           className="btn btn-ghost btn-square min-h-[var(--touch-min)] min-w-[var(--touch-min)]"
           onClick={() => setSidebarOpen((o) => !o)}
-          aria-label={sidebarOpen ? t("editor:close_sidebar") : t("editor:open_sidebar")}
+          aria-label={
+            sidebarOpen ? t("editor:close_sidebar") : t("editor:open_sidebar")
+          }
           aria-expanded={sidebarOpen}
         >
           {sidebarOpen ? <X size={22} /> : <Menu size={22} />}
@@ -498,7 +502,9 @@ export default function EditorPage() {
             {compiling ? (
               <>
                 <span className="loading loading-spinner loading-xs" />
-                <span className="hidden sm:inline">{t("editor:compiling")}</span>
+                <span className="hidden sm:inline">
+                  {t("editor:compiling")}
+                </span>
               </>
             ) : (
               t("editor:compile")
@@ -545,10 +551,7 @@ export default function EditorPage() {
               aria-hidden={activeTab !== "code"}
             >
               {currentFile && currentFile.isBinary ? (
-                <BinaryFileViewer
-                  fileName={currentFile.path}
-                  projectId={id!}
-                />
+                <BinaryFileViewer fileName={currentFile.path} projectId={id!} />
               ) : currentFile ? (
                 <Editor
                   key={currentFile.path}
