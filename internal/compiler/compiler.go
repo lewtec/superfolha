@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -63,7 +62,7 @@ func Compile(ctx context.Context, projectService *project.Service, projectId str
 	// Check if latexmk command exists
 	_, err := exec.LookPath("latexmk")
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrLatexmkNotFound, err)
+		return nil, fmt.Errorf("%w: %w", ErrLatexmkNotFound, err)
 	}
 
 	// Create temporary directory for compilation
@@ -162,9 +161,4 @@ func Compile(ctx context.Context, projectService *project.Service, projectId str
 	}
 
 	return result, nil
-}
-
-// ToJSON converts the result to JSON
-func (r *CompileResult) ToJSON() ([]byte, error) {
-	return json.Marshal(r)
 }
