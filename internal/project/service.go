@@ -30,21 +30,15 @@ func (s *Service) GetProjectPath(projectId string) string {
 }
 
 // InitProjectRepo initializes a new Git repository for a project.
+// Safe when missing: GetRepo still returns a usable ProjectRepository with ErrRepositoryNotExists.
 func (s *Service) InitProjectRepo(projectId string) error {
 	pr, err := s.repoManager.GetRepo(projectId)
 	if err != nil {
-		// Check if the error is specifically that the repository does not exist
 		if errors.Is(err, git.ErrRepositoryNotExists) {
-			// The pr instance is valid here, but pr.repo is nil.
-			// Call InitRepo on the valid pr instance.
 			return pr.InitRepo()
 		}
-		// For any other error, return it
 		return err
 	}
-	// If no error from GetRepo, it means the repository already exists and was opened successfully.
-	// We can still call InitRepo to ensure it's in a good state, or simply return nil if InitRepo
-	// is only meant for initial creation.
 	return pr.InitRepo()
 }
 
