@@ -227,18 +227,21 @@ func (r *Repository) DeleteProject(ctx context.Context, id string) error {
 	return r.queries.DeleteProject(ctx, id)
 }
 
+// IsUniqueViolation reports unique/primary-key constraint failures via
+// modernc *sqlite.Error codes (2067 UNIQUE, 1555 PRIMARYKEY). Bare
+// SQLITE_CONSTRAINT (19) is intentionally excluded — it also covers
+// CHECK/FK/NOT NULL. String matching on err.Error() is avoided.
 func (r *Repository) IsUniqueViolation(err error) bool {
-	if err == nil {
+	var se *sqlite.Error
+	if !errors.As(err, &se) {
 		return false
 	}
-	var se *sqlite.Error
-	if errors.As(err, &se) {
-		switch se.Code() {
-		case sqlite3.SQLITE_CONSTRAINT, sqlite3.SQLITE_CONSTRAINT_UNIQUE, sqlite3.SQLITE_CONSTRAINT_PRIMARYKEY:
-			return true
-		}
+	switch se.Code() {
+	case sqlite3.SQLITE_CONSTRAINT_UNIQUE, sqlite3.SQLITE_CONSTRAINT_PRIMARYKEY:
+		return true
+	default:
+		return false
 	}
-	return strings.Contains(err.Error(), "UNIQUE constraint failed")
 }
 
 func (r *Repository) Close() error {
