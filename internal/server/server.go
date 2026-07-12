@@ -310,14 +310,14 @@ func codedErrorPresenter(ctx context.Context, e error) *gqlerror.Error {
 	err := graphql.DefaultErrorPresenter(ctx, e)
 	if coded, ok := apierrors.As(e); ok {
 		if err.Extensions == nil {
-			err.Extensions = map[string]interface{}{}
+			err.Extensions = map[string]any{}
 		}
 		err.Extensions["code"] = string(coded.Code)
 		err.Message = coded.Message
 		return err
 	}
 	if err.Extensions == nil {
-		err.Extensions = map[string]interface{}{}
+		err.Extensions = map[string]any{}
 	}
 	if _, has := err.Extensions["code"]; !has {
 		err.Extensions["code"] = string(apierrors.CodeUnknown)
