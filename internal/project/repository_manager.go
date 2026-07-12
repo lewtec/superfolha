@@ -100,7 +100,8 @@ func (pr *ProjectRepository) CommitChanges(author, message string) (*igit.Commit
 	return igit.CommitChanges(pr.repoPath, author, message)
 }
 
-// SaveFile writes content to a file within the repository.
+// SaveFile writes content to a file on disk in the repository.
+// It does not stage; CommitChanges (or AddAll) stages later.
 func (pr *ProjectRepository) SaveFile(filePath, content string) error {
 	pr.Lock()
 	defer pr.Unlock()
@@ -123,7 +124,8 @@ func (pr *ProjectRepository) SaveFile(filePath, content string) error {
 	return nil
 }
 
-// DeleteFile removes a file from the repository.
+// DeleteFile removes a file on disk from the repository.
+// It does not stage; CommitChanges (or AddAll) stages later.
 func (pr *ProjectRepository) DeleteFile(filePath string) error {
 	pr.Lock()
 	defer pr.Unlock()
