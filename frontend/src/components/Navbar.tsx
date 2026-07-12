@@ -9,8 +9,6 @@ export default function Navbar({
   onCompile,
   compiling,
 }: NavbarProps) {
-  // const navigate = useNavigate() // navigate is not used anymore
-
   return (
     <div className="navbar bg-base-100 shadow-md">
       <div className="navbar-start">
