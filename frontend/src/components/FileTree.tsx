@@ -14,7 +14,7 @@ import {
 interface File {
   path: string;
   content: string;
-  isDirty: boolean; // Added isDirty
+  isDirty: boolean;
 }
 
 interface FileTreeProps {
@@ -23,8 +23,8 @@ interface FileTreeProps {
   onFileSelect: (path: string) => void;
   onNewFile: () => void;
   onDeleteFile: (path: string) => void;
-  onLoadFile: (fileName: string, content: string | null) => void; // content can be null for binary files
-  projectId: string; // New prop
+  onLoadFile: (fileName: string, content: string | null) => void;
+  projectId: string;
 }
 
 interface FileTreeItemProps {
@@ -75,7 +75,7 @@ const FileTreeItem: React.FC<FileTreeItemProps> = ({
               <ChevronRight size={16} />
             )
           ) : (
-            <div style={{ width: "16px" }}></div> // Spacer for file icon alignment
+            <div style={{ width: "16px" }}></div>
           )}
           {node.type === "directory" ? (
             <Folder size={16} />
@@ -210,7 +210,7 @@ export default function FileTree({
         ref={fileInputRef}
         className="hidden"
         onChange={handleFileChange}
-        accept="*/*" // Accept all file types
+        accept="*/*"
       />
       <ul className="menu bg-base-100 rounded-box w-full flex-1 overflow-y-auto">
         {tree.map((node) => (
