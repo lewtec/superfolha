@@ -6,6 +6,7 @@ import (
 	"embed"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -33,10 +34,14 @@ func NewRepository(dsn string) (*Repository, error) {
 		return nil, fmt.Errorf("open migration database: %w", err)
 	}
 	if err := runMigrations(migrationDB); err != nil {
-		_ = migrationDB.Close()
+		if closeErr := migrationDB.Close(); closeErr != nil {
+			log.Printf("failed to close migration database on error: %v", closeErr)
+		}
 		return nil, err
 	}
-	_ = migrationDB.Close()
+	if closeErr := migrationDB.Close(); closeErr != nil {
+		return nil, fmt.Errorf("failed to close migration database: %w", closeErr)
+	}
 
 	pool, err := pgxpool.New(context.Background(), dsn)
 	if err != nil {

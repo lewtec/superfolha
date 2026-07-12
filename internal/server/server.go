@@ -293,12 +293,16 @@ func writeAPIError(w http.ResponseWriter, err error) {
 	w.Header().Set("Content-Type", "application/json")
 	if coded, ok := apierrors.As(err); ok {
 		w.WriteHeader(coded.Status())
-		_ = json.NewEncoder(w).Encode(coded.RESTBody())
+		if encErr := json.NewEncoder(w).Encode(coded.RESTBody()); encErr != nil {
+			log.Printf("error encoding api error response: %v", encErr)
+		}
 		return
 	}
 	w.WriteHeader(http.StatusInternalServerError)
-	_ = json.NewEncoder(w).Encode(apierrors.RESTBody{
+	if encErr := json.NewEncoder(w).Encode(apierrors.RESTBody{
 		Code:    string(apierrors.CodeInternal),
 		Message: err.Error(),
-	})
+	}); encErr != nil {
+		log.Printf("error encoding internal error response: %v", encErr)
+	}
 }
