@@ -138,7 +138,10 @@ func (s *Server) handleCompile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Return JSON response
-	json.NewEncoder(w).Encode(result)
+	if encErr := json.NewEncoder(w).Encode(result); encErr != nil {
+		slog.Error("error encoding compile response", "err", encErr)
+		return
+	}
 }
 
 func (s *Server) handleUploadFile(w http.ResponseWriter, r *http.Request) {
@@ -155,7 +158,7 @@ func (s *Server) handleUploadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, _, _, err := s.resolver.getAndCheckProject(r.Context(), projectIdStr)
+	_, _, user, err := s.resolver.getAndCheckProject(r.Context(), projectIdStr)
 	if err != nil {
 		writeAPIError(w, err)
 		return
@@ -189,14 +192,17 @@ func (s *Server) handleUploadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = s.projectService.CommitChanges(projectIdStr, "System", "Uploaded file: "+filePath)
+	_, err = s.projectService.CommitChanges(projectIdStr, user.Email, "Uploaded file: "+filePath)
 	if err != nil {
 		slog.Error("error committing file", "file", filePath, "project", projectIdStr, "err", err)
 		writeAPIError(w, apierrors.Internal(err))
 		return
 	}
 
-	json.NewEncoder(w).Encode(map[string]string{"message": "File uploaded successfully", "path": filePath})
+	if encErr := json.NewEncoder(w).Encode(map[string]string{"message": "File uploaded successfully", "path": filePath}); encErr != nil {
+		slog.Error("error encoding upload response", "err", encErr)
+		return
+	}
 }
 
 func (s *Server) handleDownloadFile(w http.ResponseWriter, r *http.Request) {
@@ -246,7 +252,7 @@ func (s *Server) handleDownloadFile(w http.ResponseWriter, r *http.Request) {
 	// http.DetectContentType needs at most 512 bytes
 	var buf [512]byte
 	n, err := io.ReadFull(fileReader, buf[:])
-	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+	if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
 		slog.Error("error peeking file content type", "file", filePath, "project", projectIdStr, "err", err)
 		writeAPIError(w, apierrors.Internal(err))
 		return
