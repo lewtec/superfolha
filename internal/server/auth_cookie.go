@@ -2,13 +2,14 @@ package server
 
 import (
 	"net/http"
-	"os"
 	"time"
+
+	"github.com/lewtec/superfolha/internal/appenv"
 )
 
 func setAuthCookie(w http.ResponseWriter, token string) {
 	// Secure only when not in development so local HTTP can set the cookie.
-	secure := os.Getenv("GO_ENV") != "development"
+	secure := !appenv.IsDevelopment()
 	http.SetCookie(w, &http.Cookie{
 		Name:     "authToken",
 		Value:    token,

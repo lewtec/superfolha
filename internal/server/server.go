@@ -7,7 +7,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -15,6 +14,7 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/lewtec/superfolha/internal/apierrors"
+	"github.com/lewtec/superfolha/internal/appenv"
 	"github.com/lewtec/superfolha/internal/auth"
 	"github.com/lewtec/superfolha/internal/compiler"
 	"github.com/lewtec/superfolha/internal/db"
@@ -63,7 +63,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("/api/graphql", ResponseWriterMiddleware(auth.Middleware(srv)))
 
 	// GraphQL Playground — debug surface; only register in development
-	if isDevelopment() {
+	if appenv.IsDevelopment() {
 		mux.Handle("/api/graphiql", playground.Handler("GraphQL playground", "/api/graphql"))
 	}
 
@@ -85,13 +85,8 @@ func (s *Server) Handler() http.Handler {
 	return mux
 }
 
-// isDevelopment reports whether GO_ENV is "development".
-func isDevelopment() bool {
-	return os.Getenv("GO_ENV") == "development"
-}
-
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
-	secure := !isDevelopment()
+	secure := !appenv.IsDevelopment()
 	http.SetCookie(w, &http.Cookie{
 		Name:     "authToken",
 		Value:    "",
