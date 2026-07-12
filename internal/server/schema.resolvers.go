@@ -7,7 +7,7 @@ package server
 import (
 	"context"
 	"io"
-	"log"
+	"log/slog"
 	"os"
 
 	"github.com/google/uuid"
@@ -128,7 +128,7 @@ func (r *mutationResolver) Commit(ctx context.Context, projectID string, message
 	}
 
 	if err := r.Repo.UpdateProjectTimestamp(ctx, project.ID); err != nil {
-		log.Printf("Warning: failed to update project timestamp: %v", err)
+		slog.Warn("failed to update project timestamp", "project_id", project.ID, "err", err)
 	}
 
 	return toGraphQLCommit(commit), nil
@@ -194,7 +194,7 @@ func (r *projectResolver) File(ctx context.Context, obj *Project, path string) (
 			return nil, apierrors.Internal(err)
 		}
 	} else {
-		log.Printf("Warning: fileReader is not seekable for %s in GraphQL resolver", path)
+		slog.Warn("fileReader is not seekable", "path", path)
 	}
 
 	if !isTooBig && !isBinary {
