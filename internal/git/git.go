@@ -71,9 +71,9 @@ func CommitChanges(repoPath, author, message string) (*Commit, error) {
 		return nil, fmt.Errorf("failed to get worktree for repository at %s: %w", repoPath, err)
 	}
 
-	// Add all changes
-	if err := AddAll(repoPath); err != nil {
-		return nil, err
+	// Stage on the worktree we already hold (avoid a second PlainOpen via AddAll).
+	if _, err := w.Add("."); err != nil {
+		return nil, fmt.Errorf("failed to add all files to staging: %w", err)
 	}
 
 	// Check if there are any changes to commit
