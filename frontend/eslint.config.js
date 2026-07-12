@@ -1,6 +1,7 @@
 import globals from "globals";
 import tseslint from "typescript-eslint";
 import pluginReactConfig from "eslint-plugin-react/configs/recommended.js";
+import reactHooks from "eslint-plugin-react-hooks";
 
 export default [
   {
@@ -31,6 +32,7 @@ export default [
       "react/no-unescaped-entities": "off",
     },
   },
+  reactHooks.configs.flat.recommended,
   {
     rules: {
       "@typescript-eslint/no-unused-vars": "warn",

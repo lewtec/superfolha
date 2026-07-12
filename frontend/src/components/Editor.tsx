@@ -1,15 +1,15 @@
-import { useEffect, useRef } from "react"; // Added useCallback
+import { useCallback, useEffect, useRef } from "react";
 import { EditorView, basicSetup } from "codemirror";
 import { EditorState } from "@codemirror/state";
 import { StreamLanguage } from "@codemirror/language";
 import { stex } from "@codemirror/legacy-modes/mode/stex";
 import { autocompletion, CompletionContext } from "@codemirror/autocomplete";
-import { useDebounce } from "../hooks/useDebounce"; // Import useDebounce hook
+import { useDebounce } from "../hooks/useDebounce";
 
 interface EditorProps {
   value: string;
   onChange: (value: string) => void;
-  onSave: (content: string) => void; // Modified to accept content
+  onSave: (content: string) => void;
 }
 
 const latexLanguage = StreamLanguage.define(stex);
@@ -41,7 +41,7 @@ function latexCompletions(context: CompletionContext) {
 export default function Editor({ value, onChange, onSave }: EditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
-  const isUpdatingInternally = useRef(false); // New ref to track internal updates
+  const isUpdatingInternally = useRef(false);
 
   const onChangeRef = useRef(onChange);
   const onSaveRef = useRef(onSave);
@@ -51,11 +51,15 @@ export default function Editor({ value, onChange, onSave }: EditorProps) {
     onSaveRef.current = onSave;
   }, [onChange, onSave]);
 
-  const debouncedOnSave = useDebounce(onSaveRef.current, 1000); // 1 second debounce
-  const debouncedOnSaveRef = useRef(debouncedOnSave); // New ref for debouncedOnSave
+  // Stable callback so useDebounce does not read ref.current during render.
+  const saveViaRef = useCallback((...args: unknown[]) => {
+    onSaveRef.current(String(args[0] ?? ""));
+  }, []);
+  const debouncedOnSave = useDebounce(saveViaRef, 1000);
+  const debouncedOnSaveRef = useRef(debouncedOnSave);
 
   useEffect(() => {
-    debouncedOnSaveRef.current = debouncedOnSave; // Keep ref updated
+    debouncedOnSaveRef.current = debouncedOnSave;
   }, [debouncedOnSave]);
 
   useEffect(() => {
@@ -67,20 +71,20 @@ export default function Editor({ value, onChange, onSave }: EditorProps) {
         basicSetup,
         latexLanguage,
         autocompletion({ override: [latexCompletions] }),
-        EditorView.lineWrapping, // Enable word wrap
+        EditorView.lineWrapping,
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
             const newContent = update.state.doc.toString();
-            isUpdatingInternally.current = true; // Mark as internal update
+            isUpdatingInternally.current = true;
             onChangeRef.current(newContent);
-            debouncedOnSaveRef.current(newContent); // Pass content to debounced save
+            debouncedOnSaveRef.current(newContent);
           }
         }),
         EditorView.domEventHandlers({
           keydown: (e) => {
             if (e.ctrlKey && e.key === "s") {
               e.preventDefault();
-              onSaveRef.current(viewRef.current?.state.doc.toString() || ""); // Pass current content to immediate save
+              onSaveRef.current(viewRef.current?.state.doc.toString() || "");
               return true;
             }
             return false;
@@ -99,7 +103,9 @@ export default function Editor({ value, onChange, onSave }: EditorProps) {
     return () => {
       view.destroy();
     };
-  }, []); // Empty dependency array for true one-time initialization
+    // One-time CodeMirror mount; external value sync is handled below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Update editor when value changes externally
   useEffect(() => {

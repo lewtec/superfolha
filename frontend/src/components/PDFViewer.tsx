@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 interface PDFViewerProps {
@@ -25,16 +25,16 @@ function toPdfBlobUrl(pdfData: string): string {
  */
 export default function PDFViewer({ pdfData }: PDFViewerProps) {
   const { t } = useTranslation("editor");
-  const [error, setError] = useState<string>("");
 
-  const blobUrl = useMemo(() => {
-    if (!pdfData) return null;
+  const { blobUrl, error } = useMemo(() => {
+    if (!pdfData) return { blobUrl: null as string | null, error: "" };
     try {
-      setError("");
-      return toPdfBlobUrl(pdfData);
+      return { blobUrl: toPdfBlobUrl(pdfData), error: "" };
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-      return null;
+      return {
+        blobUrl: null as string | null,
+        error: e instanceof Error ? e.message : String(e),
+      };
     }
   }, [pdfData]);
 

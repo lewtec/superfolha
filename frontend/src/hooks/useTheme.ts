@@ -27,7 +27,7 @@ export function useTheme() {
   }, []);
 
   useEffect(() => {
-    refresh();
+    // State is initialized from storage; only subscribe to system theme changes.
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const onChange = () => {
       if (getStoredPreference() === "system") {
