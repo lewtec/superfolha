@@ -128,6 +128,12 @@ func (s *Server) handleCompile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	filePath, err = project.DecodeFilePath(filePath)
+	if err != nil {
+		writeAPIError(w, apierrors.New(apierrors.CodeInvalidInput, "invalid file path"))
+		return
+	}
+
 	result, err := compiler.Compile(r.Context(), s.projectService, projectId, filePath)
 	if err != nil {
 		slog.Error("error compiling project", "project", projectId, "file", filePath, "user", user.UserID, "err", err)
