@@ -252,6 +252,10 @@ func (s *Server) handleUploadFile(w http.ResponseWriter, r *http.Request) {
 
 	err = s.projectService.SaveFile(projectIdStr, filePath, body)
 	if err != nil {
+		if errors.Is(err, project.ErrInvalidPath) {
+			writeAPIError(w, apierrors.New(apierrors.CodeInvalidInput, "invalid file path"))
+			return
+		}
 		slog.Error("error saving file", "file", filePath, "project", projectIdStr, "err", err)
 		writeAPIError(w, apierrors.Internal(err))
 		return
