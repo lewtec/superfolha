@@ -1,12 +1,12 @@
 package project
 
 import (
-	"errors" // Import the errors package
-	"io"     // Import the io package
+	"errors"
+	"io"
 	"path/filepath"
 
 	"github.com/go-git/go-git/v5"
-	igit "github.com/lewtec/superfolha/internal/git" // Reusing existing git types and functions
+	igit "github.com/lewtec/superfolha/internal/git"
 )
 
 // ErrFileNotFound is returned when a requested file does not exist in the project.
@@ -34,7 +34,7 @@ func (s *Service) InitProjectRepo(projectId string) error {
 	pr, err := s.repoManager.GetRepo(projectId)
 	if err != nil {
 		// Check if the error is specifically that the repository does not exist
-		if err == git.ErrRepositoryNotExists { // Use the specific error type
+		if errors.Is(err, git.ErrRepositoryNotExists) {
 			// The pr instance is valid here, but pr.repo is nil.
 			// Call InitRepo on the valid pr instance.
 			return pr.InitRepo()
@@ -89,15 +89,6 @@ func (s *Service) ReadFile(projectId, filePath string) (io.ReadCloser, int64, er
 		return nil, 0, err
 	}
 	return reader, size, nil
-}
-
-// DecodeFilePath decodes a URL-encoded file path.
-func DecodeFilePath(encodedPath string) (string, error) {
-	// filepath.FromSlash returns only one value (the string result), not two.
-	// The error handling for filepath.FromSlash is incorrect.
-	decodedPath := filepath.FromSlash(encodedPath)
-	// No error is returned by filepath.FromSlash, so no error check needed here.
-	return decodedPath, nil
 }
 
 // ListFiles lists all files in a project's repository.
