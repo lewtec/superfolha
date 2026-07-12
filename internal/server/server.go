@@ -28,7 +28,7 @@ type Server struct {
 	repo           db.Repository
 	stateDir       string
 	resolver       *Resolver
-	projectService *project.Service // Added projectService
+	projectService *project.Service
 	authService    *auth.Service
 }
 
@@ -198,6 +198,10 @@ func (s *Server) handleUploadFile(w http.ResponseWriter, r *http.Request) {
 
 	err = s.projectService.SaveFile(projectIdStr, filePath, string(fileContent))
 	if err != nil {
+		if errors.Is(err, project.ErrInvalidPath) {
+			writeAPIError(w, apierrors.New(apierrors.CodeInvalidInput, "invalid file path"))
+			return
+		}
 		slog.Error("error saving file", "file", filePath, "project", projectIdStr, "err", err)
 		writeAPIError(w, apierrors.Internal(err))
 		return
