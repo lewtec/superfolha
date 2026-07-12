@@ -232,7 +232,7 @@ func (s *Server) handleDownloadFile(w http.ResponseWriter, r *http.Request) {
 
 	fileReader, fileSize, err := s.projectService.ReadFile(projectIdStr, filePath)
 	if err != nil {
-		if err == project.ErrFileNotFound {
+		if errors.Is(err, project.ErrFileNotFound) {
 			writeAPIError(w, apierrors.New(apierrors.CodeFileNotFound, "file not found"))
 			return
 		}
@@ -245,14 +245,23 @@ func (s *Server) handleDownloadFile(w http.ResponseWriter, r *http.Request) {
 	// Read a small chunk to detect content type
 	// http.DetectContentType needs at most 512 bytes
 	var buf [512]byte
-	n, _ := io.ReadFull(fileReader, buf[:])
+	n, err := io.ReadFull(fileReader, buf[:])
+	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+		slog.Error("error peeking file content type", "file", filePath, "project", projectIdStr, "err", err)
+		writeAPIError(w, apierrors.Internal(err))
+		return
+	}
 	contentType := http.DetectContentType(buf[:n])
 
 	// Reset the reader to the beginning for full content streaming
 	// This requires the underlying reader to be seekable.
 	// Since fileReader is an os.File, it is seekable.
 	if seeker, ok := fileReader.(io.ReadSeeker); ok {
-		seeker.Seek(0, io.SeekStart)
+		if _, err := seeker.Seek(0, io.SeekStart); err != nil {
+			slog.Error("error seeking file after content-type peek", "file", filePath, "project", projectIdStr, "err", err)
+			writeAPIError(w, apierrors.Internal(err))
+			return
+		}
 	} else {
 		// If not seekable, we would need to handle this differently,
 		// e.g., by reading into a buffer and then prepending the buffer
