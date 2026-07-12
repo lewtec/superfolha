@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/lewtec/superfolha/internal/appenv"
+	"github.com/lewtec/superfolha/internal/auth"
 )
 
 func setAuthCookie(w http.ResponseWriter, token string) {
@@ -13,7 +14,7 @@ func setAuthCookie(w http.ResponseWriter, token string) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "authToken",
 		Value:    token,
-		Expires:  time.Now().Add(7 * 24 * time.Hour),
+		Expires:  time.Now().Add(auth.TokenTTL),
 		HttpOnly: true,
 		Secure:   secure,
 		SameSite: http.SameSiteLaxMode,
