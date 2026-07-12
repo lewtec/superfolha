@@ -2,8 +2,10 @@ package auth
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -24,6 +26,11 @@ var (
 	ErrInvalidToken      = errors.New("invalid token")
 	ErrPasswordTooShort  = errors.New("password must be at least 8 characters")
 	ErrJWTSecretRequired = errors.New("JWT_SECRET environment variable is required")
+	ErrUnexpectedSigning = errors.New("unexpected signing method")
+
+	jwtSecretOnce sync.Once
+	jwtSecret     []byte
+	jwtSecretErr  error
 )
 
 type Claims struct {
@@ -32,23 +39,37 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
-// getJWTSecret retrieves the JWT secret from environment variable
+// getJWTSecret retrieves the JWT secret from the environment once and caches it.
+// Logs only on the first resolution so authenticated requests do not spam logs.
 func getJWTSecret() ([]byte, error) {
-	secret := os.Getenv("JWT_SECRET")
-	goEnv := os.Getenv("GO_ENV")                                                                          // Get GO_ENV as well
-	log.Printf("Auth: getJWTSecret called. JWT_SECRET is set: %t, GO_ENV env: '%s'", secret != "", goEnv) // Log env vars securely
+	jwtSecretOnce.Do(func() {
+		secret := os.Getenv("JWT_SECRET")
+		goEnv := os.Getenv("GO_ENV")
+		log.Printf("Auth: resolving JWT secret. JWT_SECRET is set: %t, GO_ENV: '%s'", secret != "", goEnv)
 
-	if secret == "" {
-		// Fallback for development only - should never be used in production
-		if goEnv == "development" { // Use goEnv here
-			log.Println("Auth: Using development fallback JWT secret.")
-			return []byte("dev-secret-change-in-production"), nil
+		if secret == "" {
+			// Fallback for development only - should never be used in production
+			if goEnv == "development" {
+				log.Println("Auth: Using development fallback JWT secret.")
+				jwtSecret = []byte("dev-secret-change-in-production")
+				return
+			}
+			log.Println("Auth: JWT_SECRET environment variable is required and not found.")
+			jwtSecretErr = ErrJWTSecretRequired
+			return
 		}
-		log.Println("Auth: JWT_SECRET environment variable is required and not found.")
-		return nil, ErrJWTSecretRequired
-	}
-	log.Println("Auth: Using JWT_SECRET from environment variable.")
-	return []byte(secret), nil
+		log.Println("Auth: Using JWT_SECRET from environment variable.")
+		jwtSecret = []byte(secret)
+	})
+	return jwtSecret, jwtSecretErr
+}
+
+// resetJWTSecretCache clears the cached secret so tests can change env vars.
+// Not for production use.
+func resetJWTSecretCache() {
+	jwtSecretOnce = sync.Once{}
+	jwtSecret = nil
+	jwtSecretErr = nil
 }
 
 // HashPassword hashes a password using bcrypt with recommended cost factor
@@ -68,7 +89,7 @@ func CheckPasswordHash(password, hash string) bool {
 
 // GenerateToken generates a JWT token for a user
 func GenerateToken(userID, email string) (string, error) {
-	jwtSecret, err := getJWTSecret()
+	secret, err := getJWTSecret()
 	if err != nil {
 		return "", err
 	}
@@ -83,18 +104,22 @@ func GenerateToken(userID, email string) (string, error) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(jwtSecret)
+	return token.SignedString(secret)
 }
 
 // ValidateToken validates a JWT token and returns the claims
 func ValidateToken(tokenString string) (*Claims, error) {
-	jwtSecret, err := getJWTSecret()
+	secret, err := getJWTSecret()
 	if err != nil {
 		return nil, err
 	}
 
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
-		return jwtSecret, nil
+		// Reject non-HMAC algorithms (classic alg confusion).
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("%w: %v", ErrUnexpectedSigning, token.Header["alg"])
+		}
+		return secret, nil
 	})
 
 	if err != nil {
