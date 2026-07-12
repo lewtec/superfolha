@@ -303,36 +303,6 @@ func ReadFile(repoPath, filePath string) (io.ReadCloser, int64, error) {
 
 }
 
-// WriteFile writes a file to the repository
-
-func WriteFile(repoPath, filePath, content string) error {
-
-	fullPath := filepath.Join(repoPath, filePath)
-
-	// Create directory if it doesn't exist
-
-	dir := filepath.Dir(fullPath)
-
-	if err := os.MkdirAll(dir, 0755); err != nil {
-
-		return fmt.Errorf("failed to create directory %s: %w", dir, err)
-
-	}
-
-	return os.WriteFile(fullPath, []byte(content), 0644)
-
-}
-
-// DeleteFile removes a file from the repository
-
-func DeleteFile(repoPath, filePath string) error {
-
-	fullPath := filepath.Join(repoPath, filePath)
-
-	return os.Remove(fullPath)
-
-}
-
 // ListFiles lists all files in the repository (excluding .git)
 
 func ListFiles(repoPath string) ([]*FileInfo, error) {
