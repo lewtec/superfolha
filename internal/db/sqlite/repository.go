@@ -6,7 +6,7 @@ import (
 	"embed"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -45,14 +45,14 @@ func NewRepository(path string) (*Repository, error) {
 
 	if err := conn.Ping(); err != nil {
 		if closeErr := conn.Close(); closeErr != nil {
-			log.Printf("failed to close sqlite connection on ping error: %v", closeErr)
+			slog.Error("failed to close sqlite connection on ping error", "err", closeErr)
 		}
 		return nil, fmt.Errorf("ping sqlite: %w", err)
 	}
 
 	if err := runMigrations(conn); err != nil {
 		if closeErr := conn.Close(); closeErr != nil {
-			log.Printf("failed to close sqlite connection on migration error: %v", closeErr)
+			slog.Error("failed to close sqlite connection on migration error", "err", closeErr)
 		}
 		return nil, err
 	}
