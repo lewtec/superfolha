@@ -63,7 +63,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("/api/graphql", ResponseWriterMiddleware(auth.Middleware(srv)))
 
 	// GraphQL Playground — debug surface; only register in development
-	if os.Getenv("GO_ENV") == "development" {
+	if isDevelopment() {
 		mux.Handle("/api/graphiql", playground.Handler("GraphQL playground", "/api/graphql"))
 	}
 
@@ -85,8 +85,13 @@ func (s *Server) Handler() http.Handler {
 	return mux
 }
 
+// isDevelopment reports whether GO_ENV is "development".
+func isDevelopment() bool {
+	return os.Getenv("GO_ENV") == "development"
+}
+
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
-	secure := os.Getenv("GO_ENV") != "development"
+	secure := !isDevelopment()
 	http.SetCookie(w, &http.Cookie{
 		Name:     "authToken",
 		Value:    "",
