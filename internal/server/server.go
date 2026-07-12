@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -128,7 +128,7 @@ func (s *Server) handleCompile(w http.ResponseWriter, r *http.Request) {
 
 	result, err := compiler.Compile(r.Context(), s.projectService, projectId, filePath)
 	if err != nil {
-		log.Printf("Error compiling project %s file %s for user %s: %v", projectId, filePath, user.UserID, err)
+		slog.Error("error compiling project", "project", projectId, "file", filePath, "user", user.UserID, "err", err)
 		if strings.Contains(err.Error(), "latexmk command not found") {
 			writeAPIError(w, apierrors.Wrap(apierrors.CodeCompileToolMissing, "latexmk not found", err))
 			return
@@ -184,14 +184,14 @@ func (s *Server) handleUploadFile(w http.ResponseWriter, r *http.Request) {
 
 	err = s.projectService.SaveFile(projectIdStr, filePath, string(fileContent))
 	if err != nil {
-		log.Printf("Error saving file %s to project %s: %v", filePath, projectIdStr, err)
+		slog.Error("error saving file", "file", filePath, "project", projectIdStr, "err", err)
 		writeAPIError(w, apierrors.Internal(err))
 		return
 	}
 
 	_, err = s.projectService.CommitChanges(projectIdStr, "System", "Uploaded file: "+filePath)
 	if err != nil {
-		log.Printf("Error committing file %s to project %s: %v", filePath, projectIdStr, err)
+		slog.Error("error committing file", "file", filePath, "project", projectIdStr, "err", err)
 		writeAPIError(w, apierrors.Internal(err))
 		return
 	}
@@ -236,7 +236,7 @@ func (s *Server) handleDownloadFile(w http.ResponseWriter, r *http.Request) {
 			writeAPIError(w, apierrors.New(apierrors.CodeFileNotFound, "file not found"))
 			return
 		}
-		log.Printf("Error reading file %s from project %s: %v", filePath, projectIdStr, err)
+		slog.Error("error reading file", "file", filePath, "project", projectIdStr, "err", err)
 		writeAPIError(w, apierrors.Internal(err))
 		return
 	}
@@ -258,7 +258,7 @@ func (s *Server) handleDownloadFile(w http.ResponseWriter, r *http.Request) {
 		// e.g., by reading into a buffer and then prepending the buffer
 		// to the stream, or by not detecting content type this way.
 		// For os.File, this path should not be taken.
-		log.Printf("Warning: fileReader is not seekable for %s", filePath)
+		slog.Warn("fileReader is not seekable", "file", filePath)
 	}
 
 	w.Header().Set("Content-Type", contentType)
@@ -267,7 +267,7 @@ func (s *Server) handleDownloadFile(w http.ResponseWriter, r *http.Request) {
 
 	_, err = io.Copy(w, fileReader) // Stream the file content
 	if err != nil {
-		log.Printf("Error writing file content to response for %s: %v", filePath, err)
+		slog.Error("error writing file content to response", "file", filePath, "err", err)
 		// No need to set status code again, as headers might have been sent
 	}
 }
@@ -296,7 +296,7 @@ func writeAPIError(w http.ResponseWriter, err error) {
 	if coded, ok := apierrors.As(err); ok {
 		w.WriteHeader(coded.Status())
 		if encErr := json.NewEncoder(w).Encode(coded.RESTBody()); encErr != nil {
-			log.Printf("error encoding api error response: %v", encErr)
+			slog.Error("error encoding api error response", "err", encErr)
 		}
 		return
 	}
@@ -305,6 +305,6 @@ func writeAPIError(w http.ResponseWriter, err error) {
 		Code:    string(apierrors.CodeInternal),
 		Message: err.Error(),
 	}); encErr != nil {
-		log.Printf("error encoding internal error response: %v", encErr)
+		slog.Error("error encoding internal error response", "err", encErr)
 	}
 }
