@@ -66,10 +66,6 @@ func NewResolver(repo db.Repository, stateDir string, projectService *project.Se
 	}
 }
 
-func (r *Resolver) getProjectPath(projectID string) string {
-	return r.projectService.GetProjectPath(projectID)
-}
-
 // requireUser returns the authenticated user, or an error if missing/invalid.
 // Me intentionally does not use this: unauthenticated Me returns (nil, nil).
 func requireUser(ctx context.Context) (*auth.UserContext, error) {
