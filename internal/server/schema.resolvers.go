@@ -259,7 +259,7 @@ func (r *queryResolver) Projects(ctx context.Context) ([]*Project, error) {
 
 	dbProjects, err := r.Repo.GetUserProjects(ctx, user.UserID)
 	if err != nil {
-		return nil, err
+		return nil, apierrors.Internal(err)
 	}
 
 	projects := make([]*Project, len(dbProjects))
