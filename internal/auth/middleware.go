@@ -30,14 +30,12 @@ func Middleware(next http.Handler) http.Handler {
 			tokenString = cookie.Value
 		}
 
-		// 2. If no token from cookie, try Authorization header
+		// 2. If no token from cookie, try Authorization header (case-sensitive "Bearer ").
 		if tokenString == "" {
+			const bearerPrefix = "Bearer "
 			authHeader := r.Header.Get("Authorization")
-			if authHeader != "" {
-				parts := strings.Split(authHeader, " ")
-				if len(parts) == 2 && parts[0] == "Bearer" {
-					tokenString = parts[1]
-				}
+			if after, ok := strings.CutPrefix(authHeader, bearerPrefix); ok {
+				tokenString = strings.TrimSpace(after)
 			}
 		}
 
