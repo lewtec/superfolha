@@ -48,6 +48,9 @@ type contextKey string
 // ResponseWriterContextKey is the key to store http.ResponseWriter in context.
 const ResponseWriterContextKey contextKey = "responseWriter"
 
+// maxUploadBytes is the multipart form size limit for handleUploadFile (32 MiB).
+const maxUploadBytes = 32 << 20
+
 // ResponseWriterMiddleware adds the http.ResponseWriter to the request context.
 func ResponseWriterMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -172,7 +175,7 @@ func (s *Server) handleUploadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = r.ParseMultipartForm(32 << 20) // 32 MB max
+	err = r.ParseMultipartForm(maxUploadBytes)
 	if err != nil {
 		writeAPIError(w, apierrors.New(apierrors.CodeInvalidInput, "failed to parse form"))
 		return
