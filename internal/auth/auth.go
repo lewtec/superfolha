@@ -28,7 +28,7 @@ var (
 	ErrJWTSecretRequired = errors.New("JWT_SECRET environment variable is required")
 	ErrUnexpectedSigning = errors.New("unexpected signing method")
 
-	jwtSecretOnce sync.Once
+	jwtSecretOnce = new(sync.Once)
 	jwtSecret     []byte
 	jwtSecretErr  error
 )
@@ -67,7 +67,7 @@ func getJWTSecret() ([]byte, error) {
 // resetJWTSecretCache clears the cached secret so tests can change env vars.
 // Not for production use.
 func resetJWTSecretCache() {
-	jwtSecretOnce = sync.Once{}
+	jwtSecretOnce = new(sync.Once)
 	jwtSecret = nil
 	jwtSecretErr = nil
 }
