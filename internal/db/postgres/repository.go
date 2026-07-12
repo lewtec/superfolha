@@ -6,7 +6,7 @@ import (
 	"embed"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -35,7 +35,7 @@ func NewRepository(dsn string) (*Repository, error) {
 	}
 	if err := runMigrations(migrationDB); err != nil {
 		if closeErr := migrationDB.Close(); closeErr != nil {
-			log.Printf("failed to close migration database on error: %v", closeErr)
+			slog.Error("failed to close migration database on error", "err", closeErr)
 		}
 		return nil, err
 	}
