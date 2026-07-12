@@ -27,7 +27,6 @@ const MaxGraphQLFileSize = 1024 * 1024 * 5 // 5 MB
 // HasBinary checks if the file content appears to be binary using http.DetectContentType.
 func HasBinary(content []byte, filename string) bool {
 	contentType := http.DetectContentType(content)
-	log.Printf("HasBinary: File %s detected content type: %s", filename, contentType)
 	if strings.HasPrefix(contentType, "text/") {
 		return false
 	}
