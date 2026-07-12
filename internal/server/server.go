@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"log/slog"
+	"mime"
 	"net/http"
+	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/99designs/gqlgen/graphql"
@@ -276,9 +278,17 @@ func (s *Server) handleDownloadFile(w http.ResponseWriter, r *http.Request) {
 		slog.Warn("fileReader is not seekable", "file", filePath)
 	}
 
+	// Use basename only so nested paths are not leaked in the download name,
+	// and FormatMediaType so quotes/newlines cannot break Content-Disposition.
+	base := filepath.Base(filePath)
+	cd := mime.FormatMediaType("attachment", map[string]string{"filename": base})
+	if cd == "" {
+		cd = `attachment; filename="download"`
+	}
+
 	w.Header().Set("Content-Type", contentType)
-	w.Header().Set("Content-Disposition", "attachment; filename=\""+filePath+"\"")
-	w.Header().Set("Content-Length", fmt.Sprintf("%d", fileSize)) // Set Content-Length header
+	w.Header().Set("Content-Disposition", cd)
+	w.Header().Set("Content-Length", strconv.FormatInt(fileSize, 10))
 
 	_, err = io.Copy(w, fileReader) // Stream the file content
 	if err != nil {
