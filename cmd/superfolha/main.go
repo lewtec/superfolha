@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -104,17 +104,20 @@ func openRepository(driver, dsn, stateDir string) (db.Repository, error) {
 func runServer(cmd *cobra.Command, args []string) {
 	absStateDir, err := filepath.Abs(stateDir)
 	if err != nil {
-		log.Fatalf("Failed to get absolute path for state directory %s: %v", stateDir, err)
+		slog.Error("failed to get absolute path for state directory", "state_dir", stateDir, "err", err)
+		os.Exit(1)
 	}
 	stateDir = absStateDir
 
 	if err := os.MkdirAll(stateDir, 0o755); err != nil {
-		log.Fatalf("Failed to create state directory: %v", err)
+		slog.Error("failed to create state directory", "err", err)
+		os.Exit(1)
 	}
 
 	repo, err := openRepository(dbDriver, dbDSN, stateDir)
 	if err != nil {
-		log.Fatalf("Unable to open database: %v", err)
+		slog.Error("unable to open database", "err", err)
+		os.Exit(1)
 	}
 	defer repo.Close()
 
@@ -122,14 +125,14 @@ func runServer(cmd *cobra.Command, args []string) {
 	if driver == "" {
 		driver = db.InferDriver(dbDSN)
 	}
-	log.Printf("Connected to database (driver=%s)", driver)
+	slog.Info("connected to database", "driver", driver)
 
 	projectService := project.NewService(stateDir)
 	authService := auth.NewService(repo)
 	srv := server.NewServer(repo, stateDir, projectService, authService)
 
 	addr := resolveAddr(listenAddr)
-	log.Printf("Starting server on %s", addr)
+	slog.Info("starting server", "addr", addr)
 
 	httpServer := &http.Server{
 		Addr:         addr,
@@ -150,17 +153,18 @@ func runServer(cmd *cobra.Command, args []string) {
 	select {
 	case err := <-serverErr:
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatalf("Server failed: %v", err)
+			slog.Error("server failed", "err", err)
+			os.Exit(1)
 		}
 	case sig := <-quit:
-		log.Printf("Shutting down server (signal=%v)...", sig)
+		slog.Info("shutting down server", "signal", sig)
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 		if err := httpServer.Shutdown(ctx); err != nil {
-			log.Printf("HTTP server shutdown error: %v", err)
+			slog.Error("HTTP server shutdown error", "err", err)
 		}
 		if err := <-serverErr; err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Printf("Server error after shutdown: %v", err)
+			slog.Error("server error after shutdown", "err", err)
 		}
 	}
 }
