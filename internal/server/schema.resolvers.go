@@ -183,6 +183,12 @@ func (r *projectResolver) Files(ctx context.Context, obj *Project) ([]*File, err
 func (r *projectResolver) File(ctx context.Context, obj *Project, path string) (*File, error) {
 	fileReader, fileSize, err := r.projectService.ReadFile(obj.ID, path)
 	if err != nil {
+		if errors.Is(err, project.ErrFileNotFound) {
+			return nil, apierrors.New(apierrors.CodeFileNotFound, "file not found")
+		}
+		if errors.Is(err, project.ErrInvalidPath) {
+			return nil, apierrors.New(apierrors.CodeInvalidInput, "invalid file path")
+		}
 		return nil, apierrors.Internal(err)
 	}
 	defer fileReader.Close()
