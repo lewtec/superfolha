@@ -117,6 +117,10 @@ func (r *mutationResolver) DeleteFile(ctx context.Context, projectID string, pat
 		if errors.Is(err, project.ErrInvalidPath) {
 			return false, apierrors.New(apierrors.CodeInvalidInput, "invalid file path")
 		}
+		// ProjectRepository.DeleteFile returns os.Remove errors unwrapped.
+		if errors.Is(err, os.ErrNotExist) {
+			return false, apierrors.New(apierrors.CodeFileNotFound, "file not found")
+		}
 		return false, apierrors.Internal(err)
 	}
 
