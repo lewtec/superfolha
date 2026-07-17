@@ -19,7 +19,7 @@ func TestHubFenceAndFlush(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	h, err := Open(svc, projectID)
+	h, err := Open(svc, projectID, "owner@example.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,8 +45,8 @@ func TestHubFenceAndFlush(t *testing.T) {
 	if !h.ClientReady("c1") {
 		t.Fatal("should be ready")
 	}
+	_ = c
 
-	// Mutate via server path and flush.
 	if err := h.Doc.SetTextServer("main.tex", "world\n"); err != nil {
 		t.Fatal(err)
 	}
@@ -61,10 +61,20 @@ func TestHubFenceAndFlush(t *testing.T) {
 		t.Fatalf("disk = %q", body)
 	}
 
-	// Sync lock blocks apply.
-	h.SetSyncLocked(true)
+	h.mu.Lock()
+	h.syncLocked = true
+	h.mu.Unlock()
 	if _, err := h.HandleSyncMessage("c1", []byte{0}); err == nil {
 		t.Fatal("expected sync locked")
 	}
-	h.SetSyncLocked(false)
+	h.mu.Lock()
+	h.syncLocked = false
+	h.mu.Unlock()
+
+	if err := h.CreateTextFile("extra.tex", "x\n"); err != nil {
+		t.Fatal(err)
+	}
+	if h.Doc.Source("extra.tex") != "x\n" {
+		t.Fatalf("extra = %q", h.Doc.Source("extra.tex"))
+	}
 }

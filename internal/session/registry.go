@@ -12,11 +12,11 @@ const DefaultIdleTTL = 30 * time.Minute
 
 // Registry holds live project hubs.
 type Registry struct {
-	mu       sync.Mutex
-	hubs     map[string]*Hub
-	idle     map[string]*time.Timer
-	svc      *project.Service
-	idleTTL  time.Duration
+	mu      sync.Mutex
+	hubs    map[string]*Hub
+	idle    map[string]*time.Timer
+	svc     *project.Service
+	idleTTL time.Duration
 }
 
 // NewRegistry creates an empty hub registry.
@@ -37,7 +37,7 @@ func (r *Registry) GetIfLive(projectID string) *Hub {
 }
 
 // GetOrOpen returns an existing hub or opens one and loads the project tree.
-func (r *Registry) GetOrOpen(projectID string) (*Hub, error) {
+func (r *Registry) GetOrOpen(projectID, ownerEmail string) (*Hub, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if t := r.idle[projectID]; t != nil {
@@ -45,9 +45,12 @@ func (r *Registry) GetOrOpen(projectID string) (*Hub, error) {
 		delete(r.idle, projectID)
 	}
 	if h, ok := r.hubs[projectID]; ok {
+		if ownerEmail != "" && h.OwnerEmail == "" {
+			h.OwnerEmail = ownerEmail
+		}
 		return h, nil
 	}
-	h, err := Open(r.svc, projectID)
+	h, err := Open(r.svc, projectID, ownerEmail)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +81,6 @@ func (r *Registry) evict(projectID string) {
 		return
 	}
 	if h.ClientCount() > 0 {
-		// Someone reconnected; cancel eviction.
 		delete(r.idle, projectID)
 		r.mu.Unlock()
 		return

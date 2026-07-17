@@ -30,6 +30,7 @@
     "i18next": "^25.6.2",
     "i18next-browser-languagedetector": "^8.2.0",
     "i18next-http-backend": "^3.0.2",
+    "lib0": "^0.2.117",
     "prettier": "^3.6.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
@@ -37,7 +38,10 @@
     "react-pdf": "^10.2.0",
     "react-relay": "^20.1.1",
     "react-router-dom": "^7.9.6",
-    "relay-runtime": "^20.1.1"
+    "relay-runtime": "^20.1.1",
+    "y-codemirror.next": "^0.3.5",
+    "y-protocols": "^1.0.7",
+    "yjs": "^13.6.31"
   },
   "devDependencies": {
     "@eslint/compat": "^2.0.0",

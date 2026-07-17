@@ -1,22 +1,21 @@
-import { useGetFileContent } from "../hooks/useGetFileContentQuery";
-import { useSaveFileMutation } from "../hooks/useSaveFileMutation";
 import { useDeleteFileMutation } from "../hooks/useDeleteFileMutation";
-import { useCommitProjectMutation } from "../hooks/useCommitProjectMutation";
-import { useDebounce } from "../hooks/useDebounce";
 import { useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { translateError, translateGraphQLErrors } from "../i18n/translateError";
 import { useGetProjectQuery } from "../hooks/useGetProjectQuery";
-import { useCallback, useEffect, useState } from "react";
-import { Menu, X, Code, FileText, Terminal } from "feather-icons-react";
+import { useAuthStatus } from "../hooks/useAuthStatus";
+import { useProjectCollab } from "../hooks/useProjectCollab";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Menu, X, Code, FileText, Terminal, MessageSquare } from "feather-icons-react";
 import FileTree from "../components/FileTree";
-import Editor from "../components/Editor";
+import CollabEditor from "../components/CollabEditor";
 import PDFViewer from "../components/PDFViewer";
 import BinaryFileViewer from "../components/BinaryFileViewer";
 import Layout from "../components/Layout";
 import { isBinaryContent } from "../utils/fileUtils";
+import type { SyncStatus } from "../collab/ProjectCollab";
 
-interface File {
+interface FileRow {
   path: string;
   content: string | null;
   isDirty: boolean;
@@ -25,171 +24,154 @@ interface File {
   isTooBig: boolean;
 }
 
-type EditorTab = "code" | "pdf" | "logs";
+type EditorTab = "code" | "pdf" | "logs" | "chat";
+
+function statusBadge(status: SyncStatus, t: (k: string) => string) {
+  switch (status) {
+    case "connecting":
+    case "syncing":
+      return (
+        <span className="badge badge-soft badge-warning whitespace-nowrap">
+          {t("editor:status_syncing")}
+        </span>
+      );
+    case "dirty":
+      return (
+        <span className="badge badge-soft badge-warning whitespace-nowrap">
+          {t("editor:status_saving")}
+        </span>
+      );
+    case "synced":
+      return (
+        <span className="badge badge-soft badge-success whitespace-nowrap">
+          {t("editor:status_synced")}
+        </span>
+      );
+    case "committing":
+      return (
+        <span className="badge badge-soft badge-warning whitespace-nowrap">
+          {t("editor:status_committing")}
+        </span>
+      );
+    case "committed":
+      return (
+        <span className="badge badge-soft badge-info whitespace-nowrap">
+          {t("editor:status_committed")}
+        </span>
+      );
+    case "flush_error":
+    case "commit_error":
+    case "error":
+      return (
+        <span className="badge badge-soft badge-error whitespace-nowrap">
+          {t("editor:status_error")}
+        </span>
+      );
+    case "offline":
+      return (
+        <span className="badge badge-soft badge-error whitespace-nowrap">
+          {t("editor:status_offline")}
+        </span>
+      );
+    default:
+      return null;
+  }
+}
 
 export default function EditorPage() {
   const { id } = useParams<{ id: string }>();
   const { t } = useTranslation(["editor", "common", "errors"]);
+  const { email } = useAuthStatus();
+  const { collab, status, files: collabFiles, chat, peers } = useProjectCollab(
+    id,
+    email,
+  );
 
   const { project } = useGetProjectQuery({ id: id! });
   const fetchedFiles = project?.files;
-  const { getFileContent } = useGetFileContent();
+  const { deleteFile } = useDeleteFileMutation();
 
-  const [files, setFiles] = useState<File[]>([]);
-  const [currentFile, setCurrentFile] = useState<File | null>(null);
+  const [currentPath, setCurrentPath] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<EditorTab>("code");
   const [pdfData, setPdfData] = useState<string | null>(null);
   const [logs, setLogs] = useState("");
   const [compiling, setCompiling] = useState(false);
-  const [editorStatus, setEditorStatus] = useState<
-    "clean" | "dirty" | "saving" | "saved" | "committed" | "error"
-  >("clean");
+  const [chatInput, setChatInput] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(() =>
     typeof window !== "undefined"
       ? window.matchMedia("(min-width: 768px)").matches
       : true,
   );
 
-  const { saveFile } = useSaveFileMutation();
-  const { deleteFile } = useDeleteFileMutation();
-  const { commitProject } = useCommitProjectMutation();
-
-  const debouncedCommit = useDebounce(() => {
-    if (editorStatus === "saved") {
-      commitProject(id!, "Auto-commit: changes saved.", {
-        onCompleted: (response, errors) => {
-          if (errors) {
-            console.error(
-              "Auto-commit failed:",
-              translateGraphQLErrors(t, errors),
-            );
-            return;
-          }
-          setEditorStatus("committed");
-        },
-        onError: (err) => {
-          console.error("Auto-commit failed:", translateError(t, err));
-        },
+  // Merge GraphQL bootstrap list with live tree.snapshot
+  const files: FileRow[] = useMemo(() => {
+    if (collabFiles.length > 0) {
+      return collabFiles.map((f) => {
+        const path = f.path;
+        const lower = path.toLowerCase();
+        const isBinary =
+          isBinaryContent("", path) ||
+          // extension-only when no content sample
+          /\.(png|jpe?g|gif|pdf|zip|woff2?|mp[34]|ttf|otf)$/i.test(lower);
+        return {
+          path,
+          content: null,
+          isDirty: false,
+          isBinary,
+          size: f.size,
+          isTooBig: f.size > 5 * 1024 * 1024,
+        };
       });
     }
-  }, 10000);
-
-  const handleFileSelect = useCallback(
-    async (path: string) => {
-      const file = files.find((f) => f.path === path);
-      if (file) {
-        if (file.content == null && !file.isBinary) {
-          const response = await getFileContent({ id: id!, path });
-          const content = response?.project?.file?.content;
-          const updatedFile = { ...file, content };
-          setFiles(files.map((f) => (f.path === path ? updatedFile : f)));
-          setCurrentFile(updatedFile);
-        } else {
-          setCurrentFile(file);
-        }
-        setActiveTab("code");
-        // Collapse drawer on small screens after pick
-        if (window.matchMedia("(max-width: 767px)").matches) {
-          setSidebarOpen(false);
-        }
-      }
-    },
-    [files, getFileContent, id],
-  );
-
-  useEffect(() => {
     if (fetchedFiles) {
-      type FetchedFile = {
-        path: string;
-        isBinary: boolean;
-        size: number;
-        isTooBig: boolean;
-      };
-
-      const initialFiles: File[] = (fetchedFiles as FetchedFile[]).map(
+      return (fetchedFiles as { path: string; isBinary: boolean; size: number; isTooBig: boolean }[]).map(
         (file) => ({
           ...file,
           content: null,
           isDirty: false,
         }),
       );
-      setFiles(initialFiles);
-      if (initialFiles.length > 0) {
-        handleFileSelect(initialFiles[0].path);
-      } else {
-        setCurrentFile(null);
-      }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-seed when server file list changes
-  }, [fetchedFiles]);
+    return [];
+  }, [collabFiles, fetchedFiles]);
+
+  const currentFile = currentPath
+    ? files.find((f) => f.path === currentPath) || null
+    : null;
 
   useEffect(() => {
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      const anyDirty = files.some((file) => file.isDirty);
-      if (anyDirty) {
-        event.preventDefault();
-        event.returnValue = "";
-
-        commitProject(id!, "Auto-commit: changes before unload.");
-      }
-    };
-
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [files, commitProject, id]);
-
-  useEffect(() => {
-    if (editorStatus === "saved") {
-      debouncedCommit();
+    if (!currentPath && files.length > 0) {
+      setCurrentPath(files[0]!.path);
     }
-  }, [editorStatus, debouncedCommit]);
+  }, [files, currentPath]);
 
-  const memoizedOnSave = useCallback(
-    (content: string) => {
-      if (currentFile) {
-        setEditorStatus("saving");
-        saveFile(id!, currentFile.path, content, {
-          onCompleted: (_response, errors) => {
-            if (errors) {
-              setEditorStatus("error");
-              alert(translateGraphQLErrors(t, errors));
-              return;
-            }
-            setEditorStatus("saved");
-            setFiles((prevFiles) =>
-              prevFiles.map((file) =>
-                file.path === currentFile.path
-                  ? { ...file, content, isDirty: false }
-                  : file,
-              ),
-            );
-            setCurrentFile((prev) =>
-              prev ? { ...prev, content, isDirty: false } : null,
-            );
-          },
-          onError: (err) => {
-            setEditorStatus("error");
-            alert(t("editor:save_failed"));
-            console.error(err);
-          },
-        });
+  const handleFileSelect = useCallback(
+    (path: string) => {
+      setCurrentPath(path);
+      setActiveTab("code");
+      if (window.matchMedia("(max-width: 767px)").matches) {
+        setSidebarOpen(false);
       }
     },
-    [id, currentFile, saveFile, t],
+    [],
   );
 
   const memoizedOnDeleteFile = useCallback(
     (path: string) => {
+      if (collab) {
+        collab.deleteFile(path);
+        if (currentPath === path) {
+          setCurrentPath(null);
+        }
+        return;
+      }
       deleteFile(id!, path, {
         onCompleted: (_response, errors) => {
           if (errors) {
             alert(translateGraphQLErrors(t, errors));
             return;
           }
-          setFiles((prev) => prev.filter((f) => f.path !== path));
-          if (currentFile?.path === path) {
-            setCurrentFile(files.filter((f) => f.path !== path)[0] || null);
-          }
+          if (currentPath === path) setCurrentPath(null);
         },
         onError: (err) => {
           alert(t("editor:delete_file_failed"));
@@ -197,118 +179,37 @@ export default function EditorPage() {
         },
       });
     },
-    [id, deleteFile, currentFile, files, t],
+    [collab, id, deleteFile, currentPath, t],
   );
 
   const handleNewFile = useCallback(() => {
     const fileName = prompt(t("editor:enter_file_name"));
-    if (fileName) {
-      const newFile: File = {
-        path: fileName,
-        content: "",
-        isDirty: true,
-        isBinary: false,
-        size: 0,
-        isTooBig: false,
-      };
-      setFiles((prev) => [...prev, newFile]);
-      setCurrentFile(newFile);
+    if (!fileName) return;
+    if (collab) {
+      collab.createFile(fileName, "");
+      setCurrentPath(fileName);
       setActiveTab("code");
+      return;
     }
-  }, [t]);
+    setCurrentPath(fileName);
+  }, [collab, t]);
 
   const handleLoadFile = useCallback(
     (fileName: string, content: string | null) => {
-      let isBinary = false;
-      let size = 0;
-      let isTooBig = false;
-
-      if (content !== null) {
-        isBinary = isBinaryContent(content, fileName);
-        size = content.length;
-        isTooBig = false;
+      // Uploads go through REST; refresh comes from tree.event / re-list.
+      // For text uploads with content, push into collab if live.
+      if (content !== null && collab && !isBinaryContent(content, fileName)) {
+        collab.createFile(fileName, content);
       }
-
-      setFiles((prev) => {
-        const existingFileIndex = prev.findIndex(
-          (file) => file.path === fileName,
-        );
-        if (existingFileIndex > -1) {
-          const updatedFiles = [...prev];
-          updatedFiles[existingFileIndex] = {
-            ...updatedFiles[existingFileIndex],
-            content:
-              content !== null
-                ? content
-                : updatedFiles[existingFileIndex].content,
-            isDirty: true,
-            isBinary,
-            size,
-            isTooBig,
-          };
-          return updatedFiles;
-        }
-        return [
-          ...prev,
-          {
-            path: fileName,
-            content: content !== null ? content : null,
-            isDirty: true,
-            isBinary,
-            size,
-            isTooBig,
-          },
-        ];
-      });
-      setCurrentFile((prev) => {
-        if (prev && prev.path === fileName) {
-          return {
-            ...prev,
-            content: content !== null ? content : prev.content,
-            isDirty: true,
-            isBinary,
-            size,
-            isTooBig,
-          };
-        }
-        return (
-          files.find((file) => file.path === fileName) || {
-            path: fileName,
-            content,
-            isDirty: true,
-            isBinary,
-            size,
-            isTooBig,
-          }
-        );
-      });
-
-      if (content !== null && !isBinary) {
-        memoizedOnSave(content);
-      }
+      setCurrentPath(fileName);
+      setActiveTab("code");
     },
-    [files, memoizedOnSave],
-  );
-
-  const handleEditorChange = useCallback(
-    (content: string) => {
-      setFiles((prevFiles) =>
-        prevFiles.map((file) =>
-          file.path === currentFile?.path
-            ? { ...file, content, isDirty: true }
-            : file,
-        ),
-      );
-      setCurrentFile((prev) =>
-        prev ? { ...prev, content, isDirty: true } : null,
-      );
-      setEditorStatus("dirty");
-    },
-    [currentFile],
+    [collab],
   );
 
   const compile = useCallback(async () => {
-    if (!currentFile || !currentFile.path) {
+    const path = currentPath;
+    if (!path) {
       setLogs(t("editor:no_file_compile"));
       setActiveTab("logs");
       return;
@@ -319,7 +220,7 @@ export default function EditorPage() {
 
     try {
       const response = await fetch(
-        `/api/compile?project=${id}&file=${encodeURIComponent(currentFile.path)}`,
+        `/api/compile?project=${id}&file=${encodeURIComponent(path)}`,
         {
           method: "GET",
           credentials: "include",
@@ -351,53 +252,20 @@ export default function EditorPage() {
     } finally {
       setCompiling(false);
     }
-  }, [id, currentFile, t]);
+  }, [id, currentPath, t]);
 
-  const getStatusBadge = () => {
-    const anyDirty = files.some((file) => file.isDirty);
-
-    if (anyDirty) {
-      return (
-        <span className="badge badge-soft badge-error whitespace-nowrap">
-          {t("editor:status_unsaved")}
-        </span>
-      );
-    }
-
-    switch (editorStatus) {
-      case "saving":
-        return (
-          <span className="badge badge-soft badge-warning whitespace-nowrap">
-            {t("editor:status_saving")}
-          </span>
-        );
-      case "saved":
-        return (
-          <span className="badge badge-soft badge-success whitespace-nowrap">
-            {t("editor:status_saved")}
-          </span>
-        );
-      case "error":
-        return (
-          <span className="badge badge-soft badge-error whitespace-nowrap">
-            {t("editor:status_error")}
-          </span>
-        );
-      case "committed":
-      case "clean":
-      default:
-        return (
-          <span className="badge badge-soft badge-info whitespace-nowrap">
-            {t("editor:status_committed")}
-          </span>
-        );
-    }
-  };
+  const sendChat = useCallback(() => {
+    const text = chatInput.trim();
+    if (!text || !collab) return;
+    collab.sendChat(text);
+    setChatInput("");
+  }, [chatInput, collab]);
 
   const viewRows: { id: EditorTab; label: string; icon: typeof Code }[] = [
     { id: "code", label: t("editor:code"), icon: Code },
     { id: "pdf", label: t("editor:pdf"), icon: FileText },
     { id: "logs", label: t("editor:logs"), icon: Terminal },
+    { id: "chat", label: t("editor:chat"), icon: MessageSquare },
   ];
 
   const selectView = (tab: EditorTab) => {
@@ -406,6 +274,12 @@ export default function EditorPage() {
       setSidebarOpen(false);
     }
   };
+
+  const treeFiles = files.map((f) => ({
+    path: f.path,
+    content: f.content ?? "",
+    isDirty: false,
+  }));
 
   const sidebar = (
     <aside
@@ -434,6 +308,25 @@ export default function EditorPage() {
         </button>
       </div>
 
+      {peers.length > 0 ? (
+        <div className="px-3 py-2 border-b border-base-300 flex flex-wrap gap-1">
+          {peers.map((p) => (
+            <span
+              key={p.clientId}
+              className="badge badge-sm gap-1"
+              style={{ borderColor: p.color, color: p.color }}
+              title={p.name}
+            >
+              <span
+                className="w-2 h-2 rounded-full"
+                style={{ background: p.color }}
+              />
+              {p.name}
+            </span>
+          ))}
+        </div>
+      ) : null}
+
       <nav
         className="p-2 border-b border-base-300 shrink-0"
         aria-label={t("editor:view")}
@@ -459,8 +352,8 @@ export default function EditorPage() {
 
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
         <FileTree
-          files={files as { path: string; content: string; isDirty: boolean }[]}
-          currentFile={currentFile?.path || null}
+          files={treeFiles}
+          currentFile={currentPath}
           onFileSelect={handleFileSelect}
           onNewFile={handleNewFile}
           onDeleteFile={memoizedOnDeleteFile}
@@ -470,6 +363,11 @@ export default function EditorPage() {
       </div>
     </aside>
   );
+
+  const ytext =
+    collab && currentPath && currentFile && !currentFile.isBinary
+      ? collab.getYText(currentPath)
+      : null;
 
   return (
     <Layout
@@ -488,7 +386,15 @@ export default function EditorPage() {
       }
       navEnd={
         <>
-          {getStatusBadge()}
+          {statusBadge(status, t)}
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm hidden sm:inline-flex"
+            onClick={() => collab?.commitNow()}
+            title={t("editor:commit_now")}
+          >
+            {t("editor:commit_now")}
+          </button>
           <button
             type="button"
             className={`btn btn-primary btn-sm sm:btn-md min-h-[var(--touch-min)] ${compiling ? "btn-disabled" : ""}`}
@@ -510,7 +416,6 @@ export default function EditorPage() {
       }
     >
       <div className="editor-workspace relative flex flex-1 min-h-0 overflow-hidden">
-        {/* Backdrop (mobile) */}
         {sidebarOpen ? (
           <button
             type="button"
@@ -527,16 +432,9 @@ export default function EditorPage() {
           {currentFile ? (
             <div className="px-3 py-1.5 text-sm border-b border-base-300 truncate text-base-content/80 shrink-0">
               {currentFile.path}
-              {currentFile.isDirty ? (
-                <span className="text-warning ml-1">•</span>
-              ) : null}
             </div>
           ) : null}
 
-          {/*
-            Keep all panes mounted so tab switches do not remount CodeMirror
-            or reload the PDF iframe. Inactive panes are only hidden.
-          */}
           <div className="relative flex-1 min-h-0">
             <div
               className={`absolute inset-0 min-h-0 flex flex-col ${
@@ -548,13 +446,17 @@ export default function EditorPage() {
             >
               {currentFile && currentFile.isBinary ? (
                 <BinaryFileViewer fileName={currentFile.path} projectId={id!} />
-              ) : currentFile ? (
-                <Editor
+              ) : currentFile && ytext && collab ? (
+                <CollabEditor
                   key={currentFile.path}
-                  value={currentFile.content}
-                  onChange={handleEditorChange}
-                  onSave={memoizedOnSave}
+                  path={currentFile.path}
+                  ytext={ytext}
+                  awareness={collab.awareness}
                 />
+              ) : currentFile && !collab ? (
+                <div className="flex items-center justify-center h-full text-base-content/70 page-pad">
+                  {t("editor:status_connecting")}
+                </div>
               ) : (
                 <div className="flex items-center justify-center h-full text-base-content/70 page-pad">
                   {t("editor:select_file")}
@@ -574,19 +476,63 @@ export default function EditorPage() {
             </div>
 
             <div
-              className={`absolute inset-0 min-h-0 flex flex-col ${
+              className={`absolute inset-0 min-h-0 flex flex-col p-3 ${
                 activeTab === "logs"
                   ? "z-10"
                   : "z-0 invisible pointer-events-none"
               }`}
               aria-hidden={activeTab !== "logs"}
             >
-              <Editor
-                key="__logs__"
-                value={logs}
-                onChange={() => null}
-                onSave={() => null}
-              />
+              <pre className="flex-1 overflow-auto text-xs font-mono whitespace-pre-wrap bg-base-200 rounded-box p-3">
+                {logs || t("editor:logs_empty")}
+              </pre>
+            </div>
+
+            <div
+              className={`absolute inset-0 min-h-0 flex flex-col ${
+                activeTab === "chat"
+                  ? "z-10"
+                  : "z-0 invisible pointer-events-none"
+              }`}
+              aria-hidden={activeTab !== "chat"}
+            >
+              <div className="flex-1 overflow-auto p-3 space-y-2">
+                {chat.length === 0 ? (
+                  <p className="text-base-content/60 text-sm">
+                    {t("editor:chat_empty")}
+                  </p>
+                ) : (
+                  chat.map((m, i) => (
+                    <div key={`${m.at}-${i}`} className="text-sm">
+                      <span className="font-semibold text-primary">
+                        {m.from}
+                      </span>
+                      <span className="text-base-content/50 text-xs ml-2">
+                        {new Date(m.at).toLocaleTimeString()}
+                      </span>
+                      <p className="whitespace-pre-wrap">{m.text}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+              <div className="p-2 border-t border-base-300 flex gap-2">
+                <input
+                  className="input input-bordered input-sm flex-1"
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") sendChat();
+                  }}
+                  placeholder={t("editor:chat_placeholder")}
+                />
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={sendChat}
+                >
+                  {t("editor:chat_send")}
+                </button>
+              </div>
             </div>
           </div>
         </div>

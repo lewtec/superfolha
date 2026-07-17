@@ -35,13 +35,14 @@ type Server struct {
 }
 
 func NewServer(repo db.Repository, stateDir string, projectService *project.Service, authService *auth.Service) *Server {
+	hubs := session.NewRegistry(projectService)
 	return &Server{
 		repo:           repo,
 		stateDir:       stateDir,
-		resolver:       NewResolver(repo, stateDir, projectService, authService),
+		resolver:       NewResolver(repo, stateDir, projectService, authService, hubs),
 		projectService: projectService,
 		authService:    authService,
-		hubs:           session.NewRegistry(projectService),
+		hubs:           hubs,
 	}
 }
 
@@ -219,8 +220,37 @@ func (s *Server) handleUploadFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	filePath := header.Filename
+	body := string(fileContent)
 
-	err = s.projectService.SaveFile(projectIdStr, filePath, string(fileContent))
+	// Common path: live hub updates CRDT for text / disk for blobs and fans out tree.event.
+	if s.hubs != nil {
+		if hub := s.hubs.GetIfLive(projectIdStr); hub != nil {
+			if err := hub.SaveTextFile(filePath, body); err != nil {
+				slog.Error("error saving file via hub", "file", filePath, "project", projectIdStr, "err", err)
+				writeAPIError(w, apierrors.Internal(err))
+				return
+			}
+			// Notify peers of new/updated path (create or replace).
+			if ev, mErr := json.Marshal(map[string]any{
+				"type": "tree.event",
+				"op":   "create",
+				"path": filePath,
+			}); mErr == nil {
+				hub.BroadcastJSON(ev, "")
+			}
+			if _, err := hub.Commit("Uploaded file: "+filePath, user.Email); err != nil {
+				slog.Error("error committing upload via hub", "file", filePath, "project", projectIdStr, "err", err)
+				writeAPIError(w, apierrors.Internal(err))
+				return
+			}
+			if encErr := json.NewEncoder(w).Encode(map[string]string{"message": "File uploaded successfully", "path": filePath}); encErr != nil {
+				slog.Error("error encoding upload response", "err", encErr)
+			}
+			return
+		}
+	}
+
+	err = s.projectService.SaveFile(projectIdStr, filePath, body)
 	if err != nil {
 		slog.Error("error saving file", "file", filePath, "project", projectIdStr, "err", err)
 		writeAPIError(w, apierrors.Internal(err))

@@ -16,6 +16,7 @@ import (
 	"github.com/lewtec/superfolha/internal/db"
 	igit "github.com/lewtec/superfolha/internal/git"
 	"github.com/lewtec/superfolha/internal/project"
+	"github.com/lewtec/superfolha/internal/session"
 )
 
 //go:embed templates
@@ -35,14 +36,16 @@ type Resolver struct {
 	StateDir       string
 	projectService *project.Service
 	authService    *auth.Service
+	hubs           *session.Registry
 }
 
-func NewResolver(repo db.Repository, stateDir string, projectService *project.Service, authService *auth.Service) *Resolver {
+func NewResolver(repo db.Repository, stateDir string, projectService *project.Service, authService *auth.Service, hubs *session.Registry) *Resolver {
 	return &Resolver{
 		Repo:           repo,
 		StateDir:       stateDir,
 		projectService: projectService,
 		authService:    authService,
+		hubs:           hubs,
 	}
 }
 
