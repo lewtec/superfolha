@@ -87,6 +87,7 @@ func openRepository(driver, dsn, stateDir string) (db.Repository, error) {
 
 	switch driver {
 	case "postgres", "postgresql":
+		slog.Warn("postgres driver is deprecated; Superfolha targets single-instance SQLite — plan to migrate off postgres")
 		if dsn == "" {
 			return nil, fmt.Errorf("postgres driver requires a DSN (--db / DATABASE_URL)")
 		}
@@ -163,6 +164,7 @@ func runServer(cmd *cobra.Command, args []string) {
 		if err := httpServer.Shutdown(ctx); err != nil {
 			slog.Error("HTTP server shutdown error", "err", err)
 		}
+		srv.CloseHubs()
 		if err := <-serverErr; err != nil && !errors.Is(err, http.ErrServerClosed) {
 			slog.Error("server error after shutdown", "err", err)
 		}

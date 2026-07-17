@@ -21,6 +21,7 @@ import (
 	"github.com/lewtec/superfolha/internal/compiler"
 	"github.com/lewtec/superfolha/internal/db"
 	"github.com/lewtec/superfolha/internal/project"
+	"github.com/lewtec/superfolha/internal/session"
 	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
@@ -28,8 +29,9 @@ type Server struct {
 	repo           db.Repository
 	stateDir       string
 	resolver       *Resolver
-	projectService *project.Service // Added projectService
+	projectService *project.Service
 	authService    *auth.Service
+	hubs           *session.Registry
 }
 
 func NewServer(repo db.Repository, stateDir string, projectService *project.Service, authService *auth.Service) *Server {
@@ -39,6 +41,14 @@ func NewServer(repo db.Repository, stateDir string, projectService *project.Serv
 		resolver:       NewResolver(repo, stateDir, projectService, authService),
 		projectService: projectService,
 		authService:    authService,
+		hubs:           session.NewRegistry(projectService),
+	}
+}
+
+// CloseHubs flushes and drops live collaboration hubs (call on shutdown).
+func (s *Server) CloseHubs() {
+	if s.hubs != nil {
+		s.hubs.CloseAll()
 	}
 }
 
@@ -74,6 +84,9 @@ func (s *Server) Handler() http.Handler {
 
 	// Compile endpoint
 	mux.Handle("/api/compile", auth.Middleware(http.HandlerFunc(s.handleCompile)))
+
+	// Live collaboration WebSocket (session fence + Yjs binary sync)
+	mux.Handle("GET /ws/projects/{projectId}", auth.Middleware(http.HandlerFunc(s.handleProjectWS)))
 
 	// Upload file endpoint
 	mux.Handle("/api/projects/{projectId}/upload-file", auth.Middleware(http.HandlerFunc(s.handleUploadFile)))
@@ -135,6 +148,17 @@ func (s *Server) handleCompile(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeAPIError(w, apierrors.New(apierrors.CodeInvalidInput, "invalid file path"))
 		return
+	}
+
+	// When a live hub exists, flush collaborative text onto the working tree first.
+	if s.hubs != nil {
+		if hub := s.hubs.GetIfLive(projectId); hub != nil {
+			if flushErr := hub.Flush(); flushErr != nil {
+				slog.Error("flush before compile", "project", projectId, "err", flushErr)
+				writeAPIError(w, apierrors.Wrap(apierrors.CodeInternal, "failed to flush project before compile", flushErr))
+				return
+			}
+		}
 	}
 
 	result, err := compiler.Compile(r.Context(), s.projectService, projectId, filePath)

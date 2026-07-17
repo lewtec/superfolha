@@ -31,10 +31,10 @@ func TestValidateRepoRelativePath(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := validateRepoRelativePath(tt.in)
+			got, err := ValidateRepoRelativePath(tt.in)
 			if tt.wantErr {
 				if err == nil {
-					t.Fatalf("validateRepoRelativePath(%q) = %q, want error", tt.in, got)
+					t.Fatalf("ValidateRepoRelativePath(%q) = %q, want error", tt.in, got)
 				}
 				if !errors.Is(err, ErrInvalidPath) {
 					t.Fatalf("error = %v, want errors.Is(..., ErrInvalidPath)", err)
@@ -42,10 +42,10 @@ func TestValidateRepoRelativePath(t *testing.T) {
 				return
 			}
 			if err != nil {
-				t.Fatalf("validateRepoRelativePath(%q) unexpected error: %v", tt.in, err)
+				t.Fatalf("ValidateRepoRelativePath(%q) unexpected error: %v", tt.in, err)
 			}
 			if got != tt.want {
-				t.Fatalf("validateRepoRelativePath(%q) = %q, want %q", tt.in, got, tt.want)
+				t.Fatalf("ValidateRepoRelativePath(%q) = %q, want %q", tt.in, got, tt.want)
 			}
 		})
 	}
