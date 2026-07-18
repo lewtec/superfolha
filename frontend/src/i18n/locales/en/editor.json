@@ -25,5 +25,16 @@
   "download": "Download",
   "binary_file": "This is a binary file and cannot be displayed in the editor.",
   "download_failed": "Failed to download file",
-  "pdf_empty": "No PDF compiled yet. Click Compile to generate a PDF."
+  "pdf_empty": "No PDF compiled yet. Click Compile to generate a PDF.",
+  "status_syncing": "Sincronizando…",
+  "status_synced": "Sincronizado",
+  "status_committing": "Haciendo commit…",
+  "status_offline": "Sin conexión",
+  "status_connecting": "Conectando a la sesión…",
+  "commit_now": "Commit",
+  "chat": "Chat",
+  "chat_empty": "Aún no hay mensajes.",
+  "chat_placeholder": "Mensaje…",
+  "chat_send": "Enviar",
+  "logs_empty": "Aún no hay registros de compilación."
 }

@@ -140,7 +140,7 @@ func (pr *ProjectRepository) ReadFile(filePath string) (io.ReadCloser, int64, er
 	pr.Lock()
 	defer pr.Unlock()
 
-	rel, err := validateRepoRelativePath(filePath)
+	rel, err := ValidateRepoRelativePath(filePath)
 	if err != nil {
 		return nil, 0, err
 	}

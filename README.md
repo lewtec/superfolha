@@ -18,7 +18,7 @@ A complete web-based LaTeX editor with Git version control, real-time compilatio
 ### Backend (Go)
 - HTTP server with stdlib router
 - GraphQL API via gqlgen
-- Dual backends (ciborg-style): SQLite (modernc.org/sqlite) or PostgreSQL (pgx), via sqlc
+- SQLite (modernc.org/sqlite) via sqlc; PostgreSQL driver still present but **deprecated** (single-instance target)
 - Git operations
 - JWT authentication
 - LaTeX compilation with latexmk / TeX Live
@@ -150,9 +150,12 @@ export DATABASE_URL="/var/superfolha/superfolha.db"
 
 - `GET /`: Serves SPA
 - `POST /api/graphql`: GraphQL API
-- `POST /api/compile`: LaTeX compilation endpoint
+- `GET /api/compile`: LaTeX compilation (`?project=&file=`); flushes live CRDT hub first when present
+- `GET /ws/projects/{id}`: Live collaboration WebSocket (JWT session; hello/hello.ack fence + Yjs)
 - `POST /api/logout`: Clears session cookie
 - `GET /playground`: GraphQL playground (development)
+
+Live collab is documented in `SPEC.md` (ygo server CRDT, Git working tree projection, single-instance).
 
 ## License
 

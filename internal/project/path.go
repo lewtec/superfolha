@@ -11,9 +11,9 @@ import (
 // ErrInvalidPath is returned when a file path is empty, absolute, or escapes the repository root.
 var ErrInvalidPath = errors.New("invalid file path")
 
-// validateRepoRelativePath cleans and validates a user-supplied path relative to a repository root.
+// ValidateRepoRelativePath cleans and validates a user-supplied path relative to a repository root.
 // It rejects empty paths, absolute paths, and paths that escape via "..".
-func validateRepoRelativePath(userPath string) (string, error) {
+func ValidateRepoRelativePath(userPath string) (string, error) {
 	if userPath == "" {
 		return "", fmt.Errorf("%w: empty path", ErrInvalidPath)
 	}
@@ -35,7 +35,7 @@ func validateRepoRelativePath(userPath string) (string, error) {
 // safeRepoPath joins userPath under repoRoot after validating it stays inside the repo.
 // Returns the absolute (or repo-rooted) filesystem path on success.
 func safeRepoPath(repoRoot, userPath string) (string, error) {
-	rel, err := validateRepoRelativePath(userPath)
+	rel, err := ValidateRepoRelativePath(userPath)
 	if err != nil {
 		return "", err
 	}
@@ -61,5 +61,5 @@ func DecodeFilePath(encodedPath string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("%w: %v", ErrInvalidPath, err)
 	}
-	return validateRepoRelativePath(decoded)
+	return ValidateRepoRelativePath(decoded)
 }

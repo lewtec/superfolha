@@ -21,6 +21,7 @@ import (
 	"github.com/lewtec/superfolha/internal/compiler"
 	"github.com/lewtec/superfolha/internal/db"
 	"github.com/lewtec/superfolha/internal/project"
+	"github.com/lewtec/superfolha/internal/session"
 	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
@@ -28,17 +29,27 @@ type Server struct {
 	repo           db.Repository
 	stateDir       string
 	resolver       *Resolver
-	projectService *project.Service // Added projectService
+	projectService *project.Service
 	authService    *auth.Service
+	hubs           *session.Registry
 }
 
 func NewServer(repo db.Repository, stateDir string, projectService *project.Service, authService *auth.Service) *Server {
+	hubs := session.NewRegistry(projectService)
 	return &Server{
 		repo:           repo,
 		stateDir:       stateDir,
-		resolver:       NewResolver(repo, stateDir, projectService, authService),
+		resolver:       NewResolver(repo, stateDir, projectService, authService, hubs),
 		projectService: projectService,
 		authService:    authService,
+		hubs:           hubs,
+	}
+}
+
+// CloseHubs flushes and drops live collaboration hubs (call on shutdown).
+func (s *Server) CloseHubs() {
+	if s.hubs != nil {
+		s.hubs.CloseAll()
 	}
 }
 
@@ -74,6 +85,9 @@ func (s *Server) Handler() http.Handler {
 
 	// Compile endpoint
 	mux.Handle("/api/compile", auth.Middleware(http.HandlerFunc(s.handleCompile)))
+
+	// Live collaboration WebSocket (session fence + Yjs binary sync)
+	mux.Handle("GET /ws/projects/{projectId}", auth.Middleware(http.HandlerFunc(s.handleProjectWS)))
 
 	// Upload file endpoint
 	mux.Handle("/api/projects/{projectId}/upload-file", auth.Middleware(http.HandlerFunc(s.handleUploadFile)))
@@ -137,6 +151,17 @@ func (s *Server) handleCompile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// When a live hub exists, flush collaborative text onto the working tree first.
+	if s.hubs != nil {
+		if hub := s.hubs.GetIfLive(projectId); hub != nil {
+			if flushErr := hub.Flush(); flushErr != nil {
+				slog.Error("flush before compile", "project", projectId, "err", flushErr)
+				writeAPIError(w, apierrors.Wrap(apierrors.CodeInternal, "failed to flush project before compile", flushErr))
+				return
+			}
+		}
+	}
+
 	result, err := compiler.Compile(r.Context(), s.projectService, projectId, filePath)
 	if err != nil {
 		slog.Error("error compiling project", "project", projectId, "file", filePath, "user", user.UserID, "err", err)
@@ -195,8 +220,37 @@ func (s *Server) handleUploadFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	filePath := header.Filename
+	body := string(fileContent)
 
-	err = s.projectService.SaveFile(projectIdStr, filePath, string(fileContent))
+	// Common path: live hub updates CRDT for text / disk for blobs and fans out tree.event.
+	if s.hubs != nil {
+		if hub := s.hubs.GetIfLive(projectIdStr); hub != nil {
+			if err := hub.SaveTextFile(filePath, body); err != nil {
+				slog.Error("error saving file via hub", "file", filePath, "project", projectIdStr, "err", err)
+				writeAPIError(w, apierrors.Internal(err))
+				return
+			}
+			// Notify peers of new/updated path (create or replace).
+			if ev, mErr := json.Marshal(map[string]any{
+				"type": "tree.event",
+				"op":   "create",
+				"path": filePath,
+			}); mErr == nil {
+				hub.BroadcastJSON(ev, "")
+			}
+			if _, err := hub.Commit("Uploaded file: "+filePath, user.Email); err != nil {
+				slog.Error("error committing upload via hub", "file", filePath, "project", projectIdStr, "err", err)
+				writeAPIError(w, apierrors.Internal(err))
+				return
+			}
+			if encErr := json.NewEncoder(w).Encode(map[string]string{"message": "File uploaded successfully", "path": filePath}); encErr != nil {
+				slog.Error("error encoding upload response", "err", encErr)
+			}
+			return
+		}
+	}
+
+	err = s.projectService.SaveFile(projectIdStr, filePath, body)
 	if err != nil {
 		slog.Error("error saving file", "file", filePath, "project", projectIdStr, "err", err)
 		writeAPIError(w, apierrors.Internal(err))

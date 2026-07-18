@@ -10,6 +10,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/lewtec/superfolha/internal/apierrors"
@@ -83,17 +84,33 @@ func (r *mutationResolver) DeleteProject(ctx context.Context, id string) (bool, 
 
 // SaveFile is the resolver for the saveFile field.
 func (r *mutationResolver) SaveFile(ctx context.Context, projectID string, path string, content string) (*File, error) {
-	_, _, _, err := r.getAndCheckProject(ctx, projectID)
+	_, _, user, err := r.getAndCheckProject(ctx, projectID)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := r.projectService.SaveFile(projectID, path, content); err != nil {
+	// Common path: live hub updates CRDT + disk; otherwise disk only.
+	if r.hubs != nil {
+		if hub := r.hubs.GetIfLive(projectID); hub != nil {
+			if err := hub.SaveTextFile(path, content); err != nil {
+				if errors.Is(err, project.ErrInvalidPath) {
+					return nil, apierrors.New(apierrors.CodeInvalidInput, "invalid file path")
+				}
+				return nil, apierrors.Internal(err)
+			}
+		} else if err := r.projectService.SaveFile(projectID, path, content); err != nil {
+			if errors.Is(err, project.ErrInvalidPath) {
+				return nil, apierrors.New(apierrors.CodeInvalidInput, "invalid file path")
+			}
+			return nil, apierrors.Internal(err)
+		}
+	} else if err := r.projectService.SaveFile(projectID, path, content); err != nil {
 		if errors.Is(err, project.ErrInvalidPath) {
 			return nil, apierrors.New(apierrors.CodeInvalidInput, "invalid file path")
 		}
 		return nil, apierrors.Internal(err)
 	}
+	_ = user
 
 	contentPtr := &content
 	isBinary := HasBinary([]byte(content), path)
@@ -113,15 +130,24 @@ func (r *mutationResolver) DeleteFile(ctx context.Context, projectID string, pat
 		return false, err
 	}
 
-	if err := r.projectService.DeleteFile(projectID, path); err != nil {
-		if errors.Is(err, project.ErrInvalidPath) {
+	var delErr error
+	if r.hubs != nil {
+		if hub := r.hubs.GetIfLive(projectID); hub != nil {
+			delErr = hub.DeleteFile(path)
+		} else {
+			delErr = r.projectService.DeleteFile(projectID, path)
+		}
+	} else {
+		delErr = r.projectService.DeleteFile(projectID, path)
+	}
+	if delErr != nil {
+		if errors.Is(delErr, project.ErrInvalidPath) {
 			return false, apierrors.New(apierrors.CodeInvalidInput, "invalid file path")
 		}
-		// ProjectRepository.DeleteFile returns os.Remove errors unwrapped.
-		if errors.Is(err, os.ErrNotExist) {
+		if errors.Is(delErr, os.ErrNotExist) {
 			return false, apierrors.New(apierrors.CodeFileNotFound, "file not found")
 		}
-		return false, apierrors.Internal(err)
+		return false, apierrors.Internal(delErr)
 	}
 
 	return true, nil
@@ -132,6 +158,25 @@ func (r *mutationResolver) Commit(ctx context.Context, projectID string, message
 	project, _, user, err := r.getAndCheckProject(ctx, projectID)
 	if err != nil {
 		return nil, err
+	}
+
+	// Live hub: flush + lock + commit through common path.
+	if r.hubs != nil {
+		if hub := r.hubs.GetIfLive(projectID); hub != nil {
+			hash, err := hub.Commit(message, user.Email)
+			if err != nil {
+				return nil, apierrors.Internal(err)
+			}
+			if err := r.Repo.UpdateProjectTimestamp(ctx, project.ID); err != nil {
+				slog.Warn("failed to update project timestamp", "project_id", project.ID, "err", err)
+			}
+			return &Commit{
+				Hash:    hash,
+				Message: message,
+				Author:  user.Email,
+				Date:    time.Now(),
+			}, nil
+		}
 	}
 
 	commit, err := r.projectService.CommitChanges(projectID, user.Email, message)
