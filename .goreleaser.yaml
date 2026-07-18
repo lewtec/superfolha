@@ -10,11 +10,10 @@ project_name: superfolha
 
 before:
   hooks:
+    # Same layout as gaderno / contapila / orvalho / telegram-sendmail:
+    # tidy + one mise entry that owns lint/fmt/test/frontend embed.
     - go mod tidy
-    # Embed SPA: vite writes to internal/server/web/dist (required for -tags release).
-    - bun install --frozen-lockfile --cwd frontend
-    - bun run --cwd frontend build
-    - go test ./...
+    - mise run ci
 
 builds:
   - id: superfolha

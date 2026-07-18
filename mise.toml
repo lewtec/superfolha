@@ -109,7 +109,9 @@ description = "Lint code"
 depends = ["lint:*"]
 
 [tasks.ci]
-depends = ["lint", "fmt", "test"]
+description = "Lint, format, test, and build SPA (web/dist for -tags release embed)"
+# build:frontend must run so GoReleaser builds with -tags release can embed the SPA.
+depends = ["lint", "fmt", "test", "build:frontend"]
 
 # Bundles the SPA into the binary (-tags release) and serves it from Go.
 # Data (SQLite + Git repos) lives under gitignored ./data.
