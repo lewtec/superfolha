@@ -89,8 +89,10 @@ go build -tags release -o superfolha ./cmd/superfolha
 
 ## Docker
 
+**Local multi-stage build** (SPA + Go + TeX Live), same as Railway/Render:
+
 ```bash
-mise run docker
+mise run docker   # docker build -f Dockerfile.build -t superfolha .
 
 docker run -v /var/lib/superfolha:/data -p 8080:8080 \
   -e JWT_SECRET="your-secure-random-secret" \
@@ -98,6 +100,35 @@ docker run -v /var/lib/superfolha:/data -p 8080:8080 \
   -e DATABASE_URL=/data/superfolha.db \
   superfolha
 ```
+
+**Published image** (GoReleaser → `ghcr.io/lewtec/superfolha`, TeX Live base + prebuilt binary):
+
+```bash
+docker pull ghcr.io/lewtec/superfolha:latest
+docker run --rm -p 8080:8080 \
+  -e JWT_SECRET="your-secure-random-secret" \
+  -v superfolha-data:/data \
+  ghcr.io/lewtec/superfolha:latest
+```
+
+Root `Dockerfile` is the **GoReleaser runtime** image (copies `$TARGETPLATFORM/superfolha` into `texlive/texlive`). Full source builds use `Dockerfile.build`.
+
+### Releases
+
+Versioning is **git tags via [svu](https://github.com/caarlos0/svu)** — no `version.txt` / `make_release`.
+
+```bash
+# Local (needs GHCR login + docker buildx):
+mise run release -- next    # svu next  (from conventional commits)
+mise run release -- patch   # force patch bump
+mise run release -- minor
+mise run release -- major
+
+# CI: Autorelease workflow (push to main, Saturday cron, or workflow_dispatch)
+# → mise run release -- next|patch|…
+```
+
+That tags with `svu`, pushes the tag, then **GoReleaser** publishes binaries, checksums, and `ghcr.io/lewtec/superfolha` (TeX Live base).
 
 ### Render
 

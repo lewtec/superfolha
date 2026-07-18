@@ -2,6 +2,8 @@
 bun = "1.3.8"
 "github:sqlc-dev/sqlc" = "1.31.1"
 go = "1.25.5"
+goreleaser = "2.15.4"
+svu = "3.3.0"
 tinytex = "2026.02"
 
 [env]
@@ -25,12 +27,16 @@ depends = ["install:*"]
 
 [tasks."build:frontend"]
 description = "Build frontend for production"
+# fmt first: do not race prettier rewriting sources while vite reads them.
+depends = ["fmt"]
+wait_for = ["fmt"]
 dir = "frontend"
 run = "bun run build"
 
 [tasks."build:backend"]
 description = "Build backend binary (embeds frontend via -tags release)"
 depends = ["build:frontend"]
+wait_for = ["build:frontend"]
 run = "go build -tags release -o superfolha ./cmd/superfolha"
 
 [tasks.build]
@@ -52,12 +58,33 @@ run = "go run github.com/99designs/gqlgen generate"
 depends = ["gen:*"]
 
 [tasks.docker]
-description = "Build production Docker image (multi-stage: SPA + Go release + TeX Live)"
-run = "docker build -t superfolha ."
+description = "Build production Docker image from source (multi-stage Dockerfile.build)"
+run = "docker build -f Dockerfile.build -t superfolha ."
 
-[tasks.test]
-description = "Run tests"
-run = "go test ./..."
+[tasks."docker:goreleaser-dry"]
+description = "Snapshot GoReleaser (binaries; docker tags get -amd64 suffix in snapshot mode)"
+run = "goreleaser release --snapshot --clean --skip=publish"
+
+[tasks.release]
+description = "svu bump → git tag → GoReleaser (binaries + ghcr.io/lewtec/superfolha)"
+usage = '''
+arg "<version>" help="svu mode: next (semver from commits), or major/minor/patch" {
+  choices "next" "major" "minor" "patch"
+  default "next"
+}
+'''
+run = '''
+# Version is entirely from git tags via svu — no version.txt.
+TAG="$(svu ${usage_version})"
+echo "Releasing tag: $TAG (svu current=$(svu current 2>/dev/null || echo none))"
+if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+  echo "Tag $TAG already exists" >&2
+  exit 1
+fi
+git tag "$TAG"
+git push origin "refs/tags/$TAG"
+goreleaser release --clean
+'''
 
 [tasks."fmt:frontend"]
 dir = "frontend"
@@ -70,25 +97,44 @@ run = "go fmt ./..."
 description = "Format code"
 depends = ["fmt:*"]
 
+# Leaf linters depend on fmt (not on sibling lint:*). mise wait_for only delays
+# *this* task's run — sibling depends still start in parallel, so never put
+# fmt and lint:frontend in the same depends list.
 [tasks."lint:frontend"]
+depends = ["fmt"]
+wait_for = ["fmt"]
 dir = "frontend"
 run = "bun run lint"
 
 [tasks."lint:backend"]
+depends = ["fmt"]
+wait_for = ["fmt"]
 run = "go vet ./..."
 
 [tasks.lint]
-description = "Lint code"
-depends = ["lint:*"]
+description = "Lint frontend + backend after fmt"
+depends = ["lint:frontend", "lint:backend"]
+wait_for = ["lint:frontend", "lint:backend"]
+
+[tasks.test]
+description = "Run tests after fmt (no gofmt rewrite mid-test)"
+depends = ["fmt"]
+wait_for = ["fmt"]
+run = "go test ./..."
 
 [tasks.ci]
-depends = ["lint", "fmt", "test"]
+description = "fmt once → then lint, test, SPA build (GoReleaser before hook)"
+# Each child waits for fmt; mise dedupes fmt. Then lint:*, test, build:frontend
+# may run in parallel (safe: different tools / outputs).
+depends = ["lint", "test", "build:frontend"]
+wait_for = ["lint", "test", "build:frontend"]
 
 # Bundles the SPA into the binary (-tags release) and serves it from Go.
 # Data (SQLite + Git repos) lives under gitignored ./data.
 [tasks.start]
 description = "Build SPA, run server with embedded UI (./data)"
 depends = ["build:frontend"]
+wait_for = ["build:frontend"]
 env = { GO_ENV = "development" }
 run = "mkdir -p data && go run -tags release ./cmd/superfolha --state-dir=./data"
 

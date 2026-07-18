@@ -167,7 +167,11 @@ export class ProjectCollab {
   };
 
   private onLocalDocUpdate = (update: Uint8Array, origin: unknown) => {
-    if (origin === "remote" || !this.ws || this.ws.readyState !== WebSocket.OPEN) {
+    if (
+      origin === "remote" ||
+      !this.ws ||
+      this.ws.readyState !== WebSocket.OPEN
+    ) {
       return;
     }
     const encoder = encoding.createEncoder();
@@ -195,7 +199,8 @@ export class ProjectCollab {
       changed,
     );
     let bin = "";
-    for (let i = 0; i < update.length; i++) bin += String.fromCharCode(update[i]!);
+    for (let i = 0; i < update.length; i++)
+      bin += String.fromCharCode(update[i]!);
     this.sendJSON({ type: "awareness", update: btoa(bin) });
   };
 
@@ -364,9 +369,7 @@ export class ProjectCollab {
     const out: { name: string; color: string; clientId: number }[] = [];
     this.awareness.getStates().forEach((state, clientId) => {
       if (clientId === this.awareness.clientID) return;
-      const user = state.user as
-        | { name?: string; color?: string }
-        | undefined;
+      const user = state.user as { name?: string; color?: string } | undefined;
       out.push({
         clientId,
         name: user?.name || `user-${clientId}`,

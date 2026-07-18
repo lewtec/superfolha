@@ -52,16 +52,16 @@ type Hub struct {
 
 	svc *project.Service
 
-	mu           sync.Mutex
-	clients      map[string]*Client
-	flushTimer   *time.Timer
-	commitTimer  *time.Timer
-	unsub        func()
-	syncLocked   bool
-	closing      bool
-	dirty        bool
-	chat         []ChatMessage
-	onCommitted  func() // optional hook (e.g. touch project timestamp)
+	mu          sync.Mutex
+	clients     map[string]*Client
+	flushTimer  *time.Timer
+	commitTimer *time.Timer
+	unsub       func()
+	syncLocked  bool
+	closing     bool
+	dirty       bool
+	chat        []ChatMessage
+	onCommitted func() // optional hook (e.g. touch project timestamp)
 }
 
 // Open loads project files into a new hub.

@@ -1,29 +1,8 @@
-# Stage 1: build frontend (SPA assets embedded into Go binary)
-FROM oven/bun:1.3.8-debian AS frontend
+# Runtime image for GoReleaser (dockers_v2).
+# Binaries are built by GoReleaser and copied from the build context as
+#   $TARGETPLATFORM/superfolha
+# Do not rebuild Go/frontend here — see Dockerfile.build for a full multi-stage build.
 
-WORKDIR /src/frontend
-
-COPY frontend/package.json frontend/bun.lock ./
-RUN bun install --frozen-lockfile
-
-COPY frontend/ ./
-# vite outDir: ../internal/server/web/dist → /src/internal/server/web/dist
-RUN bun run build
-
-# Stage 2: build Go binary with release tag (embeds SPA)
-FROM golang:1.25-bookworm AS builder
-
-WORKDIR /build
-
-COPY go.mod go.sum ./
-RUN go mod download
-
-COPY . .
-COPY --from=frontend /src/internal/server/web/dist ./internal/server/web/dist
-
-RUN CGO_ENABLED=0 GOOS=linux go build -tags release -trimpath -ldflags="-s -w" -o /build/server ./cmd/superfolha
-
-# Stage 3: runtime with TeX Live + latexmk
 FROM texlive/texlive:latest
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -31,13 +10,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+ARG TARGETPLATFORM
+COPY $TARGETPLATFORM/superfolha /app/server
 
-COPY --from=builder /build/server /app/server
+WORKDIR /app
 
 EXPOSE 8080
 
-# Match render.yaml: disk mounted at /data, repos under {STATE_DIR}/repos/{uuid}
+# Match render/railway: disk at /data, repos under {STATE_DIR}/repos/{uuid}
 ENV STATE_DIR=/data
 ENV PORT=8080
 
