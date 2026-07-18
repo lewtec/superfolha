@@ -70,7 +70,6 @@ arg "<version>" help="svu mode: next (semver from commits), or major/minor/patch
 }
 '''
 run = '''
-set -euo pipefail
 # Version is entirely from git tags via svu — no version.txt.
 TAG="$(svu ${usage_version})"
 echo "Releasing tag: $TAG (svu current=$(svu current 2>/dev/null || echo none))"
