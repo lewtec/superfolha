@@ -62,15 +62,16 @@ description = "Snapshot GoReleaser (binaries; docker tags get -amd64 suffix in s
 run = "goreleaser release --snapshot --clean --skip=publish"
 
 [tasks.release]
-description = "Tag with svu and run GoReleaser (binaries + GHCR texlive image)"
+description = "svu bump → git tag → GoReleaser (binaries + ghcr.io/lewtec/superfolha)"
 usage = '''
-arg "<version>" help="New version" {
+arg "<version>" help="svu mode: next (semver from commits), or major/minor/patch" {
   choices "next" "major" "minor" "patch"
   default "next"
 }
 '''
 run = '''
 set -euo pipefail
+# Version is entirely from git tags via svu — no version.txt.
 TAG="$(svu ${usage_version})"
 echo "Releasing tag: $TAG (svu current=$(svu current 2>/dev/null || echo none))"
 if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
@@ -78,7 +79,6 @@ if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
   exit 1
 fi
 git tag "$TAG"
-# Tag must be on remote before goreleaser publishes GitHub/GHCR artifacts
 git push origin "refs/tags/$TAG"
 goreleaser release --clean
 '''

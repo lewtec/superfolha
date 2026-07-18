@@ -115,13 +115,20 @@ Root `Dockerfile` is the **GoReleaser runtime** image (copies `$TARGETPLATFORM/s
 
 ### Releases
 
-Tagged releases use **GoReleaser** (binaries + checksums + GHCR image):
+Versioning is **git tags via [svu](https://github.com/caarlos0/svu)** — no `version.txt` / `make_release`.
 
 ```bash
-# CI: workflow_dispatch Autorelease, or push to main / Saturday cron
 # Local (needs GHCR login + docker buildx):
-mise run release -- patch   # next | patch | minor | major
+mise run release -- next    # svu next  (from conventional commits)
+mise run release -- patch   # force patch bump
+mise run release -- minor
+mise run release -- major
+
+# CI: Autorelease workflow (push to main, Saturday cron, or workflow_dispatch)
+# → mise run release -- next|patch|…
 ```
+
+That tags with `svu`, pushes the tag, then **GoReleaser** publishes binaries, checksums, and `ghcr.io/lewtec/superfolha` (TeX Live base).
 
 ### Render
 
