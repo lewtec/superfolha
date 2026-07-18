@@ -6,7 +6,14 @@ import { useGetProjectQuery } from "../hooks/useGetProjectQuery";
 import { useAuthStatus } from "../hooks/useAuthStatus";
 import { useProjectCollab } from "../hooks/useProjectCollab";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Menu, X, Code, FileText, Terminal, MessageSquare } from "feather-icons-react";
+import {
+  Menu,
+  X,
+  Code,
+  FileText,
+  Terminal,
+  MessageSquare,
+} from "feather-icons-react";
 import FileTree from "../components/FileTree";
 import CollabEditor from "../components/CollabEditor";
 import PDFViewer from "../components/PDFViewer";
@@ -82,10 +89,13 @@ export default function EditorPage() {
   const { id } = useParams<{ id: string }>();
   const { t } = useTranslation(["editor", "common", "errors"]);
   const { email } = useAuthStatus();
-  const { collab, status, files: collabFiles, chat, peers } = useProjectCollab(
-    id,
-    email,
-  );
+  const {
+    collab,
+    status,
+    files: collabFiles,
+    chat,
+    peers,
+  } = useProjectCollab(id, email);
 
   const { project } = useGetProjectQuery({ id: id! });
   const fetchedFiles = project?.files;
@@ -124,13 +134,18 @@ export default function EditorPage() {
       });
     }
     if (fetchedFiles) {
-      return (fetchedFiles as { path: string; isBinary: boolean; size: number; isTooBig: boolean }[]).map(
-        (file) => ({
-          ...file,
-          content: null,
-          isDirty: false,
-        }),
-      );
+      return (
+        fetchedFiles as {
+          path: string;
+          isBinary: boolean;
+          size: number;
+          isTooBig: boolean;
+        }[]
+      ).map((file) => ({
+        ...file,
+        content: null,
+        isDirty: false,
+      }));
     }
     return [];
   }, [collabFiles, fetchedFiles]);
@@ -145,16 +160,13 @@ export default function EditorPage() {
     }
   }, [files, currentPath]);
 
-  const handleFileSelect = useCallback(
-    (path: string) => {
-      setCurrentPath(path);
-      setActiveTab("code");
-      if (window.matchMedia("(max-width: 767px)").matches) {
-        setSidebarOpen(false);
-      }
-    },
-    [],
-  );
+  const handleFileSelect = useCallback((path: string) => {
+    setCurrentPath(path);
+    setActiveTab("code");
+    if (window.matchMedia("(max-width: 767px)").matches) {
+      setSidebarOpen(false);
+    }
+  }, []);
 
   const memoizedOnDeleteFile = useCallback(
     (path: string) => {

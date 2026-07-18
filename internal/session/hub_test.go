@@ -7,8 +7,8 @@ import (
 
 	"github.com/lewtec/superfolha/internal/crdt"
 	"github.com/lewtec/superfolha/internal/project"
-	ysync "github.com/reearth/ygo/sync"
 	ycrdt "github.com/reearth/ygo/crdt"
+	ysync "github.com/reearth/ygo/sync"
 )
 
 func TestHubFenceAndFlush(t *testing.T) {
