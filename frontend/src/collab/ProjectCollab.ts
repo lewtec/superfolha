@@ -50,6 +50,8 @@ export class ProjectCollab {
   readonly projectId: string;
 
   status: SyncStatus = "connecting";
+  /** True after the first CRDT sync from the server (docs have real content). */
+  initialSynced = false;
   files: TreeFile[] = [];
   chat: ChatMessage[] = [];
   clientId = "";
@@ -60,6 +62,8 @@ export class ProjectCollab {
   private listeners = new Set<CollabListener>();
   private destroyed = false;
   private email: string;
+  /** After hello.ack we must send SyncStep1 so the server returns SyncStep2 with full state. */
+  private fencePassed = false;
 
   constructor(projectId: string, email: string) {
     this.projectId = projectId;
@@ -195,12 +199,26 @@ export class ProjectCollab {
     this.sendJSON({ type: "awareness", update: btoa(bin) });
   };
 
+  /** Ask the server for everything we are missing (empty client → full doc). */
+  private sendSyncStep1() {
+    const encoder = encoding.createEncoder();
+    syncProtocol.writeSyncStep1(encoder, this.ydoc);
+    this.sendBinary(encoding.toUint8Array(encoder));
+  }
+
   private handleSyncMessage(u8: Uint8Array) {
     const encoder = encoding.createEncoder();
     const decoder = decoding.createDecoder(u8);
+    // origin "remote" so we do not echo applied server state as local updates
     syncProtocol.readSyncMessage(decoder, encoder, this.ydoc, "remote");
     if (encoding.length(encoder) > 1) {
       this.sendBinary(encoding.toUint8Array(encoder));
+    }
+    // First server payload after fence means we can mount editors with real text.
+    if (this.fencePassed && !this.initialSynced) {
+      this.initialSynced = true;
+      this.setStatus("synced");
+      this.notify();
     }
   }
 
@@ -227,7 +245,18 @@ export class ProjectCollab {
         }
         sessionStorage.setItem(key, sid);
         this.sendJSON({ type: "hello.ack", session_id: sid });
+        this.fencePassed = true;
+        this.initialSynced = false;
         this.setStatus("syncing");
+        // Critical: empty client must send SyncStep1; server replies SyncStep2
+        // with the loaded project text. Server-only SyncStep1 cannot fill us.
+        this.sendSyncStep1();
+        // Re-announce awareness after fence.
+        this.onLocalAwareness({
+          added: [this.awareness.clientID],
+          updated: [],
+          removed: [],
+        });
         break;
       }
       case "tree.snapshot": {

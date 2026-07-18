@@ -345,6 +345,16 @@ func (h *Hub) EncodeSyncStep1() []byte {
 	return ysync.EncodeSyncStep1(h.Doc.Doc)
 }
 
+// EncodeFullStateUpdate wraps the entire ygo document as a y-protocols Update
+// frame so a freshly connected empty client receives all collaborative text.
+func (h *Hub) EncodeFullStateUpdate() []byte {
+	raw := h.Doc.EncodeStateAsUpdate()
+	if len(raw) == 0 {
+		return nil
+	}
+	return ysync.EncodeUpdate(raw)
+}
+
 // AppendChat stores and fans out a chat message.
 func (h *Hub) AppendChat(from, text string) {
 	if text == "" {

@@ -148,6 +148,16 @@ func (s *Server) handleProjectWS(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 				hub.SendChatHistory(client)
+				// Push full CRDT state immediately (bootstrap), then SyncStep1 so
+				// the client can still complete a normal two-way handshake.
+				// SyncStep1 alone only carries a state vector — an empty client
+				// would reply with empty SyncStep2 and never receive file text.
+				if full := hub.EncodeFullStateUpdate(); len(full) > 0 {
+					select {
+					case client.Out <- session.Outbound{Binary: true, Data: full}:
+					default:
+					}
+				}
 				select {
 				case client.Out <- session.Outbound{Binary: true, Data: hub.EncodeSyncStep1()}:
 				default:

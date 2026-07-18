@@ -16,14 +16,16 @@ export function useProjectCollab(
     const session = new ProjectCollab(projectId, email);
     session.connect();
     const unsub = session.subscribe(() => setTick((n) => n + 1));
+    // Defer setState out of the effect body (lint); still before first paint frames.
     const ready = requestAnimationFrame(() => setCollab(session));
 
     return () => {
       cancelAnimationFrame(ready);
       unsub();
       session.destroy();
-      // Clear on next frame so we don't sync-setState in the effect body.
-      requestAnimationFrame(() => setCollab((cur) => (cur === session ? null : cur)));
+      requestAnimationFrame(() =>
+        setCollab((cur) => (cur === session ? null : cur)),
+      );
     };
   }, [projectId, email]);
 

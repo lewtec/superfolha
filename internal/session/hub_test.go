@@ -5,7 +5,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/lewtec/superfolha/internal/crdt"
 	"github.com/lewtec/superfolha/internal/project"
+	ysync "github.com/reearth/ygo/sync"
+	ycrdt "github.com/reearth/ygo/crdt"
 )
 
 func TestHubFenceAndFlush(t *testing.T) {
@@ -76,5 +79,58 @@ func TestHubFenceAndFlush(t *testing.T) {
 	}
 	if h.Doc.Source("extra.tex") != "x\n" {
 		t.Fatalf("extra = %q", h.Doc.Source("extra.tex"))
+	}
+}
+
+func TestHubBootstrapFullStateAndClientStep1(t *testing.T) {
+	state := t.TempDir()
+	svc := project.NewService(state)
+	projectID := "22222222-2222-2222-2222-222222222222"
+	if err := svc.InitProjectRepo(projectID); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.SaveFile(projectID, "main.tex", "\\title{Loaded}\n"); err != nil {
+		t.Fatal(err)
+	}
+
+	h, err := Open(svc, projectID, "owner@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer h.Close()
+
+	full := h.EncodeFullStateUpdate()
+	if len(full) == 0 {
+		t.Fatal("EncodeFullStateUpdate empty — clients would see empty docs")
+	}
+
+	// Empty peer applies the Update frame via ApplySyncMessage.
+	fromFull := ycrdt.New()
+	if _, err := ysync.ApplySyncMessage(fromFull, full, "remote"); err != nil {
+		t.Fatalf("apply full update: %v", err)
+	}
+	if got := fromFull.GetText(crdt.TextKey("main.tex")).ToString(); got != "\\title{Loaded}\n" {
+		t.Fatalf("after full update main.tex = %q", got)
+	}
+
+	// Empty client SyncStep1 → server must return SyncStep2 that fills the client.
+	h.AddClient("c2")
+	if !h.MarkClientReady("c2") {
+		t.Fatal("mark ready c2")
+	}
+	emptyPeer := ycrdt.New()
+	step1 := ysync.EncodeSyncStep1(emptyPeer)
+	reply, err := h.HandleSyncMessage("c2", step1)
+	if err != nil {
+		t.Fatalf("HandleSyncMessage step1: %v", err)
+	}
+	if len(reply) == 0 {
+		t.Fatal("server SyncStep2 reply empty")
+	}
+	if _, err := ysync.ApplySyncMessage(emptyPeer, reply, "remote"); err != nil {
+		t.Fatalf("apply step2: %v", err)
+	}
+	if got := emptyPeer.GetText(crdt.TextKey("main.tex")).ToString(); got != "\\title{Loaded}\n" {
+		t.Fatalf("after step2 main.tex = %q", got)
 	}
 }

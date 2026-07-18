@@ -446,13 +446,18 @@ export default function EditorPage() {
             >
               {currentFile && currentFile.isBinary ? (
                 <BinaryFileViewer fileName={currentFile.path} projectId={id!} />
-              ) : currentFile && ytext && collab ? (
+              ) : currentFile && ytext && collab && collab.initialSynced ? (
                 <CollabEditor
-                  key={currentFile.path}
+                  // Remount after initial sync so CM seeds from real Y.Text
+                  key={`${currentFile.path}:${collab.sessionId}:synced`}
                   path={currentFile.path}
                   ytext={ytext}
                   awareness={collab.awareness}
                 />
+              ) : currentFile && collab && !collab.initialSynced ? (
+                <div className="flex items-center justify-center h-full text-base-content/70 page-pad">
+                  {t("editor:status_syncing")}
+                </div>
               ) : currentFile && !collab ? (
                 <div className="flex items-center justify-center h-full text-base-content/70 page-pad">
                   {t("editor:status_connecting")}
