@@ -23,6 +23,8 @@ import (
 )
 
 var (
+	// version is set by GoReleaser (-X main.version=...).
+	version    = "dev"
 	stateDir   string
 	dbDriver   string
 	dbDSN      string
@@ -37,6 +39,13 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
+	rootCmd.AddCommand(&cobra.Command{
+		Use:   "version",
+		Short: "Print version",
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Println(version)
+		},
+	})
 	rootCmd.Flags().StringVar(&stateDir, "state-dir", getEnv("STATE_DIR", "./data"), "Directory for Git repositories (and default SQLite path)")
 	rootCmd.Flags().StringVar(&dbDriver, "db-driver", firstEnv("DB_DRIVER", "DATABASE_DRIVER"), "Database driver: sqlite (default) or postgres")
 	rootCmd.Flags().StringVar(&dbDSN, "db", firstEnv("DATABASE_URL", "DATABASE_DSN"), "Database DSN (sqlite path or postgres:// URL)")
@@ -133,7 +142,7 @@ func runServer(cmd *cobra.Command, args []string) {
 	srv := server.NewServer(repo, stateDir, projectService, authService)
 
 	addr := resolveAddr(listenAddr)
-	slog.Info("starting server", "addr", addr)
+	slog.Info("starting server", "addr", addr, "version", version)
 
 	httpServer := &http.Server{
 		Addr:         addr,

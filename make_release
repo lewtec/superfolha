@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
+# Deprecated: prefer `mise run release -- patch|minor|major|next` (svu + GoReleaser).
+# This script only bumps version.txt + optional git tag.
 
 if [ $# == 1 ]; then
 	VERSION="$1"; shift
 else
 	echo ./make_release versao_nova >&2
+	echo "hint: mise run release -- patch" >&2
 	exit 1
 fi
 

@@ -11,7 +11,8 @@
 
 [build]
 builder = "DOCKERFILE"
-dockerfilePath = "Dockerfile"
+# Multi-stage source build (SPA + Go + TeX Live). Releases also publish ghcr.io/lewtec/superfolha.
+dockerfilePath = "Dockerfile.build"
 
 [deploy]
 startCommand = "/app/server"

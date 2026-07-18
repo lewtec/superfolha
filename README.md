@@ -89,14 +89,38 @@ go build -tags release -o superfolha ./cmd/superfolha
 
 ## Docker
 
+**Local multi-stage build** (SPA + Go + TeX Live), same as Railway/Render:
+
 ```bash
-mise run docker
+mise run docker   # docker build -f Dockerfile.build -t superfolha .
 
 docker run -v /var/lib/superfolha:/data -p 8080:8080 \
   -e JWT_SECRET="your-secure-random-secret" \
   -e STATE_DIR=/data \
   -e DATABASE_URL=/data/superfolha.db \
   superfolha
+```
+
+**Published image** (GoReleaser → `ghcr.io/lewtec/superfolha`, TeX Live base + prebuilt binary):
+
+```bash
+docker pull ghcr.io/lewtec/superfolha:latest
+docker run --rm -p 8080:8080 \
+  -e JWT_SECRET="your-secure-random-secret" \
+  -v superfolha-data:/data \
+  ghcr.io/lewtec/superfolha:latest
+```
+
+Root `Dockerfile` is the **GoReleaser runtime** image (copies `$TARGETPLATFORM/superfolha` into `texlive/texlive`). Full source builds use `Dockerfile.build`.
+
+### Releases
+
+Tagged releases use **GoReleaser** (binaries + checksums + GHCR image):
+
+```bash
+# CI: workflow_dispatch Autorelease, or push to main / Saturday cron
+# Local (needs GHCR login + docker buildx):
+mise run release -- patch   # next | patch | minor | major
 ```
 
 ### Render
