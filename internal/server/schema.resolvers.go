@@ -84,33 +84,28 @@ func (r *mutationResolver) DeleteProject(ctx context.Context, id string) (bool, 
 
 // SaveFile is the resolver for the saveFile field.
 func (r *mutationResolver) SaveFile(ctx context.Context, projectID string, path string, content string) (*File, error) {
-	_, _, user, err := r.getAndCheckProject(ctx, projectID)
+	_, _, _, err := r.getAndCheckProject(ctx, projectID)
 	if err != nil {
 		return nil, err
 	}
 
-	// Common path: live hub updates CRDT + disk; otherwise disk only.
+	// Live hub updates CRDT + disk; otherwise disk only. Mirror DeleteFile routing.
+	var saveErr error
 	if r.hubs != nil {
 		if hub := r.hubs.GetIfLive(projectID); hub != nil {
-			if err := hub.SaveTextFile(path, content); err != nil {
-				if errors.Is(err, project.ErrInvalidPath) {
-					return nil, apierrors.New(apierrors.CodeInvalidInput, "invalid file path")
-				}
-				return nil, apierrors.Internal(err)
-			}
-		} else if err := r.projectService.SaveFile(projectID, path, content); err != nil {
-			if errors.Is(err, project.ErrInvalidPath) {
-				return nil, apierrors.New(apierrors.CodeInvalidInput, "invalid file path")
-			}
-			return nil, apierrors.Internal(err)
+			saveErr = hub.SaveTextFile(path, content)
+		} else {
+			saveErr = r.projectService.SaveFile(projectID, path, content)
 		}
-	} else if err := r.projectService.SaveFile(projectID, path, content); err != nil {
-		if errors.Is(err, project.ErrInvalidPath) {
+	} else {
+		saveErr = r.projectService.SaveFile(projectID, path, content)
+	}
+	if saveErr != nil {
+		if errors.Is(saveErr, project.ErrInvalidPath) {
 			return nil, apierrors.New(apierrors.CodeInvalidInput, "invalid file path")
 		}
-		return nil, apierrors.Internal(err)
+		return nil, apierrors.Internal(saveErr)
 	}
-	_ = user
 
 	contentPtr := &content
 	isBinary := HasBinary([]byte(content), path)
