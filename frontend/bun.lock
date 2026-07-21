@@ -31,7 +31,7 @@
         "react-pdf": "^10.2.0",
         "react-relay": "^20.1.1",
         "react-router-dom": "^7.9.6",
-        "relay-runtime": "^20.1.1",
+        "relay-runtime": "^21.0.0",
         "y-codemirror.next": "^0.3.5",
         "y-protocols": "^1.0.7",
         "yjs": "^13.6.31",
@@ -921,7 +921,7 @@
 
     "relay-compiler": ["relay-compiler@20.1.1", "", { "bin": { "relay-compiler": "cli.js" } }, "sha512-J/FFFLS/3vnbDkyQMw8l3Ev7dNHXMgC1RAs0fITz4Q63TFPOw142knKxY1Mm5ZZBABkAs9g2JghXaqM+phwTxw=="],
 
-    "relay-runtime": ["relay-runtime@20.1.1", "", { "dependencies": { "@babel/runtime": "^7.25.0", "fbjs": "^3.0.2", "invariant": "^2.2.4" } }, "sha512-N98ZkkyuIHdXmHaPuljihM1QbFYXATF0gxA0CESFphszsQzXs9A/zZloVfzdOI/xg3B3CfM/5nozvIoeTDIcfw=="],
+    "relay-runtime": ["relay-runtime@21.0.1", "", { "dependencies": { "@babel/runtime": "^7.25.0", "fbjs": "^3.0.2", "invariant": "^2.2.4" } }, "sha512-OS+We56sp6gkGVEcce9VCNOeg/sMbxT9unEoerQPgNAICHowSWrXNc6LJxF2OqjypxYF7kaLDSPPiaPii2Pw1g=="],
 
     "resolve": ["resolve@2.0.0-next.5", "", { "dependencies": { "is-core-module": "^2.13.0", "path-parse": "^1.0.7", "supports-preserve-symlinks-flag": "^1.0.0" }, "bin": { "resolve": "bin/resolve" } }, "sha512-U7WjGVG9sH8tvjW5SmGbQuui75FiyjAX72HX15DwBBwF9dNiQZRQAg9nnPhYy+TUnE0+VcrttuvNI8oSxZcocA=="],
 
@@ -1118,6 +1118,8 @@
     "fbjs/cross-fetch": ["cross-fetch@3.2.0", "", { "dependencies": { "node-fetch": "^2.7.0" } }, "sha512-Q+xVJLoGOeIMXZmbUK4HYk+69cQH6LudR0Vu/pRm2YlU/hDV9CiS0gKUMaWY5f2NeUH9C1nV3bsTlCo0FsTV1Q=="],
 
     "micromatch/picomatch": ["picomatch@2.3.1", "", {}, "sha512-JU3teHTNjmE2VCGFzuY8EXzCDVwEqB2a8fsIvwaStHhAWJEeVd1o1QD80CU6+ZdEXXSLbSsuLwJjkCBWqRQUVA=="],
+
+    "react-relay/relay-runtime": ["relay-runtime@20.1.1", "", { "dependencies": { "@babel/runtime": "^7.25.0", "fbjs": "^3.0.2", "invariant": "^2.2.4" } }, "sha512-N98ZkkyuIHdXmHaPuljihM1QbFYXATF0gxA0CESFphszsQzXs9A/zZloVfzdOI/xg3B3CfM/5nozvIoeTDIcfw=="],
 
     "@typescript-eslint/typescript-estree/minimatch/brace-expansion": ["brace-expansion@2.0.2", "", { "dependencies": { "balanced-match": "^1.0.0" } }, "sha512-Jt0vHyM+jmUBqojB7E1NIYadt0vI0Qxjxd2TErW94wDz+E2LAm5vKMXXwg6ZZBTHPuUlDgQHKXvjGBdfcF1ZDQ=="],
 
