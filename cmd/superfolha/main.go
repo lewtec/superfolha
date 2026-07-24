@@ -145,11 +145,12 @@ func runServer(cmd *cobra.Command, args []string) {
 	slog.Info("starting server", "addr", addr, "version", version)
 
 	httpServer := &http.Server{
-		Addr:         addr,
-		Handler:      srv.Handler(),
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 5 * time.Minute,
-		IdleTimeout:  60 * time.Second,
+		Addr:              addr,
+		Handler:           srv.Handler(),
+		ReadTimeout:       15 * time.Second,
+		ReadHeaderTimeout: 5 * time.Second,
+		WriteTimeout:      5 * time.Minute,
+		IdleTimeout:       60 * time.Second,
 	}
 
 	serverErr := make(chan error, 1)
