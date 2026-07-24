@@ -92,7 +92,7 @@ func authPayloadFromResponse(ctx context.Context, authResp *auth.AuthResponse, o
 		slog.Error("http.ResponseWriter not found in context", "op", op)
 		return nil, apierrors.New(apierrors.CodeInternal, "response writer not available")
 	}
-	setAuthCookie(w, authResp.Token)
+	auth.SetAuthCookie(w, authResp.Token)
 	return &AuthPayload{
 		User: toGraphQLUser(authResp.User.ID, authResp.User.Email),
 	}, nil

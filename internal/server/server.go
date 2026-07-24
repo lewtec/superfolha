@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"path/filepath"
 	"strconv"
-	"time"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/handler"
@@ -105,17 +104,7 @@ func (s *Server) Handler() http.Handler {
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
-	secure := !appenv.IsDevelopment()
-	http.SetCookie(w, &http.Cookie{
-		Name:     "authToken",
-		Value:    "",
-		Path:     "/",
-		MaxAge:   -1,
-		Expires:  time.Unix(0, 0),
-		HttpOnly: true,
-		Secure:   secure,
-		SameSite: http.SameSiteLaxMode,
-	})
+	auth.ClearAuthCookie(w)
 	w.WriteHeader(http.StatusNoContent)
 }
 

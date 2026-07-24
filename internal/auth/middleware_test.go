@@ -109,7 +109,7 @@ func TestMiddleware_AuthSources(t *testing.T) {
 			gotUser = nil
 			req := httptest.NewRequest(http.MethodGet, "/", nil)
 			if tt.cookie != "" {
-				req.AddCookie(&http.Cookie{Name: "authToken", Value: tt.cookie})
+				req.AddCookie(&http.Cookie{Name: AuthCookieName, Value: tt.cookie})
 			}
 			if tt.authHeader != "" {
 				req.Header.Set("Authorization", tt.authHeader)
@@ -132,7 +132,7 @@ func TestMiddleware_AuthSources(t *testing.T) {
 			}
 
 			setCookie := rec.Header().Get("Set-Cookie")
-			cleared := strings.Contains(setCookie, "authToken=") &&
+			cleared := strings.Contains(setCookie, AuthCookieName+"=") &&
 				(strings.Contains(setCookie, "Max-Age=0") || strings.Contains(setCookie, "Max-Age=-1"))
 			if tt.wantClearCookie && !cleared {
 				t.Errorf("expected authToken clear cookie, Set-Cookie=%q", setCookie)
