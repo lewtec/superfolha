@@ -94,6 +94,26 @@ func (r *Registry) evict(projectID string) {
 	_ = h.Close()
 }
 
+// CloseProject drops a live hub for projectID (flush + disconnect peers).
+// No-op when the hub is not open. Call before deleting the project tree so
+// idle eviction or a later flush cannot recreate files under a removed path.
+func (r *Registry) CloseProject(projectID string) {
+	r.mu.Lock()
+	if t := r.idle[projectID]; t != nil {
+		t.Stop()
+		delete(r.idle, projectID)
+	}
+	h, ok := r.hubs[projectID]
+	if ok {
+		delete(r.hubs, projectID)
+	}
+	r.mu.Unlock()
+	if !ok {
+		return
+	}
+	_ = h.Close()
+}
+
 // CloseAll flushes and drops every hub (server shutdown).
 func (r *Registry) CloseAll() {
 	r.mu.Lock()

@@ -71,6 +71,12 @@ func (r *mutationResolver) DeleteProject(ctx context.Context, id string) (bool, 
 		return false, err
 	}
 
+	// Tear down live collab before wiping the repo so flush/commit/idle-evict
+	// cannot write back into (or recreate) a deleted project path.
+	if r.hubs != nil {
+		r.hubs.CloseProject(project.ID)
+	}
+
 	if err := r.Repo.DeleteProject(ctx, project.ID); err != nil {
 		return false, apierrors.Internal(err)
 	}
