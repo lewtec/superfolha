@@ -39,27 +39,7 @@ func InitRepo(path string) error {
 	return nil
 }
 
-// AddAll stages all changes
-func AddAll(repoPath string) error {
-	r, err := git.PlainOpen(repoPath)
-	if err != nil {
-		return fmt.Errorf("failed to open repository at %s: %w", repoPath, err)
-	}
-
-	w, err := r.Worktree()
-	if err != nil {
-		return fmt.Errorf("failed to get worktree for repository at %s: %w", repoPath, err)
-	}
-
-	_, err = w.Add(".")
-	if err != nil {
-		return fmt.Errorf("failed to add all files to staging: %w", err)
-	}
-
-	return nil
-}
-
-// Commit creates a new commit
+// Commit creates a new commit (stages all worktree changes first).
 func CommitChanges(repoPath, author, message string) (*Commit, error) {
 	r, err := git.PlainOpen(repoPath)
 	if err != nil {
@@ -71,7 +51,7 @@ func CommitChanges(repoPath, author, message string) (*Commit, error) {
 		return nil, fmt.Errorf("failed to get worktree for repository at %s: %w", repoPath, err)
 	}
 
-	// Stage on the worktree we already hold (avoid a second PlainOpen via AddAll).
+	// Stage on the worktree we already hold (single PlainOpen for stage + commit).
 	if _, err := w.Add("."); err != nil {
 		return nil, fmt.Errorf("failed to add all files to staging: %w", err)
 	}

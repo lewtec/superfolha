@@ -84,15 +84,7 @@ func (pr *ProjectRepository) InitRepo() error {
 	return igit.InitRepo(pr.repoPath)
 }
 
-// AddAll stages all changes in the repository.
-func (pr *ProjectRepository) AddAll() error {
-	pr.Lock()
-	defer pr.Unlock()
-
-	return igit.AddAll(pr.repoPath)
-}
-
-// CommitChanges commits all staged changes in the repository.
+// CommitChanges stages and commits all worktree changes in the repository.
 func (pr *ProjectRepository) CommitChanges(author, message string) (*igit.Commit, error) {
 	pr.Lock()
 	defer pr.Unlock()
@@ -101,7 +93,7 @@ func (pr *ProjectRepository) CommitChanges(author, message string) (*igit.Commit
 }
 
 // SaveFile writes content to a file on disk in the repository.
-// It does not stage; CommitChanges (or AddAll) stages later.
+// It does not stage; CommitChanges stages later.
 func (pr *ProjectRepository) SaveFile(filePath, content string) error {
 	pr.Lock()
 	defer pr.Unlock()
@@ -125,7 +117,7 @@ func (pr *ProjectRepository) SaveFile(filePath, content string) error {
 }
 
 // DeleteFile removes a file on disk from the repository.
-// It does not stage; CommitChanges (or AddAll) stages later.
+// It does not stage; CommitChanges stages later.
 func (pr *ProjectRepository) DeleteFile(filePath string) error {
 	pr.Lock()
 	defer pr.Unlock()
