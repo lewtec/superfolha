@@ -1,7 +1,6 @@
 package sqlite
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -19,7 +18,7 @@ func TestIsUniqueViolation_EmailConflict(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = repo.Close() })
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err = repo.CreateUser(ctx, db.CreateUserParams{
 		ID: "user-1", Email: "dup@example.com", PasswordHash: "hash-a",
 	})
@@ -58,7 +57,7 @@ func TestIsUniqueViolation_PrimaryKey(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = repo.Close() })
 
-	ctx := context.Background()
+	ctx := t.Context()
 	if _, err := repo.CreateUser(ctx, db.CreateUserParams{
 		ID: "same-id", Email: "a@example.com", PasswordHash: "h",
 	}); err != nil {
@@ -104,7 +103,7 @@ func TestIsUniqueViolation_NonUnique(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = r.Close() })
 
-	_, execErr := r.db.ExecContext(context.Background(),
+	_, execErr := r.db.ExecContext(t.Context(),
 		`INSERT INTO users (id, email, password_hash) VALUES ('x', NULL, 'h')`)
 	if execErr == nil {
 		t.Fatal("want NOT NULL error")
