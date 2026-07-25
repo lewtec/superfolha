@@ -69,7 +69,7 @@ func (rm *RepositoryManager) GetRepo(projectId string) (*ProjectRepository, erro
 			rm.repos[projectId] = pr // usable after InitRepo even when missing
 			return pr, err
 		}
-		return nil, fmt.Errorf("failed to open git repository at %s: %w", repoPath, err)
+		return nil, fmt.Errorf("open git repository at %s: %w", repoPath, err)
 	}
 
 	rm.repos[projectId] = pr
@@ -106,11 +106,11 @@ func (pr *ProjectRepository) SaveFile(filePath, content string) error {
 	// Ensure the directory exists
 	dir := filepath.Dir(fullPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("failed to create directory %s: %w", dir, err)
+		return fmt.Errorf("create directory %s: %w", dir, err)
 	}
 
 	if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
-		return fmt.Errorf("failed to write file %s: %w", fullPath, err)
+		return fmt.Errorf("write file %s: %w", fullPath, err)
 	}
 
 	return nil
