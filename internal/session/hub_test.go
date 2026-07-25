@@ -134,3 +134,42 @@ func TestHubBootstrapFullStateAndClientStep1(t *testing.T) {
 		t.Fatalf("after step2 main.tex = %q", got)
 	}
 }
+
+func TestRegistryCloseProject(t *testing.T) {
+	state := t.TempDir()
+	svc := project.NewService(state)
+	projectID := "33333333-3333-3333-3333-333333333333"
+	if err := svc.InitProjectRepo(projectID); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.SaveFile(projectID, "main.tex", "body\n"); err != nil {
+		t.Fatal(err)
+	}
+
+	reg := NewRegistry(svc)
+	reg.CloseProject(projectID) // no-op when cold
+
+	h, err := reg.GetOrOpen(projectID, "owner@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reg.GetIfLive(projectID) != h {
+		t.Fatal("hub should be live after GetOrOpen")
+	}
+	c := h.AddClient("c1")
+	if c == nil {
+		t.Fatal("client")
+	}
+
+	reg.CloseProject(projectID)
+	if reg.GetIfLive(projectID) != nil {
+		t.Fatal("hub must not remain live after CloseProject")
+	}
+	// Peer channel closed so WS writers stop.
+	if _, ok := <-c.Out; ok {
+		t.Fatal("client Out should be closed after CloseProject")
+	}
+
+	// Safe to call again.
+	reg.CloseProject(projectID)
+}
