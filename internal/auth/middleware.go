@@ -4,9 +4,6 @@ import (
 	"context"
 	"net/http"
 	"strings"
-	"time"
-
-	"github.com/lewtec/superfolha/internal/appenv"
 )
 
 type contextKey string
@@ -25,7 +22,7 @@ func Middleware(next http.Handler) http.Handler {
 		var tokenString string
 
 		// 1. Try to get the token from a cookie
-		cookie, err := r.Cookie("authToken")
+		cookie, err := r.Cookie(AuthCookieName)
 		if err == nil {
 			tokenString = cookie.Value
 		}
@@ -49,19 +46,8 @@ func Middleware(next http.Handler) http.Handler {
 				})
 				r = r.WithContext(ctx)
 			} else if cookie != nil {
-				// Invalid cookie token: clear it with the same Secure/SameSite flags used on set/logout
-				// so local HTTP development can actually drop the cookie.
-				secure := !appenv.IsDevelopment()
-				http.SetCookie(w, &http.Cookie{
-					Name:     "authToken",
-					Value:    "",
-					Path:     "/",
-					MaxAge:   -1,
-					Expires:  time.Unix(0, 0),
-					HttpOnly: true,
-					Secure:   secure,
-					SameSite: http.SameSiteLaxMode,
-				})
+				// Invalid cookie token: clear with the same flags as Set/logout.
+				ClearAuthCookie(w)
 			}
 		}
 
