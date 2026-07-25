@@ -78,7 +78,7 @@ func TestLogin_UnknownEmailSameErrorAsWrongPassword(t *testing.T) {
 	svc := NewService(newMemRepo(db.User{
 		ID: "user-1", Email: "known@example.com", PasswordHash: hash,
 	}))
-	ctx := context.Background()
+	ctx := t.Context()
 
 	_, errUnknown := svc.Login(ctx, "missing@example.com", "correct-horse-battery")
 	_, errWrong := svc.Login(ctx, "known@example.com", "wrong-password-xx")
@@ -109,7 +109,7 @@ func TestLogin_Success(t *testing.T) {
 		ID: "user-1", Email: "known@example.com", PasswordHash: hash,
 	}))
 
-	resp, err := svc.Login(context.Background(), "Known@example.com", pass)
+	resp, err := svc.Login(t.Context(), "Known@example.com", pass)
 	if err != nil {
 		t.Fatalf("Login: %v", err)
 	}
