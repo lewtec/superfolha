@@ -40,7 +40,7 @@ func NewRepository(dsn string) (*Repository, error) {
 		return nil, err
 	}
 	if closeErr := migrationDB.Close(); closeErr != nil {
-		return nil, fmt.Errorf("failed to close migration database: %w", closeErr)
+		return nil, fmt.Errorf("close migration database: %w", closeErr)
 	}
 
 	pool, err := pgxpool.New(context.Background(), dsn)
