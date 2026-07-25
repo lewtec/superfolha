@@ -53,25 +53,25 @@ func CommitChanges(repoPath, author, message string) (*Commit, error) {
 
 	// Stage on the worktree we already hold (single PlainOpen for stage + commit).
 	if _, err := w.Add("."); err != nil {
-		return nil, fmt.Errorf("failed to add all files to staging: %w", err)
+		return nil, fmt.Errorf("add all files to staging: %w", err)
 	}
 
 	// Check if there are any changes to commit
 	status, err := w.Status()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get worktree status: %w", err)
+		return nil, fmt.Errorf("get worktree status: %w", err)
 	}
 
 	// If there are no changes, return the last commit (noop)
 	if status.IsClean() {
 		ref, err := r.Head()
 		if err != nil {
-			return nil, fmt.Errorf("failed to get HEAD reference: %w", err)
+			return nil, fmt.Errorf("get HEAD reference: %w", err)
 		}
 
 		obj, err := r.CommitObject(ref.Hash())
 		if err != nil {
-			return nil, fmt.Errorf("failed to get last commit object: %w", err)
+			return nil, fmt.Errorf("get last commit object: %w", err)
 		}
 
 		return &Commit{
@@ -91,13 +91,13 @@ func CommitChanges(repoPath, author, message string) (*Commit, error) {
 		},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to commit changes: %w", err)
+		return nil, fmt.Errorf("commit changes: %w", err)
 	}
 
 	// Get the commit object
 	obj, err := r.CommitObject(commitHash)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get commit object: %w", err)
+		return nil, fmt.Errorf("get commit object: %w", err)
 	}
 
 	return &Commit{
@@ -117,7 +117,7 @@ func GetHistory(repoPath string) ([]*Commit, error) {
 
 	cIter, err := r.Log(&git.LogOptions{Order: git.LogOrderCommitterTime})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get commit log: %w", err)
+		return nil, fmt.Errorf("get commit log: %w", err)
 	}
 
 	var commits []*Commit
@@ -131,7 +131,7 @@ func GetHistory(repoPath string) ([]*Commit, error) {
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to iterate commits: %w", err)
+		return nil, fmt.Errorf("iterate commits: %w", err)
 	}
 
 	return commits, nil
