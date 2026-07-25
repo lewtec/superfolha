@@ -16,7 +16,7 @@ func (t Time) MarshalGQL(w io.Writer) {
 	w.Write([]byte(strconv.Quote(tyme.Format(time.RFC3339))))
 }
 
-func (t *Time) UnmarshalGQL(v interface{}) error {
+func (t *Time) UnmarshalGQL(v any) error {
 	str, ok := v.(string)
 	if !ok {
 		return fmt.Errorf("Time must be a string")
@@ -37,7 +37,7 @@ func MarshalTime(t time.Time) graphql.Marshaler {
 	})
 }
 
-func UnmarshalTime(v interface{}) (time.Time, error) {
+func UnmarshalTime(v any) (time.Time, error) {
 	str, ok := v.(string)
 	if !ok {
 		return time.Time{}, fmt.Errorf("Time must be a string")
