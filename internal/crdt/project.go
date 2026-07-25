@@ -24,6 +24,7 @@ type ProjectDoc struct {
 	Doc *ycrdt.Doc
 	// TextPaths is the set of relative paths that have a Y.Text in this doc.
 	// Updated on load and when text files are added/removed server-side.
+	// Keys are always slash-normalized, repo-relative, non-escaping paths.
 	TextPaths map[string]struct{}
 }
 
@@ -33,6 +34,20 @@ func New() *ProjectDoc {
 		Doc:       ycrdt.New(),
 		TextPaths: make(map[string]struct{}),
 	}
+}
+
+// collabPath cleans and jails a path for CRDT text keys.
+// Uses the same rules as disk I/O (ValidateRepoRelativePath) plus a .git deny list.
+func collabPath(userPath string) (string, error) {
+	clean, err := project.ValidateRepoRelativePath(userPath)
+	if err != nil {
+		return "", err
+	}
+	path := filepath.ToSlash(clean)
+	if path == ".git" || strings.HasPrefix(path, ".git/") {
+		return "", fmt.Errorf("%w: .git path not collaborative", project.ErrInvalidPath)
+	}
+	return path, nil
 }
 
 // TextKey returns the Y.Text root key for a relative path.
@@ -53,11 +68,14 @@ func (p *ProjectDoc) EncodeStateAsUpdate() []byte {
 
 // Source returns collaborative text for path, or empty if not in the doc.
 func (p *ProjectDoc) Source(relPath string) string {
-	relPath = filepath.ToSlash(relPath)
-	if _, ok := p.TextPaths[relPath]; !ok {
+	path, err := collabPath(relPath)
+	if err != nil {
 		return ""
 	}
-	return p.Doc.GetText(TextKey(relPath)).ToString()
+	if _, ok := p.TextPaths[path]; !ok {
+		return ""
+	}
+	return p.Doc.GetText(TextKey(path)).ToString()
 }
 
 // TextPathList returns sorted collaborative paths.
@@ -77,25 +95,21 @@ type FileContent struct {
 }
 
 // LoadFromFiles populates Y.Text entries from a project file listing.
-// Blobs and oversize text are skipped (not collaborative).
+// Blobs, oversize text, and invalid/escaping paths are skipped (not collaborative).
 // Expected on a fresh doc (hub open).
 func (p *ProjectDoc) LoadFromFiles(files []FileContent) error {
 	// Pre-create Y.Text handles outside the transaction (ygo requirement).
 	texts := make(map[string]*ycrdt.YText)
 	accepted := make([]FileContent, 0, len(files))
 	for _, f := range files {
-		path := filepath.ToSlash(f.Path)
-		if path == "" || strings.HasPrefix(path, ".git/") || path == ".git" {
+		path, err := collabPath(f.Path)
+		if err != nil {
 			continue
 		}
 		if project.IsBinary(f.Content, path) {
 			continue
 		}
 		if int64(len(f.Content)) > project.MaxCollabTextBytes {
-			continue
-		}
-		// Reject paths that escape or are absolute when cleaned.
-		if filepath.IsAbs(path) || path == ".." || strings.HasPrefix(path, "../") {
 			continue
 		}
 		texts[path] = p.Doc.GetText(TextKey(path))
@@ -127,15 +141,15 @@ func (p *ProjectDoc) LoadFromFiles(files []FileContent) error {
 
 // SetTextServer replaces a path's collaborative text (server origin).
 func (p *ProjectDoc) SetTextServer(relPath, content string) error {
-	relPath = filepath.ToSlash(relPath)
-	if relPath == "" {
-		return fmt.Errorf("empty path")
+	path, err := collabPath(relPath)
+	if err != nil {
+		return err
 	}
 	if int64(len(content)) > project.MaxCollabTextBytes {
 		return fmt.Errorf("text exceeds collab size cap")
 	}
-	st := p.Doc.GetText(TextKey(relPath))
-	err := p.Doc.TransactE(func(txn *ycrdt.Transaction) error {
+	st := p.Doc.GetText(TextKey(path))
+	err = p.Doc.TransactE(func(txn *ycrdt.Transaction) error {
 		if n := st.Len(); n > 0 {
 			st.Delete(txn, 0, n)
 		}
@@ -147,18 +161,22 @@ func (p *ProjectDoc) SetTextServer(relPath, content string) error {
 	if err != nil {
 		return err
 	}
-	p.TextPaths[relPath] = struct{}{}
+	p.TextPaths[path] = struct{}{}
 	return nil
 }
 
 // RemoveText drops a path from the collaborative set (does not delete disk file).
 func (p *ProjectDoc) RemoveText(relPath string) error {
-	relPath = filepath.ToSlash(relPath)
-	if _, ok := p.TextPaths[relPath]; !ok {
+	path, err := collabPath(relPath)
+	if err != nil {
+		// Invalid paths cannot be in TextPaths when keys are jail-normalized.
 		return nil
 	}
-	st := p.Doc.GetText(TextKey(relPath))
-	err := p.Doc.TransactE(func(txn *ycrdt.Transaction) error {
+	if _, ok := p.TextPaths[path]; !ok {
+		return nil
+	}
+	st := p.Doc.GetText(TextKey(path))
+	err = p.Doc.TransactE(func(txn *ycrdt.Transaction) error {
 		if n := st.Len(); n > 0 {
 			st.Delete(txn, 0, n)
 		}
@@ -167,7 +185,7 @@ func (p *ProjectDoc) RemoveText(relPath string) error {
 	if err != nil {
 		return err
 	}
-	delete(p.TextPaths, relPath)
+	delete(p.TextPaths, path)
 	return nil
 }
 
@@ -178,7 +196,7 @@ func (p *ProjectDoc) FlushToDir(rootDir string) error {
 		return fmt.Errorf("empty root dir")
 	}
 	for _, rel := range p.TextPathList() {
-		// Re-validate path jail
+		// Re-validate path jail (defense in depth; keys should already be clean).
 		clean, err := project.ValidateRepoRelativePath(rel)
 		if err != nil {
 			return fmt.Errorf("flush %q: %w", rel, err)
