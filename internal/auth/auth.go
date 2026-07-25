@@ -35,7 +35,20 @@ var (
 	jwtSecretOnce = new(sync.Once)
 	jwtSecret     []byte
 	jwtSecretErr  error
+
+	// dummyBcryptHash is a real cost-BcryptCost hash used only so Login still
+	// spends bcrypt time when the email is unknown (timing equalization).
+	dummyBcryptHash = mustDummyBcryptHash()
 )
+
+func mustDummyBcryptHash() string {
+	// Fixed plaintext; value is never a real user password.
+	h, err := bcrypt.GenerateFromPassword([]byte("superfolha-login-timing-dummy"), BcryptCost)
+	if err != nil {
+		panic("auth: generate dummy bcrypt hash: " + err.Error())
+	}
+	return string(h)
+}
 
 type Claims struct {
 	UserID string `json:"user_id"`
