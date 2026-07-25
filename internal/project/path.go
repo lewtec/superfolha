@@ -12,7 +12,8 @@ import (
 var ErrInvalidPath = errors.New("invalid file path")
 
 // ValidateRepoRelativePath cleans and validates a user-supplied path relative to a repository root.
-// It rejects empty paths, absolute paths, and paths that escape via "..".
+// It rejects empty paths, absolute paths, paths that escape via "..", and any path under a ".git"
+// directory component (so disk I/O cannot rewrite hooks/config the way collab CRDT already jails).
 func ValidateRepoRelativePath(userPath string) (string, error) {
 	if userPath == "" {
 		return "", fmt.Errorf("%w: empty path", ErrInvalidPath)
@@ -29,7 +30,25 @@ func ValidateRepoRelativePath(userPath string) (string, error) {
 	if cleaned == ".." || strings.HasPrefix(cleaned, ".."+string(filepath.Separator)) {
 		return "", fmt.Errorf("%w: path escapes repository root", ErrInvalidPath)
 	}
+	if hasGitDirComponent(cleaned) {
+		return "", fmt.Errorf("%w: .git paths are not allowed", ErrInvalidPath)
+	}
 	return cleaned, nil
+}
+
+// hasGitDirComponent reports whether cleaned contains a path segment exactly equal to ".git".
+// ".gitignore" and similar names are allowed; only the git metadata directory is denied.
+func hasGitDirComponent(cleaned string) bool {
+	if cleaned == ".git" {
+		return true
+	}
+	sep := string(filepath.Separator)
+	for _, seg := range strings.Split(cleaned, sep) {
+		if seg == ".git" {
+			return true
+		}
+	}
+	return false
 }
 
 // safeRepoPath joins userPath under repoRoot after validating it stays inside the repo.
