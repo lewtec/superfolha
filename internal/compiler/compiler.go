@@ -75,7 +75,7 @@ func Compile(ctx context.Context, projectService *project.Service, projectId str
 	// Create temporary directory for compilation
 	compileUUID, err := uuid.NewV7()
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate compile ID: %w", err)
+		return nil, fmt.Errorf("generate compile ID: %w", err)
 	}
 	compileID := compileUUID.String()
 	tmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("compile-%s", compileID))
@@ -87,7 +87,7 @@ func Compile(ctx context.Context, projectService *project.Service, projectId str
 	// Get all files from the project
 	projectFiles, err := projectService.ListFiles(projectId)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list project files: %w", err)
+		return nil, fmt.Errorf("list project files: %w", err)
 	}
 
 	// Copy project files to the temporary directory
