@@ -28,12 +28,12 @@ type FileInfo struct {
 // InitRepo creates a new git repository
 func InitRepo(path string) error {
 	if err := os.MkdirAll(path, 0755); err != nil {
-		return fmt.Errorf("failed to create directory %s: %w", path, err)
+		return fmt.Errorf("create directory %s: %w", path, err)
 	}
 
 	_, err := git.PlainInit(path, false)
 	if err != nil {
-		return fmt.Errorf("failed to initialize git repository at %s: %w", path, err)
+		return fmt.Errorf("initialize git repository at %s: %w", path, err)
 	}
 
 	return nil
@@ -43,12 +43,12 @@ func InitRepo(path string) error {
 func CommitChanges(repoPath, author, message string) (*Commit, error) {
 	r, err := git.PlainOpen(repoPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open repository at %s: %w", repoPath, err)
+		return nil, fmt.Errorf("open repository at %s: %w", repoPath, err)
 	}
 
 	w, err := r.Worktree()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get worktree for repository at %s: %w", repoPath, err)
+		return nil, fmt.Errorf("get worktree for repository at %s: %w", repoPath, err)
 	}
 
 	// Stage on the worktree we already hold (single PlainOpen for stage + commit).
@@ -112,7 +112,7 @@ func CommitChanges(repoPath, author, message string) (*Commit, error) {
 func GetHistory(repoPath string) ([]*Commit, error) {
 	r, err := git.PlainOpen(repoPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open repository at %s: %w", repoPath, err)
+		return nil, fmt.Errorf("open repository at %s: %w", repoPath, err)
 	}
 
 	cIter, err := r.Log(&git.LogOptions{Order: git.LogOrderCommitterTime})
@@ -144,12 +144,12 @@ var ErrGitFileNotFound = errors.New("file not found in git repository")
 func ReadFile(repoPath, filePath string) (io.ReadCloser, int64, error) {
 	r, err := git.PlainOpen(repoPath)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to open repository at %s: %w", repoPath, err)
+		return nil, 0, fmt.Errorf("open repository at %s: %w", repoPath, err)
 	}
 
 	w, err := r.Worktree()
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to get worktree for repository at %s: %w", repoPath, err)
+		return nil, 0, fmt.Errorf("get worktree for repository at %s: %w", repoPath, err)
 	}
 
 	file, err := w.Filesystem.Open(filePath)
@@ -157,13 +157,13 @@ func ReadFile(repoPath, filePath string) (io.ReadCloser, int64, error) {
 		if os.IsNotExist(err) {
 			return nil, 0, ErrGitFileNotFound
 		}
-		return nil, 0, fmt.Errorf("failed to open file %s: %w", filePath, err)
+		return nil, 0, fmt.Errorf("open file %s: %w", filePath, err)
 	}
 
 	fileInfo, err := w.Filesystem.Stat(filePath) // Use w.Filesystem.Stat
 	if err != nil {
 		file.Close() // Ensure file is closed on error
-		return nil, 0, fmt.Errorf("failed to get file info for %s: %w", filePath, err)
+		return nil, 0, fmt.Errorf("get file info for %s: %w", filePath, err)
 	}
 
 	return file, fileInfo.Size(), nil
@@ -208,7 +208,7 @@ func ListFiles(repoPath string) ([]*FileInfo, error) {
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to walk directory %s: %w", repoPath, err)
+		return nil, fmt.Errorf("walk directory %s: %w", repoPath, err)
 	}
 
 	return files, nil
