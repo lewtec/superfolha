@@ -139,13 +139,42 @@ func TestInternalHelper(t *testing.T) {
 	if nilErr.Status() != http.StatusInternalServerError {
 		t.Errorf("Internal(nil).Status() = %d, want 500", nilErr.Status())
 	}
+	if nilErr.Message != "internal error" {
+		t.Errorf("Internal(nil).Message = %q, want %q", nilErr.Message, "internal error")
+	}
 
-	cause := errors.New("db down")
+	cause := errors.New("db down: secret path /var/lib/superfolha.db")
 	wrapped := Internal(cause)
 	if !errors.Is(wrapped, cause) {
 		t.Errorf("Internal(cause) should wrap cause; Unwrap chain missing")
 	}
 	if CodeOf(wrapped) != CodeInternal {
 		t.Errorf("CodeOf(Internal(cause)) = %q, want %q", CodeOf(wrapped), CodeInternal)
+	}
+	// Client-facing Message must not embed the underlying error text.
+	if wrapped.Message != "internal error" {
+		t.Errorf("Internal(cause).Message = %q, want generic %q", wrapped.Message, "internal error")
+	}
+	body := wrapped.RESTBody()
+	if body.Message != "internal error" {
+		t.Errorf("RESTBody().Message = %q, want generic internal error", body.Message)
+	}
+	if body.Code != string(CodeInternal) {
+		t.Errorf("RESTBody().Code = %q, want %s", body.Code, CodeInternal)
+	}
+	// Error() keeps the cause for operator logs.
+	if got := wrapped.Error(); got != "internal error: "+cause.Error() {
+		t.Errorf("Error() = %q, want cause appended for logs", got)
+	}
+}
+
+func TestErrorString_DoesNotDoubleCause(t *testing.T) {
+	t.Parallel()
+
+	cause := errors.New("disk full")
+	// Call sites that already put err.Error() in Message should not double-append.
+	w := Wrap(CodeCompileFailed, cause.Error(), cause)
+	if got := w.Error(); got != cause.Error() {
+		t.Errorf("Error() = %q, want %q (no double append)", got, cause.Error())
 	}
 }

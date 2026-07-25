@@ -2,8 +2,8 @@ package apierrors
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
+	"strings"
 )
 
 // Error is returned by services and presented to clients with a stable Code.
@@ -17,8 +17,19 @@ type Error struct {
 }
 
 func (e *Error) Error() string {
+	// Prefer Message for client-oriented summaries; append the underlying
+	// cause for operator logs when it adds information.
 	if e.Message != "" {
+		if e.Err != nil {
+			cause := e.Err.Error()
+			if e.Message != cause && !strings.Contains(e.Message, cause) {
+				return e.Message + ": " + cause
+			}
+		}
 		return e.Message
+	}
+	if e.Err != nil {
+		return e.Err.Error()
 	}
 	return string(e.Code)
 }
@@ -87,9 +98,12 @@ func (e *Error) RESTBody() RESTBody {
 	return RESTBody{Code: string(e.Code), Message: e.Message}
 }
 
+// Internal returns a CodeInternal error safe for clients.
+// Message is always the generic "internal error" (GraphQL/REST present Message);
+// the underlying cause is kept on Err for Unwrap/errors.Is and for Error() logs.
 func Internal(err error) *Error {
 	if err == nil {
 		return New(CodeInternal, "internal error")
 	}
-	return Wrap(CodeInternal, fmt.Sprintf("internal error: %v", err), err)
+	return Wrap(CodeInternal, "internal error", err)
 }
