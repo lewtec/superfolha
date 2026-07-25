@@ -31,7 +31,7 @@ type Repository struct {
 }
 
 func NewRepository(path string) (*Repository, error) {
-	dsn, err := buildDSN(path)
+	dsn, filePath, err := buildDSN(path)
 	if err != nil {
 		return nil, err
 	}
@@ -57,27 +57,68 @@ func NewRepository(path string) (*Repository, error) {
 		return nil, err
 	}
 
+	// Owner-only: DB stores password hashes and session material.
+	if err := ensureOwnerOnlyFile(filePath); err != nil {
+		if closeErr := conn.Close(); closeErr != nil {
+			slog.Error("failed to close sqlite connection on chmod error", "err", closeErr)
+		}
+		return nil, err
+	}
+
 	return &Repository{db: conn, queries: New(conn)}, nil
 }
 
-func buildDSN(path string) (string, error) {
+// buildDSN returns a modernc DSN and the filesystem path of the DB file (for chmod).
+func buildDSN(path string) (dsn, filePath string, err error) {
 	path = strings.TrimSpace(path)
 	if path == "" {
-		return "", fmt.Errorf("sqlite path is empty")
+		return "", "", fmt.Errorf("sqlite path is empty")
 	}
 	if strings.HasPrefix(path, "file:") {
-		return ensurePragmas(path), nil
+		filePath = sqliteFilePath(path)
+		return ensurePragmas(path), filePath, nil
 	}
 	if dir := filepath.Dir(path); dir != "" && dir != "." {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
-			return "", fmt.Errorf("create sqlite directory %s: %w", dir, err)
+			return "", "", fmt.Errorf("create sqlite directory %s: %w", dir, err)
 		}
 	}
 	abs, err := filepath.Abs(path)
 	if err != nil {
-		return "", fmt.Errorf("absolute sqlite path: %w", err)
+		return "", "", fmt.Errorf("absolute sqlite path: %w", err)
 	}
-	return ensurePragmas("file:" + abs), nil
+	return ensurePragmas("file:" + abs), abs, nil
+}
+
+// sqliteFilePath extracts the filesystem path from a file: URI (best-effort).
+func sqliteFilePath(dsn string) string {
+	s := strings.TrimPrefix(dsn, "file:")
+	if i := strings.IndexAny(s, "?#"); i >= 0 {
+		s = s[:i]
+	}
+	return s
+}
+
+// ensureOwnerOnlyFile sets mode 0600 on path when it is a regular file.
+// Missing path is ignored (in-memory / non-file DSNs).
+func ensureOwnerOnlyFile(path string) error {
+	if path == "" || path == ":memory:" {
+		return nil
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("stat sqlite file: %w", err)
+	}
+	if !info.Mode().IsRegular() {
+		return nil
+	}
+	if err := os.Chmod(path, 0o600); err != nil {
+		return fmt.Errorf("chmod sqlite file 0600: %w", err)
+	}
+	return nil
 }
 
 func ensurePragmas(dsn string) string {
