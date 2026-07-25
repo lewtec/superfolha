@@ -59,8 +59,15 @@ func Compile(ctx context.Context, projectService *project.Service, projectId str
 	ctx, cancel := context.WithTimeout(ctx, DefaultCompileTimeout)
 	defer cancel()
 
+	// Jail the entry file before any I/O or process spawn. filepath.Join(tmp, "../x")
+	// escapes the compile sandbox; HTTP already validates, but Compile is also a package API.
+	filePath, err := project.ValidateRepoRelativePath(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("compile file path: %w", err)
+	}
+
 	// Check if latexmk command exists
-	_, err := exec.LookPath("latexmk")
+	_, err = exec.LookPath("latexmk")
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrLatexmkNotFound, err)
 	}
@@ -85,16 +92,19 @@ func Compile(ctx context.Context, projectService *project.Service, projectId str
 
 	// Copy project files to the temporary directory
 	for _, file := range projectFiles {
-		// Ensure directory structure is maintained
-		targetPath := filepath.Join(tmpDir, file.Path)
+		rel, pathErr := project.ValidateRepoRelativePath(file.Path)
+		if pathErr != nil {
+			return nil, fmt.Errorf("project file path %q: %w", file.Path, pathErr)
+		}
+		targetPath := filepath.Join(tmpDir, rel)
 		if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
-			return nil, fmt.Errorf("failed to create directory for file %s: %w", file.Path, err)
+			return nil, fmt.Errorf("failed to create directory for file %s: %w", rel, err)
 		}
 
 		// Read file content
-		fileReader, _, err := projectService.ReadFile(projectId, file.Path)
+		fileReader, _, err := projectService.ReadFile(projectId, rel)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read file %s from project: %w", file.Path, err)
+			return nil, fmt.Errorf("failed to read file %s from project: %w", rel, err)
 		}
 
 		// Write file content to temporary directory
@@ -110,7 +120,7 @@ func Compile(ctx context.Context, projectService *project.Service, projectId str
 		outFile.Close()
 
 		if copyErr != nil {
-			return nil, fmt.Errorf("failed to copy file %s to temporary directory: %w", file.Path, copyErr)
+			return nil, fmt.Errorf("failed to copy file %s to temporary directory: %w", rel, copyErr)
 		}
 	}
 
@@ -136,7 +146,7 @@ func Compile(ctx context.Context, projectService *project.Service, projectId str
 		return nil, fmt.Errorf("latex compile timed out or was canceled (limit %s): %w", DefaultCompileTimeout, ctx.Err())
 	}
 
-	// Check if PDF was generated
+	// Check if PDF was generated (path is jailed; nested entry files keep their dir)
 	pdfPath := filepath.Join(tmpDir, strings.TrimSuffix(filePath, ".tex")+".pdf")
 	_, pdfErr := os.Stat(pdfPath) // Check if file exists
 
