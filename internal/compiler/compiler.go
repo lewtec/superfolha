@@ -98,20 +98,20 @@ func Compile(ctx context.Context, projectService *project.Service, projectId str
 		}
 		targetPath := filepath.Join(tmpDir, rel)
 		if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
-			return nil, fmt.Errorf("failed to create directory for file %s: %w", rel, err)
+			return nil, fmt.Errorf("create directory for file %s: %w", rel, err)
 		}
 
 		// Read file content
 		fileReader, _, err := projectService.ReadFile(projectId, rel)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read file %s from project: %w", rel, err)
+			return nil, fmt.Errorf("read file %s from project: %w", rel, err)
 		}
 
 		// Write file content to temporary directory
 		outFile, err := os.Create(targetPath)
 		if err != nil {
 			fileReader.Close()
-			return nil, fmt.Errorf("failed to create temporary file %s: %w", targetPath, err)
+			return nil, fmt.Errorf("create temporary file %s: %w", targetPath, err)
 		}
 
 		_, copyErr := io.Copy(outFile, fileReader)
@@ -120,7 +120,7 @@ func Compile(ctx context.Context, projectService *project.Service, projectId str
 		outFile.Close()
 
 		if copyErr != nil {
-			return nil, fmt.Errorf("failed to copy file %s to temporary directory: %w", rel, copyErr)
+			return nil, fmt.Errorf("copy file %s to temporary directory: %w", rel, copyErr)
 		}
 	}
 
