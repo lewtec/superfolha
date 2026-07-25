@@ -443,6 +443,9 @@ func (h *Hub) emitSyncStatusLocked(status string) {
 }
 
 // Close flushes, optional final commit, unsubscribes, closes clients.
+// If the project root is already gone (e.g. deleteProject removed the tree
+// before a late idle close), skip flush/commit so Close cannot resurrect
+// the directory via FlushToDir or an unconditional MkdirAll.
 func (h *Hub) Close() error {
 	h.mu.Lock()
 	h.closing = true
@@ -467,6 +470,15 @@ func (h *Hub) Close() error {
 	root := h.Root
 	h.mu.Unlock()
 
+	if root != "" {
+		if _, err := os.Stat(root); err != nil {
+			if os.IsNotExist(err) {
+				return nil
+			}
+			return err
+		}
+	}
+
 	if doc != nil {
 		if err := doc.FlushToDir(root); err != nil {
 			return err
@@ -478,7 +490,5 @@ func (h *Hub) Close() error {
 			slog.Warn("final hub commit on close", "project", h.ProjectID, "err", err)
 		}
 	}
-	// Touch empty dirs so tools see hub root exists
-	_ = os.MkdirAll(root, 0o755)
 	return nil
 }
