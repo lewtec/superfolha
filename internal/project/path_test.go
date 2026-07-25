@@ -26,6 +26,13 @@ func TestValidateRepoRelativePath(t *testing.T) {
 		{name: "escape nested", in: "foo/../../etc/passwd", wantErr: true},
 		{name: "absolute", in: "/etc/passwd", wantErr: true},
 		{name: "double slash normalizes", in: "foo//bar.tex", want: filepath.Join("foo", "bar.tex")},
+		{name: "gitignore allowed", in: ".gitignore", want: ".gitignore"},
+		{name: "gitattributes allowed", in: ".gitattributes", want: ".gitattributes"},
+		{name: "git dir only", in: ".git", wantErr: true},
+		{name: "git config", in: ".git/config", wantErr: true},
+		{name: "git hooks", in: ".git/hooks/pre-commit", wantErr: true},
+		{name: "nested git dir", in: "vendor/.git/config", wantErr: true},
+		{name: "dot git with slash normalize", in: ".git/", wantErr: true},
 	}
 
 	for _, tt := range tests {
@@ -66,6 +73,7 @@ func TestSafeRepoPath(t *testing.T) {
 		{name: "traversal", user: "../../etc/passwd", wantErr: true},
 		{name: "absolute", user: "/tmp/x", wantErr: true},
 		{name: "empty", user: "", wantErr: true},
+		{name: "git config", user: ".git/config", wantErr: true},
 	}
 
 	for _, tt := range tests {
@@ -109,6 +117,7 @@ func TestDecodeFilePath(t *testing.T) {
 		{name: "absolute after decode", in: "%2Fetc%2Fpasswd", wantErr: true},
 		{name: "empty", in: "", wantErr: true},
 		{name: "invalid escape", in: "bad%zz", wantErr: true},
+		{name: "encoded git config", in: ".git%2Fconfig", wantErr: true},
 	}
 
 	for _, tt := range tests {
