@@ -131,7 +131,7 @@ func ValidateToken(tokenString string) (*Claims, error) {
 		return nil, err
 	}
 
-	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (any, error) {
 		// Reject non-HMAC algorithms (classic alg confusion).
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("%w: %v", ErrUnexpectedSigning, token.Header["alg"])
