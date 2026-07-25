@@ -5,19 +5,46 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"github.com/lewtec/superfolha/internal/appenv"
+	"github.com/lewtec/superfolha/internal/project"
 	"github.com/lewtec/superfolha/internal/session"
 )
+
+// wsMaxMessageBytes caps a single WebSocket frame. Collaborative text is limited
+// by project.MaxCollabTextBytes; leave headroom for y-protocols framing and
+// multi-file state vectors without allowing unbounded memory use per message.
+const wsMaxMessageBytes = project.MaxCollabTextBytes + 1<<20 // 6 MiB
+
+// wsCheckOrigin rejects cross-site browser WebSocket handshakes in production.
+// Cookie-authenticated collab sockets would otherwise be open to CSWSH if
+// CheckOrigin always returned true. Development (GO_ENV=development) allows all
+// origins so the Vite dev proxy (different port) can connect.
+func wsCheckOrigin(r *http.Request) bool {
+	if appenv.IsDevelopment() {
+		return true
+	}
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		// Non-browser clients often omit Origin; auth still required after upgrade.
+		return true
+	}
+	u, err := url.Parse(origin)
+	if err != nil || u.Host == "" {
+		return false
+	}
+	return strings.EqualFold(u.Host, r.Host)
+}
 
 var wsUpgrader = websocket.Upgrader{
 	ReadBufferSize:  64 * 1024,
 	WriteBufferSize: 64 * 1024,
-	CheckOrigin: func(r *http.Request) bool {
-		return true
-	},
+	CheckOrigin:     wsCheckOrigin,
 }
 
 type wsControl struct {
@@ -71,6 +98,7 @@ func (s *Server) handleProjectWS(w http.ResponseWriter, r *http.Request) {
 		slog.Error("ws upgrade", "err", err)
 		return
 	}
+	conn.SetReadLimit(wsMaxMessageBytes)
 
 	clientID := uuid.NewString()
 	client := hub.AddClient(clientID)
