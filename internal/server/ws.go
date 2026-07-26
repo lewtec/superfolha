@@ -86,9 +86,12 @@ func (s *Server) handleProjectWS(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to open project session", http.StatusInternalServerError)
 		return
 	}
+	// Commit may fire after the HTTP request ends; keep values, drop cancel.
+	commitCtx := context.WithoutCancel(r.Context())
 	hub.SetOnCommitted(func() {
-		// Request context may be done after the socket closes; use background.
-		if err := s.repo.UpdateProjectTimestamp(context.Background(), projectID); err != nil {
+		ctx, cancel := context.WithTimeout(commitCtx, 10*time.Second)
+		defer cancel()
+		if err := s.repo.UpdateProjectTimestamp(ctx, projectID); err != nil {
 			slog.Warn("project timestamp after hub commit", "project", projectID, "err", err)
 		}
 	})
