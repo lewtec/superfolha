@@ -76,7 +76,7 @@ func TestResolveAddr(t *testing.T) {
 
 func TestOpenRepository(t *testing.T) {
 	t.Run("unknown driver", func(t *testing.T) {
-		repo, err := openRepository("mysql", "unused", t.TempDir())
+		repo, err := openRepository(t.Context(), "mysql", "unused", t.TempDir())
 		if err == nil {
 			if repo != nil {
 				_ = repo.Close()
@@ -92,7 +92,7 @@ func TestOpenRepository(t *testing.T) {
 	})
 
 	t.Run("postgres without DSN", func(t *testing.T) {
-		repo, err := openRepository("postgres", "", t.TempDir())
+		repo, err := openRepository(t.Context(), "postgres", "", t.TempDir())
 		if err == nil {
 			if repo != nil {
 				_ = repo.Close()
@@ -108,7 +108,7 @@ func TestOpenRepository(t *testing.T) {
 	})
 
 	t.Run("postgresql alias without DSN", func(t *testing.T) {
-		_, err := openRepository("postgresql", "  ", t.TempDir())
+		_, err := openRepository(t.Context(), "postgresql", "  ", t.TempDir())
 		if err == nil {
 			t.Fatal("expected error for postgresql without DSN")
 		}
@@ -121,7 +121,7 @@ func TestOpenRepository(t *testing.T) {
 		stateDir := t.TempDir()
 		wantDB := filepath.Join(stateDir, "superfolha.db")
 
-		repo, err := openRepository("sqlite", "", stateDir)
+		repo, err := openRepository(t.Context(), "sqlite", "", stateDir)
 		if err != nil {
 			t.Fatalf("openRepository(sqlite, \"\", stateDir): %v", err)
 		}
@@ -143,7 +143,7 @@ func TestOpenRepository(t *testing.T) {
 		stateDir := t.TempDir()
 		wantDB := filepath.Join(stateDir, "superfolha.db")
 
-		repo, err := openRepository("sqlite3", "  ", stateDir)
+		repo, err := openRepository(t.Context(), "sqlite3", "  ", stateDir)
 		if err != nil {
 			t.Fatalf("openRepository(sqlite3, whitespace DSN, stateDir): %v", err)
 		}

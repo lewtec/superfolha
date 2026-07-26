@@ -28,7 +28,10 @@ type Repository struct {
 	queries *Queries
 }
 
-func NewRepository(dsn string) (*Repository, error) {
+// NewRepository opens a postgres pool and runs migrations.
+// ctx bounds pool create and the initial ping (callers should pass a real
+// request or startup context rather than inventing one inside this package).
+func NewRepository(ctx context.Context, dsn string) (*Repository, error) {
 	migrationDB, err := sql.Open("pgx", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open migration database: %w", err)
@@ -43,11 +46,11 @@ func NewRepository(dsn string) (*Repository, error) {
 		return nil, fmt.Errorf("close migration database: %w", closeErr)
 	}
 
-	pool, err := pgxpool.New(context.Background(), dsn)
+	pool, err := pgxpool.New(ctx, dsn)
 	if err != nil {
 		return nil, fmt.Errorf("create pool: %w", err)
 	}
-	if err := pool.Ping(context.Background()); err != nil {
+	if err := pool.Ping(ctx); err != nil {
 		pool.Close()
 		return nil, fmt.Errorf("ping postgres: %w", err)
 	}

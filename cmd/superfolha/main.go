@@ -87,7 +87,7 @@ func resolveAddr(addr string) string {
 	return "127.0.0.1:8080"
 }
 
-func openRepository(driver, dsn, stateDir string) (db.Repository, error) {
+func openRepository(ctx context.Context, driver, dsn, stateDir string) (db.Repository, error) {
 	driver = strings.ToLower(strings.TrimSpace(driver))
 	dsn = strings.TrimSpace(dsn)
 	if driver == "" {
@@ -100,7 +100,7 @@ func openRepository(driver, dsn, stateDir string) (db.Repository, error) {
 		if dsn == "" {
 			return nil, fmt.Errorf("postgres driver requires a DSN (--db / DATABASE_URL)")
 		}
-		return postgres.NewRepository(dsn)
+		return postgres.NewRepository(ctx, dsn)
 	case "sqlite", "sqlite3":
 		if dsn == "" {
 			dsn = filepath.Join(stateDir, "superfolha.db")
@@ -124,7 +124,8 @@ func runServer(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	repo, err := openRepository(dbDriver, dbDSN, stateDir)
+	// Process-root context for startup I/O (pool create / ping); not request-scoped.
+	repo, err := openRepository(context.Background(), dbDriver, dbDSN, stateDir)
 	if err != nil {
 		slog.Error("unable to open database", "err", err)
 		os.Exit(1)
