@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/lewtec/superfolha/internal/project"
+	"errors"
+	"io/fs"
 )
 
 // Close must not recreate a project tree that was already removed (deleteProject
@@ -34,18 +36,18 @@ func TestHubCloseDoesNotRecreateRemovedRoot(t *testing.T) {
 	if err := os.RemoveAll(root); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(root); !os.IsNotExist(err) {
+	if _, err := os.Stat(root); !errors.Is(err, fs.ErrNotExist) {
 		t.Fatalf("root should be gone, stat err=%v", err)
 	}
 
 	if err := h.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
 	}
-	if _, err := os.Stat(root); !os.IsNotExist(err) {
+	if _, err := os.Stat(root); !errors.Is(err, fs.ErrNotExist) {
 		t.Fatalf("Close recreated project root %s (stat err=%v)", root, err)
 	}
 	// Parent repos/ dir may still exist; ensure no project subtree returned.
-	if _, err := os.Stat(filepath.Join(root, "main.tex")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(root, "main.tex")); !errors.Is(err, fs.ErrNotExist) {
 		t.Fatalf("Close recreated project files under %s", root)
 	}
 }

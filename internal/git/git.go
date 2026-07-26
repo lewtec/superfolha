@@ -154,7 +154,7 @@ func ReadFile(repoPath, filePath string) (io.ReadCloser, int64, error) {
 
 	file, err := w.Filesystem.Open(filePath)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, fs.ErrNotExist) {
 			return nil, 0, ErrGitFileNotFound
 		}
 		return nil, 0, fmt.Errorf("open file %s: %w", filePath, err)

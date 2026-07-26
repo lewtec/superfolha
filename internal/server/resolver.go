@@ -17,6 +17,7 @@ import (
 	igit "github.com/lewtec/superfolha/internal/git"
 	"github.com/lewtec/superfolha/internal/project"
 	"github.com/lewtec/superfolha/internal/session"
+	"errors"
 )
 
 //go:embed templates
@@ -118,7 +119,7 @@ func (r *Resolver) getAndCheckProject(ctx context.Context, projectID string) (*d
 	}
 
 	projectPath := r.projectService.GetProjectPath(projectID)
-	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
+	if _, err := os.Stat(projectPath); errors.Is(err, fs.ErrNotExist) {
 		if err := r.projectService.InitProjectRepo(projectID); err != nil {
 			return nil, "", nil, apierrors.Internal(err)
 		}

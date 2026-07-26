@@ -20,6 +20,7 @@ import (
 	"modernc.org/sqlite"
 	_ "modernc.org/sqlite"
 	sqlite3 "modernc.org/sqlite/lib"
+	"io/fs"
 )
 
 //go:embed migrations/*.sql
@@ -107,7 +108,7 @@ func ensureOwnerOnlyFile(path string) error {
 	}
 	info, err := os.Stat(path)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, fs.ErrNotExist) {
 			return nil
 		}
 		return fmt.Errorf("stat sqlite file: %w", err)

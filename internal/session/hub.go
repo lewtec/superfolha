@@ -13,6 +13,8 @@ import (
 	"github.com/lewtec/superfolha/internal/crdt"
 	"github.com/lewtec/superfolha/internal/project"
 	ysync "github.com/reearth/ygo/sync"
+	"errors"
+	"io/fs"
 )
 
 const (
@@ -472,7 +474,7 @@ func (h *Hub) Close() error {
 
 	if root != "" {
 		if _, err := os.Stat(root); err != nil {
-			if os.IsNotExist(err) {
+			if errors.Is(err, fs.ErrNotExist) {
 				return nil
 			}
 			return err

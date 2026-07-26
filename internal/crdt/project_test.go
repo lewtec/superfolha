@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/lewtec/superfolha/internal/project"
+	"io/fs"
 )
 
 func TestLoadFlushRoundTrip(t *testing.T) {
@@ -40,7 +41,7 @@ func TestLoadFlushRoundTrip(t *testing.T) {
 	if string(body) != "\\documentclass{article}\n" {
 		t.Fatalf("flushed body = %q", body)
 	}
-	if _, err := os.Stat(filepath.Join(dir, "fig.png")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(dir, "fig.png")); !errors.Is(err, fs.ErrNotExist) {
 		t.Fatal("flush must not invent blob files")
 	}
 }
