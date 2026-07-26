@@ -1,13 +1,16 @@
 package server
 
 import (
-	"fmt"
+	"errors"
 	"io"
 	"strconv"
 	"time"
 
 	"github.com/99designs/gqlgen/graphql"
 )
+
+// Sentinel for GraphQL Time scalar type errors (errors.Is).
+var ErrTimeMustBeString = errors.New("Time must be a string")
 
 type Time time.Time
 
@@ -19,7 +22,7 @@ func (t Time) MarshalGQL(w io.Writer) {
 func (t *Time) UnmarshalGQL(v any) error {
 	str, ok := v.(string)
 	if !ok {
-		return fmt.Errorf("Time must be a string")
+		return ErrTimeMustBeString
 	}
 
 	parsed, err := time.Parse(time.RFC3339, str)
@@ -40,7 +43,7 @@ func MarshalTime(t time.Time) graphql.Marshaler {
 func UnmarshalTime(v any) (time.Time, error) {
 	str, ok := v.(string)
 	if !ok {
-		return time.Time{}, fmt.Errorf("Time must be a string")
+		return time.Time{}, ErrTimeMustBeString
 	}
 	return time.Parse(time.RFC3339, str)
 }
