@@ -26,6 +26,9 @@ import (
 //go:embed migrations/*.sql
 var migrationsFS embed.FS
 
+// Sentinel for empty SQLite path (errors.Is).
+var ErrEmptyPath = errors.New("sqlite path is empty")
+
 type Repository struct {
 	db      *sql.DB
 	queries *Queries
@@ -73,7 +76,7 @@ func NewRepository(path string) (*Repository, error) {
 func buildDSN(path string) (dsn, filePath string, err error) {
 	path = strings.TrimSpace(path)
 	if path == "" {
-		return "", "", fmt.Errorf("sqlite path is empty")
+		return "", "", ErrEmptyPath
 	}
 	if strings.HasPrefix(path, "file:") {
 		filePath = sqliteFilePath(path)
