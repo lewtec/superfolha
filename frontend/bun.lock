@@ -29,7 +29,7 @@
         "react-dom": "^19.2.0",
         "react-i18next": "^16.3.3",
         "react-pdf": "^10.2.0",
-        "react-relay": "^20.1.1",
+        "react-relay": "^21.0.0",
         "react-router-dom": "^7.9.6",
         "relay-runtime": "^20.1.1",
         "y-codemirror.next": "^0.3.5",
@@ -909,7 +909,7 @@
 
     "react-refresh": ["react-refresh@0.18.0", "", {}, "sha512-QgT5//D3jfjJb6Gsjxv0Slpj23ip+HtOpnNgnb2S5zU3CB26G/IDPGoy4RJB42wzFE46DRsstbW6tKHoKbhAxw=="],
 
-    "react-relay": ["react-relay@20.1.1", "", { "dependencies": { "@babel/runtime": "^7.25.0", "fbjs": "^3.0.2", "invariant": "^2.2.4", "nullthrows": "^1.1.1", "relay-runtime": "20.1.1" }, "peerDependencies": { "react": "^16.9.0 || ^17 || ^18 || ^19" } }, "sha512-pwl7wHHXCOx32dOg4TVNkhVojgGVvOBMo9pcMGeM1BIFYvmwGauKTtBB+qr5buXHGooCL8TXjMVg+ZLizIsbeQ=="],
+    "react-relay": ["react-relay@21.0.1", "", { "dependencies": { "@babel/runtime": "^7.25.0", "fbjs": "^3.0.2", "invariant": "^2.2.4", "nullthrows": "^1.1.1", "relay-runtime": "21.0.1" }, "peerDependencies": { "react": "^16.9.0 || ^17 || ^18 || ^19" } }, "sha512-08BBmpdolP8vslClnszG+g4vkcbVHvaoR0BDHyhicwpCfbtnVGe73/MfPja/xj30eLWSP5WPYNqZupTdEPZvtw=="],
 
     "react-router": ["react-router@7.9.6", "", { "dependencies": { "cookie": "^1.0.1", "set-cookie-parser": "^2.6.0" }, "peerDependencies": { "react": ">=18", "react-dom": ">=18" }, "optionalPeers": ["react-dom"] }, "sha512-Y1tUp8clYRXpfPITyuifmSoE2vncSME18uVLgaqyxh9H35JWpIfzHo+9y3Fzh5odk/jxPW29IgLgzcdwxGqyNA=="],
 
@@ -1118,6 +1118,8 @@
     "fbjs/cross-fetch": ["cross-fetch@3.2.0", "", { "dependencies": { "node-fetch": "^2.7.0" } }, "sha512-Q+xVJLoGOeIMXZmbUK4HYk+69cQH6LudR0Vu/pRm2YlU/hDV9CiS0gKUMaWY5f2NeUH9C1nV3bsTlCo0FsTV1Q=="],
 
     "micromatch/picomatch": ["picomatch@2.3.1", "", {}, "sha512-JU3teHTNjmE2VCGFzuY8EXzCDVwEqB2a8fsIvwaStHhAWJEeVd1o1QD80CU6+ZdEXXSLbSsuLwJjkCBWqRQUVA=="],
+
+    "react-relay/relay-runtime": ["relay-runtime@21.0.1", "", { "dependencies": { "@babel/runtime": "^7.25.0", "fbjs": "^3.0.2", "invariant": "^2.2.4" } }, "sha512-OS+We56sp6gkGVEcce9VCNOeg/sMbxT9unEoerQPgNAICHowSWrXNc6LJxF2OqjypxYF7kaLDSPPiaPii2Pw1g=="],
 
     "@typescript-eslint/typescript-estree/minimatch/brace-expansion": ["brace-expansion@2.0.2", "", { "dependencies": { "balanced-match": "^1.0.0" } }, "sha512-Jt0vHyM+jmUBqojB7E1NIYadt0vI0Qxjxd2TErW94wDz+E2LAm5vKMXXwg6ZZBTHPuUlDgQHKXvjGBdfcF1ZDQ=="],
 
