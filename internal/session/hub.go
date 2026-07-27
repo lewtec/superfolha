@@ -2,7 +2,8 @@ package session
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
+	"io/fs"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -13,8 +14,14 @@ import (
 	"github.com/lewtec/superfolha/internal/crdt"
 	"github.com/lewtec/superfolha/internal/project"
 	ysync "github.com/reearth/ygo/sync"
-	"errors"
-	"io/fs"
+)
+
+// Sentinel errors for hub lifecycle and sync fencing (errors.Is).
+var (
+	ErrHubClosed        = errors.New("hub closed")
+	ErrCommitInProgress = errors.New("commit already in progress")
+	ErrClientNotReady   = errors.New("client not session-ready")
+	ErrSyncLocked       = errors.New("sync locked")
 )
 
 const (
@@ -159,7 +166,7 @@ func (h *Hub) Flush() error {
 	root := h.Root
 	h.mu.Unlock()
 	if doc == nil {
-		return fmt.Errorf("hub closed")
+		return ErrHubClosed
 	}
 	return doc.FlushToDir(root)
 }
@@ -180,7 +187,7 @@ func (h *Hub) Commit(message, author string) (string, error) {
 	h.mu.Lock()
 	if h.syncLocked {
 		h.mu.Unlock()
-		return "", fmt.Errorf("commit already in progress")
+		return "", ErrCommitInProgress
 	}
 	h.syncLocked = true
 	h.emitSyncStatusLocked("committing")
@@ -328,10 +335,10 @@ func (h *Hub) ClientReady(id string) bool {
 // HandleSyncMessage applies a y-protocols sync frame.
 func (h *Hub) HandleSyncMessage(clientID string, msg []byte) ([]byte, error) {
 	if !h.ClientReady(clientID) {
-		return nil, fmt.Errorf("client not session-ready")
+		return nil, ErrClientNotReady
 	}
 	if h.SyncLocked() {
-		return nil, fmt.Errorf("sync locked")
+		return nil, ErrSyncLocked
 	}
 	reply, err := ysync.ApplySyncMessage(h.Doc.Doc, msg, clientID)
 	if err == nil {
