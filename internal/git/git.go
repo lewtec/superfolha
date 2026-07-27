@@ -25,6 +25,47 @@ type FileInfo struct {
 	Size int64
 }
 
+// openRepo opens a repository at repoPath with a consistent error wrap.
+func openRepo(repoPath string) (*git.Repository, error) {
+	r, err := git.PlainOpen(repoPath)
+	if err != nil {
+		return nil, fmt.Errorf("open repository at %s: %w", repoPath, err)
+	}
+	return r, nil
+}
+
+// repoWorktree returns the worktree for an already-open repository.
+func repoWorktree(r *git.Repository, repoPath string) (*git.Worktree, error) {
+	w, err := r.Worktree()
+	if err != nil {
+		return nil, fmt.Errorf("get worktree for repository at %s: %w", repoPath, err)
+	}
+	return w, nil
+}
+
+// openRepoWorktree opens a repository and its worktree.
+func openRepoWorktree(repoPath string) (*git.Repository, *git.Worktree, error) {
+	r, err := openRepo(repoPath)
+	if err != nil {
+		return nil, nil, err
+	}
+	w, err := repoWorktree(r, repoPath)
+	if err != nil {
+		return nil, nil, err
+	}
+	return r, w, nil
+}
+
+// commitFromObject maps a go-git commit object to the package Commit type.
+func commitFromObject(c *object.Commit) *Commit {
+	return &Commit{
+		Hash:    c.Hash.String(),
+		Message: c.Message,
+		Author:  c.Author.String(),
+		Date:    c.Author.When,
+	}
+}
+
 // InitRepo creates a new git repository
 func InitRepo(path string) error {
 	if err := os.MkdirAll(path, 0755); err != nil {
@@ -41,14 +82,9 @@ func InitRepo(path string) error {
 
 // Commit creates a new commit (stages all worktree changes first).
 func CommitChanges(repoPath, author, message string) (*Commit, error) {
-	r, err := git.PlainOpen(repoPath)
+	r, w, err := openRepoWorktree(repoPath)
 	if err != nil {
-		return nil, fmt.Errorf("open repository at %s: %w", repoPath, err)
-	}
-
-	w, err := r.Worktree()
-	if err != nil {
-		return nil, fmt.Errorf("get worktree for repository at %s: %w", repoPath, err)
+		return nil, err
 	}
 
 	// Stage on the worktree we already hold (single PlainOpen for stage + commit).
@@ -74,12 +110,7 @@ func CommitChanges(repoPath, author, message string) (*Commit, error) {
 			return nil, fmt.Errorf("get last commit object: %w", err)
 		}
 
-		return &Commit{
-			Hash:    obj.Hash.String(),
-			Message: obj.Message,
-			Author:  obj.Author.String(),
-			Date:    obj.Author.When,
-		}, nil
+		return commitFromObject(obj), nil
 	}
 
 	// Create commit
@@ -100,19 +131,14 @@ func CommitChanges(repoPath, author, message string) (*Commit, error) {
 		return nil, fmt.Errorf("get commit object: %w", err)
 	}
 
-	return &Commit{
-		Hash:    obj.Hash.String(),
-		Message: obj.Message,
-		Author:  obj.Author.String(), // This will include name and email
-		Date:    obj.Author.When,
-	}, nil
+	return commitFromObject(obj), nil
 }
 
 // GetHistory returns commit history
 func GetHistory(repoPath string) ([]*Commit, error) {
-	r, err := git.PlainOpen(repoPath)
+	r, err := openRepo(repoPath)
 	if err != nil {
-		return nil, fmt.Errorf("open repository at %s: %w", repoPath, err)
+		return nil, err
 	}
 
 	cIter, err := r.Log(&git.LogOptions{Order: git.LogOrderCommitterTime})
@@ -122,12 +148,7 @@ func GetHistory(repoPath string) ([]*Commit, error) {
 
 	var commits []*Commit
 	err = cIter.ForEach(func(c *object.Commit) error {
-		commits = append(commits, &Commit{
-			Hash:    c.Hash.String(),
-			Message: c.Message,
-			Author:  c.Author.String(),
-			Date:    c.Author.When,
-		})
+		commits = append(commits, commitFromObject(c))
 		return nil
 	})
 	if err != nil {
@@ -142,14 +163,9 @@ var ErrGitFileNotFound = errors.New("file not found in git repository")
 
 // ReadFile reads a file from the repository
 func ReadFile(repoPath, filePath string) (io.ReadCloser, int64, error) {
-	r, err := git.PlainOpen(repoPath)
+	_, w, err := openRepoWorktree(repoPath)
 	if err != nil {
-		return nil, 0, fmt.Errorf("open repository at %s: %w", repoPath, err)
-	}
-
-	w, err := r.Worktree()
-	if err != nil {
-		return nil, 0, fmt.Errorf("get worktree for repository at %s: %w", repoPath, err)
+		return nil, 0, err
 	}
 
 	file, err := w.Filesystem.Open(filePath)
