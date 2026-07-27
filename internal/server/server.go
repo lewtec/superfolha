@@ -215,6 +215,11 @@ func (s *Server) handleUploadFile(w http.ResponseWriter, r *http.Request) {
 	if s.hubs != nil {
 		if hub := s.hubs.GetIfLive(projectIdStr); hub != nil {
 			if err := hub.SaveTextFile(filePath, body); err != nil {
+				// Match disk upload and GraphQL SaveFile: path jail is client input, not 500.
+				if errors.Is(err, project.ErrInvalidPath) {
+					writeAPIError(w, apierrors.New(apierrors.CodeInvalidInput, "invalid file path"))
+					return
+				}
 				slog.Error("error saving file via hub", "file", filePath, "project", projectIdStr, "err", err)
 				writeAPIError(w, apierrors.Internal(err))
 				return
