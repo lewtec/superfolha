@@ -7,6 +7,12 @@ import (
 	"testing"
 )
 
+var (
+	ErrPlain    = errors.New("plain")
+	ErrDBDown   = errors.New("db down: secret path /var/lib/superfolha.db")
+	ErrDiskFull = errors.New("disk full")
+)
+
 func TestErrorStatus_AllCodes(t *testing.T) {
 	t.Parallel()
 
@@ -93,7 +99,7 @@ func TestAsAndCodeOf(t *testing.T) {
 
 	t.Run("As plain error", func(t *testing.T) {
 		t.Parallel()
-		plain := errors.New("plain")
+		plain := ErrPlain
 		if _, ok := As(plain); ok {
 			t.Fatal("As(plain) = true, want false")
 		}
@@ -143,7 +149,7 @@ func TestInternalHelper(t *testing.T) {
 		t.Errorf("Internal(nil).Message = %q, want %q", nilErr.Message, "internal error")
 	}
 
-	cause := errors.New("db down: secret path /var/lib/superfolha.db")
+	cause := ErrDBDown
 	wrapped := Internal(cause)
 	if !errors.Is(wrapped, cause) {
 		t.Errorf("Internal(cause) should wrap cause; Unwrap chain missing")
@@ -171,7 +177,7 @@ func TestInternalHelper(t *testing.T) {
 func TestErrorString_DoesNotDoubleCause(t *testing.T) {
 	t.Parallel()
 
-	cause := errors.New("disk full")
+	cause := ErrDiskFull
 	// Call sites that already put err.Error() in Message should not double-append.
 	w := Wrap(CodeCompileFailed, cause.Error(), cause)
 	if got := w.Error(); got != cause.Error() {

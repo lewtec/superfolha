@@ -18,7 +18,12 @@ func TestMiddleware_AuthSources(t *testing.T) {
 	// Handler that records whether a user was injected into the request context.
 	var gotUser *UserContext
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotUser, _ = GetUserFromContext(r.Context())
+		u, ok := GetUserFromContext(r.Context())
+		if ok {
+			gotUser = u
+		} else {
+			gotUser = nil
+		}
 		w.WriteHeader(http.StatusOK)
 	})
 	handler := Middleware(next)

@@ -1,6 +1,7 @@
 package session
 
 import (
+	"log/slog"
 	"sync"
 	"time"
 
@@ -91,7 +92,9 @@ func (r *Registry) evict(projectID string) {
 		delete(r.idle, projectID)
 	}
 	r.mu.Unlock()
-	_ = h.Close()
+	if err := h.Close(); err != nil {
+		slog.Error("close idle hub", "project", projectID, "err", err)
+	}
 }
 
 // CloseProject drops a live hub for projectID (flush + disconnect peers).
@@ -111,7 +114,9 @@ func (r *Registry) CloseProject(projectID string) {
 	if !ok {
 		return
 	}
-	_ = h.Close()
+	if err := h.Close(); err != nil {
+		slog.Error("close project hub", "project", projectID, "err", err)
+	}
 }
 
 // CloseAll flushes and drops every hub (server shutdown).
@@ -124,7 +129,9 @@ func (r *Registry) CloseAll() {
 	hubs := r.hubs
 	r.hubs = make(map[string]*Hub)
 	r.mu.Unlock()
-	for _, h := range hubs {
-		_ = h.Close()
+	for id, h := range hubs {
+		if err := h.Close(); err != nil {
+			slog.Error("close hub on shutdown", "project", id, "err", err)
+		}
 	}
 }

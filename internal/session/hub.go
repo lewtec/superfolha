@@ -2,7 +2,8 @@ package session
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
+	"io/fs"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -13,8 +14,6 @@ import (
 	"github.com/lewtec/superfolha/internal/crdt"
 	"github.com/lewtec/superfolha/internal/project"
 	ysync "github.com/reearth/ygo/sync"
-	"errors"
-	"io/fs"
 )
 
 const (
@@ -22,6 +21,13 @@ const (
 	commitDebounce = 30 * time.Second
 	chatCap        = 200
 	autoCommitMsg  = "Auto-commit: live session"
+)
+
+var (
+	ErrHubClosed             = errors.New("hub closed")
+	ErrCommitInProgress      = errors.New("commit already in progress")
+	ErrClientNotSessionReady = errors.New("client not session-ready")
+	ErrSyncLocked            = errors.New("sync locked")
 )
 
 // Client is a connected browser peer.
@@ -159,7 +165,7 @@ func (h *Hub) Flush() error {
 	root := h.Root
 	h.mu.Unlock()
 	if doc == nil {
-		return fmt.Errorf("hub closed")
+		return ErrHubClosed
 	}
 	return doc.FlushToDir(root)
 }
@@ -180,7 +186,7 @@ func (h *Hub) Commit(message, author string) (string, error) {
 	h.mu.Lock()
 	if h.syncLocked {
 		h.mu.Unlock()
-		return "", fmt.Errorf("commit already in progress")
+		return "", ErrCommitInProgress
 	}
 	h.syncLocked = true
 	h.emitSyncStatusLocked("committing")
@@ -328,10 +334,10 @@ func (h *Hub) ClientReady(id string) bool {
 // HandleSyncMessage applies a y-protocols sync frame.
 func (h *Hub) HandleSyncMessage(clientID string, msg []byte) ([]byte, error) {
 	if !h.ClientReady(clientID) {
-		return nil, fmt.Errorf("client not session-ready")
+		return nil, ErrClientNotSessionReady
 	}
 	if h.SyncLocked() {
-		return nil, fmt.Errorf("sync locked")
+		return nil, ErrSyncLocked
 	}
 	reply, err := ysync.ApplySyncMessage(h.Doc.Doc, msg, clientID)
 	if err == nil {
@@ -369,13 +375,17 @@ func (h *Hub) AppendChat(from, text string) {
 		h.chat = h.chat[len(h.chat)-chatCap:]
 	}
 	// copy for send outside lock
-	payload, _ := json.Marshal(map[string]any{
+	payload, err := json.Marshal(map[string]any{
 		"type": "chat.message",
 		"from": msg.From,
 		"text": msg.Text,
 		"at":   msg.At,
 	})
 	h.mu.Unlock()
+	if err != nil {
+		slog.Error("marshal chat.message", "project", h.ProjectID, "err", err)
+		return
+	}
 	h.broadcast(payload, false, "")
 }
 
@@ -391,10 +401,14 @@ func (h *Hub) ChatHistory() []ChatMessage {
 // SendChatHistory sends chat.history to one client.
 func (h *Hub) SendChatHistory(c *Client) {
 	hist := h.ChatHistory()
-	b, _ := json.Marshal(map[string]any{
+	b, err := json.Marshal(map[string]any{
 		"type":     "chat.history",
 		"messages": hist,
 	})
+	if err != nil {
+		slog.Error("marshal chat.history", "project", h.ProjectID, "err", err)
+		return
+	}
 	select {
 	case c.Out <- Outbound{Data: b}:
 	default:
@@ -421,7 +435,11 @@ func (h *Hub) BroadcastJSON(data []byte, skipClientID string) {
 }
 
 func (h *Hub) broadcastJSONMap(m map[string]any, skip string) {
-	b, _ := json.Marshal(m)
+	b, err := json.Marshal(m)
+	if err != nil {
+		slog.Error("marshal hub broadcast", "project", h.ProjectID, "err", err)
+		return
+	}
 	h.broadcast(b, false, skip)
 }
 
@@ -432,7 +450,11 @@ func (h *Hub) emitSyncStatus(status string) {
 }
 
 func (h *Hub) emitSyncStatusLocked(status string) {
-	b, _ := json.Marshal(map[string]string{"type": "sync.status", "status": status})
+	b, err := json.Marshal(map[string]string{"type": "sync.status", "status": status})
+	if err != nil {
+		slog.Error("marshal sync.status", "project", h.ProjectID, "err", err)
+		return
+	}
 	for _, c := range h.clients {
 		if !c.Ready {
 			continue

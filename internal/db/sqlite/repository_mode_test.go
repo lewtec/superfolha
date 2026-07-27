@@ -17,7 +17,11 @@ func TestNewRepositorySetsOwnerOnlyMode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewRepository: %v", err)
 	}
-	t.Cleanup(func() { _ = repo.Close() })
+	t.Cleanup(func() {
+		if err := repo.Close(); err != nil {
+			t.Errorf("repo.Close(): %v", err)
+		}
+	})
 
 	info, err := os.Stat(path)
 	if err != nil {

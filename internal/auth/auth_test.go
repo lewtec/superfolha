@@ -43,20 +43,27 @@ func TestValidateToken_RejectsNoneAlg(t *testing.T) {
 	withJWTEnv(t, "test-secret-for-jwt-validation", "")
 
 	// Craft an unsigned token with alg=none (classic confusion vector).
-	header, _ := json.Marshal(map[string]string{"alg": "none", "typ": "JWT"})
-	payload, _ := json.Marshal(map[string]string{"user_id": "evil", "email": "evil@example.com"})
+	header, err := json.Marshal(map[string]string{"alg": "none", "typ": "JWT"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload, err := json.Marshal(map[string]string{"user_id": "evil", "email": "evil@example.com"})
+	if err != nil {
+		t.Fatal(err)
+	}
 	noneToken := base64.RawURLEncoding.EncodeToString(header) + "." +
 		base64.RawURLEncoding.EncodeToString(payload) + "."
 
-	_, err := ValidateToken(noneToken)
+	_, err = ValidateToken(noneToken)
 	if err == nil {
 		t.Fatal("expected error for alg=none token, got nil")
 	}
-	if !errors.Is(err, ErrUnexpectedSigning) && !strings.Contains(err.Error(), "unexpected signing method") {
-		// jwt/v5 may wrap or reject none before keyfunc; either rejection is fine.
-		if !strings.Contains(strings.ToLower(err.Error()), "none") &&
-			!strings.Contains(strings.ToLower(err.Error()), "signing") &&
-			!strings.Contains(strings.ToLower(err.Error()), "algorithm") {
+	// jwt/v5 may wrap ErrUnexpectedSigning or reject alg=none before keyfunc.
+	if !errors.Is(err, ErrUnexpectedSigning) {
+		msg := strings.ToLower(err.Error())
+		if !strings.Contains(msg, "none") &&
+			!strings.Contains(msg, "signing") &&
+			!strings.Contains(msg, "algorithm") {
 			t.Logf("rejected with: %v (acceptable if not accepted)", err)
 		}
 	}
@@ -67,18 +74,24 @@ func TestValidateToken_RejectsNonHMAC(t *testing.T) {
 
 	// Header claims HS256 but we forge RS256-looking method via raw header alg=RS256
 	// without a valid signature — keyfunc must reject before accepting the secret.
-	header, _ := json.Marshal(map[string]string{"alg": "RS256", "typ": "JWT"})
-	payload, _ := json.Marshal(map[string]any{
+	header, err := json.Marshal(map[string]string{"alg": "RS256", "typ": "JWT"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload, err := json.Marshal(map[string]any{
 		"user_id": "evil",
 		"email":   "evil@example.com",
 		"exp":     time.Now().Add(time.Hour).Unix(),
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	// Dummy signature so Parse reaches keyfunc / method checks.
 	sig := base64.RawURLEncoding.EncodeToString([]byte("not-a-real-sig"))
 	rsToken := base64.RawURLEncoding.EncodeToString(header) + "." +
 		base64.RawURLEncoding.EncodeToString(payload) + "." + sig
 
-	_, err := ValidateToken(rsToken)
+	_, err = ValidateToken(rsToken)
 	if err == nil {
 		t.Fatal("expected error for RS256 token, got nil")
 	}

@@ -1,35 +1,11 @@
 import { useEffect, useRef } from "react";
 import { EditorView, basicSetup } from "codemirror";
 import { EditorState } from "@codemirror/state";
-import { StreamLanguage } from "@codemirror/language";
-import { stex } from "@codemirror/legacy-modes/mode/stex";
-import { autocompletion, CompletionContext } from "@codemirror/autocomplete";
+import { autocompletion } from "@codemirror/autocomplete";
 import { yCollab } from "y-codemirror.next";
 import * as Y from "yjs";
 import type { Awareness } from "y-protocols/awareness";
-
-const latexLanguage = StreamLanguage.define(stex);
-
-function latexCompletions(context: CompletionContext) {
-  const word = context.matchBefore(/\\[\w]*/);
-  if (!word || (word.from === word.to && !context.explicit)) return null;
-
-  const options = [
-    { label: "\\section{}", type: "keyword" },
-    { label: "\\subsection{}", type: "keyword" },
-    { label: "\\textbf{}", type: "keyword" },
-    { label: "\\textit{}", type: "keyword" },
-    { label: "\\begin{}", type: "keyword" },
-    { label: "\\end{}", type: "keyword" },
-    { label: "\\item", type: "keyword" },
-    { label: "\\label{}", type: "keyword" },
-    { label: "\\ref{}", type: "keyword" },
-    { label: "\\cite{}", type: "keyword" },
-    { label: "\\usepackage{}", type: "keyword" },
-  ];
-
-  return { from: word.from, options };
-}
+import { latexCompletions, latexLanguage } from "./latexCompletions";
 
 interface CollabEditorProps {
   ytext: Y.Text;

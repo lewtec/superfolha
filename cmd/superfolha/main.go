@@ -29,6 +29,10 @@ var (
 	dbDriver   string
 	dbDSN      string
 	listenAddr string
+
+	// Driver configuration errors (errors.Is).
+	ErrPostgresDSNRequired = errors.New("postgres driver requires a DSN (--db / DATABASE_URL)")
+	ErrUnknownDBDriver     = errors.New("unknown database driver")
 )
 
 var rootCmd = &cobra.Command{
@@ -87,7 +91,7 @@ func resolveAddr(addr string) string {
 	return "127.0.0.1:8080"
 }
 
-func openRepository(driver, dsn, stateDir string) (db.Repository, error) {
+func openRepository(ctx context.Context, driver, dsn, stateDir string) (db.Repository, error) {
 	driver = strings.ToLower(strings.TrimSpace(driver))
 	dsn = strings.TrimSpace(dsn)
 	if driver == "" {
@@ -98,20 +102,22 @@ func openRepository(driver, dsn, stateDir string) (db.Repository, error) {
 	case "postgres", "postgresql":
 		slog.Warn("postgres driver is deprecated; Superfolha targets single-instance SQLite — plan to migrate off postgres")
 		if dsn == "" {
-			return nil, fmt.Errorf("postgres driver requires a DSN (--db / DATABASE_URL)")
+			return nil, ErrPostgresDSNRequired
 		}
-		return postgres.NewRepository(dsn)
+		return postgres.NewRepository(ctx, dsn)
 	case "sqlite", "sqlite3":
 		if dsn == "" {
 			dsn = filepath.Join(stateDir, "superfolha.db")
 		}
 		return sqlite.NewRepository(dsn)
 	default:
-		return nil, fmt.Errorf("unknown database driver %q (want sqlite or postgres)", driver)
+		return nil, fmt.Errorf("%w %q (want sqlite or postgres)", ErrUnknownDBDriver, driver)
 	}
 }
 
 func runServer(cmd *cobra.Command, args []string) {
+	ctx := cmd.Context()
+
 	absStateDir, err := filepath.Abs(stateDir)
 	if err != nil {
 		slog.Error("failed to get absolute path for state directory", "state_dir", stateDir, "err", err)
@@ -124,7 +130,7 @@ func runServer(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	repo, err := openRepository(dbDriver, dbDSN, stateDir)
+	repo, err := openRepository(ctx, dbDriver, dbDSN, stateDir)
 	if err != nil {
 		slog.Error("unable to open database", "err", err)
 		os.Exit(1)
@@ -158,20 +164,18 @@ func runServer(cmd *cobra.Command, args []string) {
 		serverErr <- httpServer.ListenAndServe()
 	}()
 
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
-
 	select {
 	case err := <-serverErr:
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			slog.Error("server failed", "err", err)
 			os.Exit(1)
 		}
-	case sig := <-quit:
-		slog.Info("shutting down server", "signal", sig)
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	case <-ctx.Done():
+		slog.Info("shutting down server", "cause", ctx.Err())
+		// Parent is already cancelled (signal); WithoutCancel keeps values without inheriting cancel.
+		shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
 		defer cancel()
-		if err := httpServer.Shutdown(ctx); err != nil {
+		if err := httpServer.Shutdown(shutdownCtx); err != nil {
 			slog.Error("HTTP server shutdown error", "err", err)
 		}
 		srv.CloseHubs()
@@ -182,7 +186,9 @@ func runServer(cmd *cobra.Command, args []string) {
 }
 
 func main() {
-	if err := rootCmd.Execute(); err != nil {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	if err := rootCmd.ExecuteContext(ctx); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}

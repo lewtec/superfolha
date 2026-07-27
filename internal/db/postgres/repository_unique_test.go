@@ -8,6 +8,11 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
+var (
+	ErrPlainDuplicateKey = errors.New("duplicate key value violates unique constraint")
+	ErrPlainDuplicate    = errors.New("duplicate key")
+)
+
 func TestIsUniqueViolation(t *testing.T) {
 	repo := &Repository{}
 
@@ -25,8 +30,8 @@ func TestIsUniqueViolation(t *testing.T) {
 		want bool
 	}{
 		{name: "nil", err: nil, want: false},
-		{name: "plain error", err: errors.New("duplicate key value violates unique constraint"), want: false},
-		{name: "wrapped plain error", err: fmt.Errorf("create user: %w", errors.New("duplicate key")), want: false},
+		{name: "plain error", err: ErrPlainDuplicateKey, want: false},
+		{name: "wrapped plain error", err: fmt.Errorf("create user: %w", ErrPlainDuplicate), want: false},
 		{name: "pg unique 23505", err: unique, want: true},
 		{name: "wrapped pg unique", err: fmt.Errorf("create user: %w", unique), want: true},
 		{name: "double-wrapped pg unique", err: fmt.Errorf("auth: %w", fmt.Errorf("create user: %w", unique)), want: true},

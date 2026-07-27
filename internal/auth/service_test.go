@@ -9,6 +9,12 @@ import (
 	"github.com/lewtec/superfolha/internal/db"
 )
 
+var (
+	ErrMemUnique         = errors.New("unique")
+	ErrMemNotFound       = errors.New("not found")
+	ErrMemNotImplemented = errors.New("not implemented")
+)
+
 // memRepo is a minimal in-memory db.Repository for auth Service tests.
 type memRepo struct {
 	byEmail map[string]db.User
@@ -24,7 +30,7 @@ func newMemRepo(users ...db.User) *memRepo {
 
 func (m *memRepo) CreateUser(ctx context.Context, arg db.CreateUserParams) (db.User, error) {
 	if _, ok := m.byEmail[arg.Email]; ok {
-		return db.User{}, errors.New("unique")
+		return db.User{}, ErrMemUnique
 	}
 	u := db.User{ID: arg.ID, Email: arg.Email, PasswordHash: arg.PasswordHash}
 	m.byEmail[arg.Email] = u
@@ -34,7 +40,7 @@ func (m *memRepo) CreateUser(ctx context.Context, arg db.CreateUserParams) (db.U
 func (m *memRepo) GetUserByEmail(ctx context.Context, email string) (db.User, error) {
 	u, ok := m.byEmail[email]
 	if !ok {
-		return db.User{}, errors.New("not found")
+		return db.User{}, ErrMemNotFound
 	}
 	return u, nil
 }
@@ -45,26 +51,26 @@ func (m *memRepo) GetUserByID(ctx context.Context, id string) (db.User, error) {
 			return u, nil
 		}
 	}
-	return db.User{}, errors.New("not found")
+	return db.User{}, ErrMemNotFound
 }
 
 func (m *memRepo) CreateProject(ctx context.Context, arg db.CreateProjectParams) (db.Project, error) {
-	return db.Project{}, errors.New("not implemented")
+	return db.Project{}, ErrMemNotImplemented
 }
 func (m *memRepo) GetProject(ctx context.Context, id string) (db.Project, error) {
-	return db.Project{}, errors.New("not implemented")
+	return db.Project{}, ErrMemNotImplemented
 }
 func (m *memRepo) GetUserProjects(ctx context.Context, userID string) ([]db.Project, error) {
-	return nil, errors.New("not implemented")
+	return nil, ErrMemNotImplemented
 }
 func (m *memRepo) UpdateProjectTimestamp(ctx context.Context, id string) error {
-	return errors.New("not implemented")
+	return ErrMemNotImplemented
 }
 func (m *memRepo) DeleteProject(ctx context.Context, id string) error {
-	return errors.New("not implemented")
+	return ErrMemNotImplemented
 }
 func (m *memRepo) IsUniqueViolation(err error) bool {
-	return err != nil && err.Error() == "unique"
+	return errors.Is(err, ErrMemUnique)
 }
 func (m *memRepo) Close() error { return nil }
 

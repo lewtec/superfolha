@@ -11,12 +11,26 @@ import (
 	sqlite3 "modernc.org/sqlite/lib"
 )
 
+var (
+	ErrUniqueConstraintMsg = errors.New("UNIQUE constraint failed: users.email")
+	ErrUniqueConstraint    = errors.New("UNIQUE constraint failed")
+)
+
+func cleanupRepo(t *testing.T, repo *Repository) {
+	t.Helper()
+	t.Cleanup(func() {
+		if err := repo.Close(); err != nil {
+			t.Errorf("repo.Close(): %v", err)
+		}
+	})
+}
+
 func TestIsUniqueViolation_EmailConflict(t *testing.T) {
 	repo, err := NewRepository(filepath.Join(t.TempDir(), "unique.db"))
 	if err != nil {
 		t.Fatalf("NewRepository: %v", err)
 	}
-	t.Cleanup(func() { _ = repo.Close() })
+	cleanupRepo(t, repo)
 
 	ctx := t.Context()
 	_, err = repo.CreateUser(ctx, db.CreateUserParams{
@@ -55,7 +69,7 @@ func TestIsUniqueViolation_PrimaryKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewRepository: %v", err)
 	}
-	t.Cleanup(func() { _ = repo.Close() })
+	cleanupRepo(t, repo)
 
 	ctx := t.Context()
 	if _, err := repo.CreateUser(ctx, db.CreateUserParams{
@@ -89,10 +103,10 @@ func TestIsUniqueViolation_NonUnique(t *testing.T) {
 		t.Fatal("nil should not be unique violation")
 	}
 	// Fragile string matching must not be used — message alone is insufficient.
-	if repo.IsUniqueViolation(errors.New("UNIQUE constraint failed: users.email")) {
+	if repo.IsUniqueViolation(ErrUniqueConstraintMsg) {
 		t.Fatal("plain error with UNIQUE message must not match without *sqlite.Error")
 	}
-	if repo.IsUniqueViolation(fmt.Errorf("wrap: %w", errors.New("UNIQUE constraint failed"))) {
+	if repo.IsUniqueViolation(fmt.Errorf("wrap: %w", ErrUniqueConstraint)) {
 		t.Fatal("wrapped plain error must not match")
 	}
 
@@ -101,7 +115,7 @@ func TestIsUniqueViolation_NonUnique(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewRepository: %v", err)
 	}
-	t.Cleanup(func() { _ = r.Close() })
+	cleanupRepo(t, r)
 
 	_, execErr := r.db.ExecContext(t.Context(),
 		`INSERT INTO users (id, email, password_hash) VALUES ('x', NULL, 'h')`)

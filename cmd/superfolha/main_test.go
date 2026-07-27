@@ -1,9 +1,9 @@
 package main
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
@@ -75,16 +75,20 @@ func TestResolveAddr(t *testing.T) {
 }
 
 func TestOpenRepository(t *testing.T) {
+	ctx := t.Context()
+
 	t.Run("unknown driver", func(t *testing.T) {
-		repo, err := openRepository("mysql", "unused", t.TempDir())
+		repo, err := openRepository(ctx, "mysql", "unused", t.TempDir())
 		if err == nil {
 			if repo != nil {
-				_ = repo.Close()
+				if closeErr := repo.Close(); closeErr != nil {
+					t.Errorf("repo.Close(): %v", closeErr)
+				}
 			}
 			t.Fatal("expected error for unknown driver")
 		}
-		if !strings.Contains(err.Error(), "unknown database driver") {
-			t.Fatalf("error = %q, want substring %q", err.Error(), "unknown database driver")
+		if !errors.Is(err, ErrUnknownDBDriver) {
+			t.Fatalf("error = %v, want %v", err, ErrUnknownDBDriver)
 		}
 		if repo != nil {
 			t.Fatal("expected nil repository on error")
@@ -92,15 +96,17 @@ func TestOpenRepository(t *testing.T) {
 	})
 
 	t.Run("postgres without DSN", func(t *testing.T) {
-		repo, err := openRepository("postgres", "", t.TempDir())
+		repo, err := openRepository(ctx, "postgres", "", t.TempDir())
 		if err == nil {
 			if repo != nil {
-				_ = repo.Close()
+				if closeErr := repo.Close(); closeErr != nil {
+					t.Errorf("repo.Close(): %v", closeErr)
+				}
 			}
 			t.Fatal("expected error for postgres without DSN")
 		}
-		if !strings.Contains(err.Error(), "postgres driver requires a DSN") {
-			t.Fatalf("error = %q, want substring %q", err.Error(), "postgres driver requires a DSN")
+		if !errors.Is(err, ErrPostgresDSNRequired) {
+			t.Fatalf("error = %v, want %v", err, ErrPostgresDSNRequired)
 		}
 		if repo != nil {
 			t.Fatal("expected nil repository on error")
@@ -108,12 +114,12 @@ func TestOpenRepository(t *testing.T) {
 	})
 
 	t.Run("postgresql alias without DSN", func(t *testing.T) {
-		_, err := openRepository("postgresql", "  ", t.TempDir())
+		_, err := openRepository(ctx, "postgresql", "  ", t.TempDir())
 		if err == nil {
 			t.Fatal("expected error for postgresql without DSN")
 		}
-		if !strings.Contains(err.Error(), "postgres driver requires a DSN") {
-			t.Fatalf("error = %q, want substring %q", err.Error(), "postgres driver requires a DSN")
+		if !errors.Is(err, ErrPostgresDSNRequired) {
+			t.Fatalf("error = %v, want %v", err, ErrPostgresDSNRequired)
 		}
 	})
 
@@ -121,7 +127,7 @@ func TestOpenRepository(t *testing.T) {
 		stateDir := t.TempDir()
 		wantDB := filepath.Join(stateDir, "superfolha.db")
 
-		repo, err := openRepository("sqlite", "", stateDir)
+		repo, err := openRepository(ctx, "sqlite", "", stateDir)
 		if err != nil {
 			t.Fatalf("openRepository(sqlite, \"\", stateDir): %v", err)
 		}
@@ -143,7 +149,7 @@ func TestOpenRepository(t *testing.T) {
 		stateDir := t.TempDir()
 		wantDB := filepath.Join(stateDir, "superfolha.db")
 
-		repo, err := openRepository("sqlite3", "  ", stateDir)
+		repo, err := openRepository(ctx, "sqlite3", "  ", stateDir)
 		if err != nil {
 			t.Fatalf("openRepository(sqlite3, whitespace DSN, stateDir): %v", err)
 		}

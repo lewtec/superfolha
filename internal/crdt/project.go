@@ -1,6 +1,7 @@
 package crdt
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -16,6 +17,13 @@ import (
 const (
 	OriginServer = "superfolha.server"
 	OriginLoad   = "superfolha.load"
+)
+
+var (
+	// ErrTextTooLarge is returned when collaborative text exceeds MaxCollabTextBytes.
+	ErrTextTooLarge = errors.New("text exceeds collab size cap")
+	// ErrEmptyRootDir is returned when FlushToDir is called with an empty root.
+	ErrEmptyRootDir = errors.New("empty root dir")
 )
 
 // ProjectDoc wraps a ygo document with multi-file text helpers.
@@ -146,7 +154,7 @@ func (p *ProjectDoc) SetTextServer(relPath, content string) error {
 		return err
 	}
 	if int64(len(content)) > project.MaxCollabTextBytes {
-		return fmt.Errorf("text exceeds collab size cap")
+		return ErrTextTooLarge
 	}
 	st := p.Doc.GetText(TextKey(path))
 	err = p.Doc.TransactE(func(txn *ycrdt.Transaction) error {
@@ -193,7 +201,7 @@ func (p *ProjectDoc) RemoveText(relPath string) error {
 // Creates parent directories as needed. Does not touch blob files or delete missing paths.
 func (p *ProjectDoc) FlushToDir(rootDir string) error {
 	if rootDir == "" {
-		return fmt.Errorf("empty root dir")
+		return ErrEmptyRootDir
 	}
 	for _, rel := range p.TextPathList() {
 		// Re-validate path jail (defense in depth; keys should already be clean).

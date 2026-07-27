@@ -74,7 +74,7 @@ func (s *Service) Login(ctx context.Context, email, password string) (*AuthRespo
 	if err != nil {
 		// Burn bcrypt cost comparable to a real password check so unknown
 		// emails are not free to probe relative to wrong passwords.
-		_ = CheckPasswordHash(password, dummyBcryptHash)
+		CheckPasswordHash(password, dummyBcryptHash)
 		return nil, apierrors.New(apierrors.CodeInvalidCredentials, "invalid credentials")
 	}
 
