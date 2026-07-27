@@ -63,7 +63,7 @@ func safeRepoPath(repoRoot, userPath string) (string, error) {
 	// Double-check with Rel so join/clean edge cases cannot slip past.
 	check, err := filepath.Rel(repoRoot, full)
 	if err != nil {
-		return "", fmt.Errorf("%w: %v", ErrInvalidPath, err)
+		return "", fmt.Errorf("%w: %w", ErrInvalidPath, err)
 	}
 	if check == ".." || strings.HasPrefix(check, ".."+string(filepath.Separator)) {
 		return "", fmt.Errorf("%w: path escapes repository root", ErrInvalidPath)
@@ -78,7 +78,7 @@ func safeRepoPath(repoRoot, userPath string) (string, error) {
 func DecodeFilePath(encodedPath string) (string, error) {
 	decoded, err := url.PathUnescape(encodedPath)
 	if err != nil {
-		return "", fmt.Errorf("%w: %v", ErrInvalidPath, err)
+		return "", fmt.Errorf("%w: %w", ErrInvalidPath, err)
 	}
 	return ValidateRepoRelativePath(decoded)
 }
