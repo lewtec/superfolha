@@ -26,6 +26,20 @@ import esErrors from "./locales/es/errors.json";
 export const supportedLngs = ["en", "pt", "es"] as const;
 export type SupportedLng = (typeof supportedLngs)[number];
 
+/** Short codes for compact switchers (navbar). */
+export const langCodes: Record<SupportedLng, string> = {
+  en: "EN",
+  pt: "PT",
+  es: "ES",
+};
+
+/** Full language names for menus. */
+export const langLabels: Record<SupportedLng, string> = {
+  en: "English",
+  pt: "Português",
+  es: "Español",
+};
+
 const resources = {
   en: {
     common: enCommon,

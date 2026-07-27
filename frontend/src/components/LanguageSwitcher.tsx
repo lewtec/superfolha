@@ -1,11 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { supportedLngs, type SupportedLng } from "../i18n";
-
-const labels: Record<SupportedLng, string> = {
-  en: "EN",
-  pt: "PT",
-  es: "ES",
-};
+import { langCodes, supportedLngs, type SupportedLng } from "../i18n";
 
 export default function LanguageSwitcher() {
   const { i18n, t } = useTranslation("common");
@@ -27,7 +21,7 @@ export default function LanguageSwitcher() {
       >
         {supportedLngs.map((lng) => (
           <option key={lng} value={lng}>
-            {labels[lng]}
+            {langCodes[lng]}
           </option>
         ))}
       </select>

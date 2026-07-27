@@ -3,13 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { LogOut, Moon, Sun, User, Folder } from "feather-icons-react";
 import { useTheme } from "../hooks/useTheme";
-import { supportedLngs, type SupportedLng } from "../i18n";
-
-const langLabels: Record<SupportedLng, string> = {
-  en: "English",
-  pt: "Português",
-  es: "Español",
-};
+import { langLabels, supportedLngs, type SupportedLng } from "../i18n";
 
 function initialsFromEmail(email: string | null | undefined): string {
   if (!email) return "";

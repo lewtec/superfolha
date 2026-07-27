@@ -86,9 +86,10 @@ func (s *Server) handleProjectWS(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to open project session", http.StatusInternalServerError)
 		return
 	}
+	// Detach from request cancel so post-close commits still update timestamps.
+	commitCtx := context.WithoutCancel(r.Context())
 	hub.SetOnCommitted(func() {
-		// Request context may be done after the socket closes; use background.
-		if err := s.repo.UpdateProjectTimestamp(context.Background(), projectID); err != nil {
+		if err := s.repo.UpdateProjectTimestamp(commitCtx, projectID); err != nil {
 			slog.Warn("project timestamp after hub commit", "project", projectID, "err", err)
 		}
 	})
@@ -105,14 +106,19 @@ func (s *Server) handleProjectWS(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		remaining := hub.RemoveClient(clientID)
 		s.hubs.NoteClientLeft(projectID, remaining)
-		_ = conn.Close()
+		if err := conn.Close(); err != nil {
+			slog.Debug("ws close", "project", projectID, "client", clientID, "err", err)
+		}
 	}()
 
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
 		for out := range client.Out {
-			_ = conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+			if err := conn.SetWriteDeadline(time.Now().Add(10 * time.Second)); err != nil {
+				slog.Debug("ws write deadline", "project", projectID, "err", err)
+				return
+			}
 			mt := websocket.TextMessage
 			if out.Binary {
 				mt = websocket.BinaryMessage
@@ -123,16 +129,20 @@ func (s *Server) handleProjectWS(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	hello, _ := json.Marshal(map[string]string{
+	if hello := marshalWSJSON(map[string]string{
 		"type":       "hello",
 		"session_id": hub.SessionID,
 		"client_id":  clientID,
 		"project_id": projectID,
-	})
-	client.Out <- session.Outbound{Data: hello}
+	}); hello != nil {
+		client.Out <- session.Outbound{Data: hello}
+	}
 
 	for {
-		_ = conn.SetReadDeadline(time.Now().Add(120 * time.Second))
+		if err := conn.SetReadDeadline(time.Now().Add(120 * time.Second)); err != nil {
+			slog.Debug("ws read deadline", "project", projectID, "err", err)
+			break
+		}
 		mt, data, err := conn.ReadMessage()
 		if err != nil {
 			break
@@ -156,13 +166,14 @@ func (s *Server) handleProjectWS(w http.ResponseWriter, r *http.Request) {
 			}
 			if ctrl.Type == "hello.ack" {
 				if ctrl.SessionID != "" && ctrl.SessionID != hub.SessionID {
-					errFrame, _ := json.Marshal(map[string]string{
+					if errFrame := marshalWSJSON(map[string]string{
 						"type":    "error",
 						"message": "session_id mismatch",
-					})
-					select {
-					case client.Out <- session.Outbound{Data: errFrame}:
-					default:
+					}); errFrame != nil {
+						select {
+						case client.Out <- session.Outbound{Data: errFrame}:
+						default:
+						}
 					}
 					continue
 				}
@@ -197,10 +208,11 @@ func (s *Server) handleProjectWS(w http.ResponseWriter, r *http.Request) {
 			}
 			switch ctrl.Type {
 			case "ping":
-				b, _ := json.Marshal(map[string]string{"type": "pong"})
-				select {
-				case client.Out <- session.Outbound{Data: b}:
-				default:
+				if b := marshalWSJSON(map[string]string{"type": "pong"}); b != nil {
+					select {
+					case client.Out <- session.Outbound{Data: b}:
+					default:
+					}
 				}
 			case "chat.send":
 				hub.AppendChat(user.Email, ctrl.Text)
@@ -236,8 +248,20 @@ func (s *Server) handleProjectWS(w http.ResponseWriter, r *http.Request) {
 	<-done
 }
 
+func marshalWSJSON(v any) []byte {
+	b, err := json.Marshal(v)
+	if err != nil {
+		slog.Error("ws marshal", "err", err)
+		return nil
+	}
+	return b
+}
+
 func sendWSError(c *session.Client, msg string) {
-	b, _ := json.Marshal(map[string]string{"type": "error", "message": msg})
+	b := marshalWSJSON(map[string]string{"type": "error", "message": msg})
+	if b == nil {
+		return
+	}
 	select {
 	case c.Out <- session.Outbound{Data: b}:
 	default:
