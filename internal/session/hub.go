@@ -249,7 +249,9 @@ func (h *Hub) SaveTextFile(path, content string) error {
 // DeleteFile removes path from disk and CRDT text map.
 func (h *Hub) DeleteFile(path string) error {
 	path = filepath.ToSlash(path)
-	_ = h.Doc.RemoveText(path)
+	if err := h.Doc.RemoveText(path); err != nil {
+		return err
+	}
 	if err := h.svc.DeleteFile(h.ProjectID, path); err != nil {
 		return err
 	}

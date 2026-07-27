@@ -1,11 +1,12 @@
 import { useMutation } from "react-relay";
+import type { PayloadError } from "relay-runtime";
 import type { CreateProjectMutation as CreateProjectMutationType } from "../mutations/__generated__/CreateProjectMutation.graphql";
 import CreateProjectMutationGraphql from "../mutations/CreateProjectMutation";
 
 interface UseCreateProjectMutationConfig {
   onCompleted?: (
     response: CreateProjectMutationType["response"],
-    errors: ReadonlyArray<Error> | null,
+    errors: ReadonlyArray<PayloadError> | null,
   ) => void;
   onError?: (error: Error) => void;
 }

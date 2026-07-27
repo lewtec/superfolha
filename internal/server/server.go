@@ -200,7 +200,11 @@ func (s *Server) handleUploadFile(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, apierrors.New(apierrors.CodeInvalidInput, "missing file"))
 		return
 	}
-	defer file.Close()
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil {
+			slog.Debug("close upload form file", "err", closeErr)
+		}
+	}()
 
 	fileContent, err := io.ReadAll(file)
 	if err != nil {
@@ -208,13 +212,23 @@ func (s *Server) handleUploadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	filePath := header.Filename
+	// Multipart Filename may include client path separators; jail via the same
+	// path validator as GraphQL/download (basename-only upload name is still relative).
+	filePath, err := project.ValidateRepoRelativePath(filepath.Base(header.Filename))
+	if err != nil {
+		writeAPIError(w, apierrors.New(apierrors.CodeInvalidInput, "invalid file path"))
+		return
+	}
 	body := string(fileContent)
 
 	// Common path: live hub updates CRDT for text / disk for blobs and fans out tree.event.
 	if s.hubs != nil {
 		if hub := s.hubs.GetIfLive(projectIdStr); hub != nil {
 			if err := hub.SaveTextFile(filePath, body); err != nil {
+				if errors.Is(err, project.ErrInvalidPath) {
+					writeAPIError(w, apierrors.New(apierrors.CodeInvalidInput, "invalid file path"))
+					return
+				}
 				slog.Error("error saving file via hub", "file", filePath, "project", projectIdStr, "err", err)
 				writeAPIError(w, apierrors.Internal(err))
 				return
@@ -302,11 +316,19 @@ func (s *Server) handleDownloadFile(w http.ResponseWriter, r *http.Request) {
 			writeAPIError(w, apierrors.New(apierrors.CodeFileNotFound, "file not found"))
 			return
 		}
+		if errors.Is(err, project.ErrInvalidPath) {
+			writeAPIError(w, apierrors.New(apierrors.CodeInvalidInput, "invalid file path"))
+			return
+		}
 		slog.Error("error reading file", "file", filePath, "project", projectIdStr, "err", err)
 		writeAPIError(w, apierrors.Internal(err))
 		return
 	}
-	defer fileReader.Close() // Ensure the file is closed
+	defer func() {
+		if closeErr := fileReader.Close(); closeErr != nil {
+			slog.Debug("close download reader", "file", filePath, "err", closeErr)
+		}
+	}()
 
 	// Read a small chunk to detect content type
 	// http.DetectContentType needs at most 512 bytes

@@ -1,11 +1,12 @@
 import { useMutation } from "react-relay";
+import type { PayloadError } from "relay-runtime";
 import type { SaveFileMutation as SaveFileMutationType } from "../mutations/__generated__/SaveFileMutation.graphql";
 import SaveFileMutationGraphql from "../mutations/SaveFileMutation";
 
 interface SaveFileCallbacks {
   onCompleted?: (
     response: SaveFileMutationType["response"],
-    errors: ReadonlyArray<Error> | null,
+    errors: ReadonlyArray<PayloadError> | null,
   ) => void;
   onError?: (error: Error) => void;
 }

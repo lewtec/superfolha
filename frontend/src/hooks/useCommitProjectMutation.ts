@@ -1,11 +1,12 @@
 import { useMutation } from "react-relay";
+import type { PayloadError } from "relay-runtime";
 import type { CommitProjectMutation as CommitProjectMutationType } from "../mutations/__generated__/CommitProjectMutation.graphql";
 import CommitProjectMutationGraphql from "../mutations/CommitProjectMutation";
 
 interface CommitProjectCallbacks {
   onCompleted?: (
     response: CommitProjectMutationType["response"],
-    errors: ReadonlyArray<Error> | null,
+    errors: ReadonlyArray<PayloadError> | null,
   ) => void;
   onError?: (error: Error) => void;
 }

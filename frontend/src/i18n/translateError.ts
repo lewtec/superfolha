@@ -23,14 +23,11 @@ export function extractErrorCode(err: unknown): string {
       source?: { errors?: GraphQLLikeError[] };
       errors?: GraphQLLikeError[];
     };
+    const withGql = err as Error & { graphQLErrors?: GraphQLLikeError[] };
     const list =
       anyErr.source?.errors ||
       anyErr.errors ||
-      (Array.isArray(
-        (err as { graphQLErrors?: GraphQLLikeError[] }).graphQLErrors,
-      )
-        ? (err as { graphQLErrors: GraphQLLikeError[] }).graphQLErrors
-        : null);
+      (Array.isArray(withGql.graphQLErrors) ? withGql.graphQLErrors : null);
     if (list?.[0]?.extensions?.code) {
       return String(list[0].extensions.code);
     }

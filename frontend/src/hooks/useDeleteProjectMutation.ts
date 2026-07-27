@@ -1,35 +1,34 @@
 import { useMutation } from "react-relay";
+import type { PayloadError, SelectorStoreUpdater } from "relay-runtime";
 import type { DeleteProjectMutation as DeleteProjectMutationType } from "../mutations/__generated__/DeleteProjectMutation.graphql";
 import DeleteProjectMutationGraphql from "../mutations/DeleteProjectMutation";
 
-interface UseDeleteProjectMutationConfig {
+interface DeleteProjectCallbacks {
   onCompleted?: (
     response: DeleteProjectMutationType["response"],
-    errors: ReadonlyArray<Error> | null,
+    errors: ReadonlyArray<PayloadError> | null,
   ) => void;
   onError?: (error: Error) => void;
-  updater?: DeleteProjectMutationType["updater"];
+  updater?: SelectorStoreUpdater<DeleteProjectMutationType["response"]>;
 }
 
-export function useDeleteProjectMutation(
-  config?: UseDeleteProjectMutationConfig,
-) {
+export function useDeleteProjectMutation() {
   const [commit, isInFlight] = useMutation<DeleteProjectMutationType>(
     DeleteProjectMutationGraphql,
   );
 
-  const deleteProject = (id: string) => {
+  const deleteProject = (id: string, callbacks?: DeleteProjectCallbacks) => {
     commit({
       variables: {
         id,
       },
       onCompleted: (response, errors) => {
-        config?.onCompleted?.(response, errors);
+        callbacks?.onCompleted?.(response, errors);
       },
       onError: (err) => {
-        config?.onError?.(err);
+        callbacks?.onError?.(err);
       },
-      updater: config?.updater,
+      updater: callbacks?.updater,
     });
   };
 

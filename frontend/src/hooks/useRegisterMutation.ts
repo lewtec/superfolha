@@ -1,11 +1,12 @@
 import { useMutation } from "react-relay";
+import type { PayloadError } from "relay-runtime";
 import type { RegisterMutation as RegisterMutationType } from "../mutations/__generated__/RegisterMutation.graphql";
 import RegisterMutationGraphql from "../mutations/RegisterMutation";
 
 interface UseRegisterMutationConfig {
   onCompleted?: (
     response: RegisterMutationType["response"],
-    errors: ReadonlyArray<Error> | null,
+    errors: ReadonlyArray<PayloadError> | null,
   ) => void;
   onError?: (error: Error) => void;
 }

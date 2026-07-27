@@ -82,7 +82,7 @@ func Compile(ctx context.Context, projectService *project.Service, projectId str
 	if err := os.MkdirAll(tmpDir, 0755); err != nil {
 		return nil, err
 	}
-	defer os.RemoveAll(tmpDir) // Cleanup (runs on cancel/timeout too)
+	defer os.RemoveAll(tmpDir) // best-effort cleanup (also on cancel/timeout)
 
 	// Get all files from the project
 	projectFiles, err := projectService.ListFiles(projectId)

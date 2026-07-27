@@ -134,15 +134,11 @@ export default function EditorPage() {
       });
     }
     if (fetchedFiles) {
-      return (
-        fetchedFiles as {
-          path: string;
-          isBinary: boolean;
-          size: number;
-          isTooBig: boolean;
-        }[]
-      ).map((file) => ({
-        ...file,
+      return fetchedFiles.map((file) => ({
+        path: file.path,
+        isBinary: file.isBinary,
+        size: file.size,
+        isTooBig: file.isTooBig,
         content: null,
         isDirty: false,
       }));

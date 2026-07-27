@@ -36,31 +36,7 @@ export default function Projects() {
     });
 
   const { deleteProject, isInFlight: isDeletingProject } =
-    useDeleteProjectMutation({
-      onCompleted: (_response, errors) => {
-        if (errors) {
-          setError(translateGraphQLErrors(t, errors));
-          return;
-        }
-      },
-      onError: (err) => {
-        setError(translateError(t, err));
-        console.error(err);
-      },
-      updater: (store, response) => {
-        if (response?.deleteProject?.id) {
-          const deletedId = response.deleteProject.id;
-          const root = store.getRoot();
-          const projectsRec = root.getLinkedRecords("projects");
-          if (projectsRec) {
-            const newProjects = projectsRec.filter(
-              (project) => project.getValue("id") !== deletedId,
-            );
-            root.setLinkedRecords(newProjects, "projects");
-          }
-        }
-      },
-    });
+    useDeleteProjectMutation();
 
   const handleCreateProject = () => {
     if (!newProjectName.trim()) {
@@ -76,7 +52,28 @@ export default function Projects() {
       return;
     }
     setError("");
-    deleteProject(id);
+    deleteProject(id, {
+      onCompleted: (_response, errors) => {
+        if (errors) {
+          setError(translateGraphQLErrors(t, errors));
+        }
+      },
+      onError: (err) => {
+        setError(translateError(t, err));
+        console.error(err);
+      },
+      // Mutation returns boolean; drop the record using the deleted id from the call.
+      updater: (store, response) => {
+        if (!response?.deleteProject) return;
+        const root = store.getRoot();
+        const projectsRec = root.getLinkedRecords("projects");
+        if (!projectsRec) return;
+        root.setLinkedRecords(
+          projectsRec.filter((project) => project.getValue("id") !== id),
+          "projects",
+        );
+      },
+    });
   };
 
   return (

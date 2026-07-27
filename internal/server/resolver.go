@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 
+	"errors"
 	"github.com/google/uuid"
 	"github.com/lewtec/superfolha/internal/apierrors"
 	"github.com/lewtec/superfolha/internal/auth"
@@ -17,7 +18,6 @@ import (
 	igit "github.com/lewtec/superfolha/internal/git"
 	"github.com/lewtec/superfolha/internal/project"
 	"github.com/lewtec/superfolha/internal/session"
-	"errors"
 )
 
 //go:embed templates
@@ -135,12 +135,12 @@ func (r *Resolver) getAndCheckProject(ctx context.Context, projectID string) (*d
 
 			content, err := templatesFS.ReadFile(path)
 			if err != nil {
-				return fmt.Errorf("failed to read template file %s: %w", path, err)
+				return fmt.Errorf("read template file %s: %w", path, err)
 			}
 
 			relativePath := strings.TrimPrefix(path, templateDir+"/")
 			if err := r.projectService.SaveFile(projectID, relativePath, string(content)); err != nil {
-				return fmt.Errorf("failed to write template file %s: %w", relativePath, err)
+				return fmt.Errorf("write template file %s: %w", relativePath, err)
 			}
 			return nil
 		})

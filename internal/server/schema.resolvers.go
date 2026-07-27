@@ -10,11 +10,13 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/lewtec/superfolha/internal/apierrors"
 	"github.com/lewtec/superfolha/internal/auth"
+	"github.com/lewtec/superfolha/internal/crdt"
 	"github.com/lewtec/superfolha/internal/db"
 	"github.com/lewtec/superfolha/internal/project"
 )
@@ -42,6 +44,11 @@ func (r *mutationResolver) CreateProject(ctx context.Context, name string) (*Pro
 	user, err := requireUser(ctx)
 	if err != nil {
 		return nil, err
+	}
+
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, apierrors.New(apierrors.CodeInvalidInput, "project name is required")
 	}
 
 	projectUUID, err := uuid.NewV7()
@@ -109,6 +116,9 @@ func (r *mutationResolver) SaveFile(ctx context.Context, projectID string, path 
 	if saveErr != nil {
 		if errors.Is(saveErr, project.ErrInvalidPath) {
 			return nil, apierrors.New(apierrors.CodeInvalidInput, "invalid file path")
+		}
+		if errors.Is(saveErr, crdt.ErrTextTooLarge) {
+			return nil, apierrors.New(apierrors.CodeInvalidInput, "text exceeds collab size cap")
 		}
 		return nil, apierrors.Internal(saveErr)
 	}
@@ -211,11 +221,15 @@ func (r *projectResolver) Files(ctx context.Context, obj *Project) ([]*File, err
 		var buf [512]byte
 		n, err := io.ReadFull(fileReader, buf[:])
 		if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
-			fileReader.Close()
+			if closeErr := fileReader.Close(); closeErr != nil {
+				slog.Debug("close file reader after peek error", "path", f.Path, "err", closeErr)
+			}
 			return nil, apierrors.Internal(err)
 		}
 		isBinary := HasBinary(buf[:n], f.Path)
-		fileReader.Close()
+		if closeErr := fileReader.Close(); closeErr != nil {
+			slog.Debug("close file reader", "path", f.Path, "err", closeErr)
+		}
 
 		files[i] = &File{
 			Path:     f.Path,
@@ -241,7 +255,11 @@ func (r *projectResolver) File(ctx context.Context, obj *Project, path string) (
 		}
 		return nil, apierrors.Internal(err)
 	}
-	defer fileReader.Close()
+	defer func() {
+		if closeErr := fileReader.Close(); closeErr != nil {
+			slog.Debug("close file reader", "path", path, "err", closeErr)
+		}
+	}()
 
 	isTooBig := fileSize > MaxGraphQLFileSize
 	var content *string
