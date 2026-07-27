@@ -1,6 +1,7 @@
 package crdt
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -10,6 +11,12 @@ import (
 
 	"github.com/lewtec/superfolha/internal/project"
 	ycrdt "github.com/reearth/ygo/crdt"
+)
+
+// Sentinel errors for collab text and flush preconditions (errors.Is).
+var (
+	ErrTextExceedsCollabCap = errors.New("text exceeds collab size cap")
+	ErrEmptyRootDir         = errors.New("empty root dir")
 )
 
 // Origins used for Transact so observers can distinguish writers.
@@ -146,7 +153,7 @@ func (p *ProjectDoc) SetTextServer(relPath, content string) error {
 		return err
 	}
 	if int64(len(content)) > project.MaxCollabTextBytes {
-		return fmt.Errorf("text exceeds collab size cap")
+		return ErrTextExceedsCollabCap
 	}
 	st := p.Doc.GetText(TextKey(path))
 	err = p.Doc.TransactE(func(txn *ycrdt.Transaction) error {
@@ -193,7 +200,7 @@ func (p *ProjectDoc) RemoveText(relPath string) error {
 // Creates parent directories as needed. Does not touch blob files or delete missing paths.
 func (p *ProjectDoc) FlushToDir(rootDir string) error {
 	if rootDir == "" {
-		return fmt.Errorf("empty root dir")
+		return ErrEmptyRootDir
 	}
 	for _, rel := range p.TextPathList() {
 		// Re-validate path jail (defense in depth; keys should already be clean).
