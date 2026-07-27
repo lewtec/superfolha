@@ -280,17 +280,19 @@ func (s *Server) handleDownloadFile(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, err)
 		return
 	}
-	// filePath will be everything after /api/projects/{projectId}/download/
-	// We need to decode the URL path because encodeURIComponent was used on the frontend
-	encodedFilePath := r.URL.Path[len("/api/projects/"+projectIdStr+"/download/"):]
-	filePath, err := project.DecodeFilePath(encodedFilePath)
-	if err != nil {
-		writeAPIError(w, apierrors.New(apierrors.CodeInvalidInput, "invalid file path"))
+
+	// Route is /api/projects/{projectId}/download/{filePath...}; PathValue returns the
+	// wildcard segment (ServeMux unescapes path elements; same as projectId).
+	rawFilePath := r.PathValue("filePath")
+	if rawFilePath == "" {
+		writeAPIError(w, apierrors.New(apierrors.CodeInvalidInput, "missing file path"))
 		return
 	}
-
-	if filePath == "" {
-		writeAPIError(w, apierrors.New(apierrors.CodeInvalidInput, "missing file path"))
+	// DecodeFilePath still PathUnescape + jail: clients may double-encode, and
+	// we must reject absolute / .. / .git components before disk I/O.
+	filePath, err := project.DecodeFilePath(rawFilePath)
+	if err != nil {
+		writeAPIError(w, apierrors.New(apierrors.CodeInvalidInput, "invalid file path"))
 		return
 	}
 
