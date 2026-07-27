@@ -1,0 +1,20 @@
+# Mark machine-generated sources so GitHub collapses them in diffs
+# and excludes them from language stats (linguist-generated).
+# Hand-written resolver bodies live in schema.resolvers.go — not listed.
+
+# gqlgen (see gqlgen.yml)
+/internal/server/generated.go  linguist-generated=true
+/internal/server/models.go      linguist-generated=true
+
+# sqlc (see sqlc.yaml) — repository.go / migrations / queries.sql are hand-written
+/internal/db/sqlite/db.go           linguist-generated=true
+/internal/db/sqlite/models.go       linguist-generated=true
+/internal/db/sqlite/querier.go      linguist-generated=true
+/internal/db/sqlite/queries.sql.go  linguist-generated=true
+/internal/db/postgres/db.go           linguist-generated=true
+/internal/db/postgres/models.go       linguist-generated=true
+/internal/db/postgres/querier.go      linguist-generated=true
+/internal/db/postgres/queries.sql.go  linguist-generated=true
+
+# Relay compiler output
+/frontend/src/**/__generated__/**  linguist-generated=true
