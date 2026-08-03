@@ -28,7 +28,7 @@ COPY --from=frontend /src/internal/server/web/dist ./internal/server/web/dist
 RUN CGO_ENABLED=0 GOOS=linux go build -tags release -trimpath -ldflags="-s -w" -o /build/server ./cmd/superfolha
 
 # Stage 3: runtime with TeX Live + latexmk
-FROM texlive/texlive:latest
+FROM texlive/texlive:latest@sha256:8957c916b8160049f89c24d362a6d86c09d8a04095acde37e88404c4afed85b4
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
