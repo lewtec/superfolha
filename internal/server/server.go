@@ -136,7 +136,7 @@ func (s *Server) handleCompile(w http.ResponseWriter, r *http.Request) {
 
 	filePath, err = project.DecodeFilePath(filePath)
 	if err != nil {
-		writeAPIError(w, apierrors.New(apierrors.CodeInvalidInput, "invalid file path"))
+		writeAPIError(w, mapPathAPIError(err))
 		return
 	}
 
@@ -216,7 +216,7 @@ func (s *Server) handleUploadFile(w http.ResponseWriter, r *http.Request) {
 	// path validator as GraphQL/download (basename-only upload name is still relative).
 	filePath, err := project.ValidateRepoRelativePath(filepath.Base(header.Filename))
 	if err != nil {
-		writeAPIError(w, apierrors.New(apierrors.CodeInvalidInput, "invalid file path"))
+		writeAPIError(w, mapPathAPIError(err))
 		return
 	}
 	body := string(fileContent)
@@ -225,8 +225,8 @@ func (s *Server) handleUploadFile(w http.ResponseWriter, r *http.Request) {
 	if s.hubs != nil {
 		if hub := s.hubs.GetIfLive(projectIdStr); hub != nil {
 			if err := hub.SaveTextFile(filePath, body); err != nil {
-				if errors.Is(err, project.ErrInvalidPath) {
-					writeAPIError(w, apierrors.New(apierrors.CodeInvalidInput, "invalid file path"))
+				if mapped := mapPathAPIError(err); mapped != nil {
+					writeAPIError(w, mapped)
 					return
 				}
 				slog.Error("error saving file via hub", "file", filePath, "project", projectIdStr, "err", err)
@@ -255,8 +255,8 @@ func (s *Server) handleUploadFile(w http.ResponseWriter, r *http.Request) {
 
 	err = s.projectService.SaveFile(projectIdStr, filePath, body)
 	if err != nil {
-		if errors.Is(err, project.ErrInvalidPath) {
-			writeAPIError(w, apierrors.New(apierrors.CodeInvalidInput, "invalid file path"))
+		if mapped := mapPathAPIError(err); mapped != nil {
+			writeAPIError(w, mapped)
 			return
 		}
 		slog.Error("error saving file", "file", filePath, "project", projectIdStr, "err", err)
@@ -306,18 +306,14 @@ func (s *Server) handleDownloadFile(w http.ResponseWriter, r *http.Request) {
 	// we must reject absolute / .. / .git components before disk I/O.
 	filePath, err := project.DecodeFilePath(rawFilePath)
 	if err != nil {
-		writeAPIError(w, apierrors.New(apierrors.CodeInvalidInput, "invalid file path"))
+		writeAPIError(w, mapPathAPIError(err))
 		return
 	}
 
 	fileReader, fileSize, err := s.projectService.ReadFile(projectIdStr, filePath)
 	if err != nil {
-		if errors.Is(err, project.ErrFileNotFound) {
-			writeAPIError(w, apierrors.New(apierrors.CodeFileNotFound, "file not found"))
-			return
-		}
-		if errors.Is(err, project.ErrInvalidPath) {
-			writeAPIError(w, apierrors.New(apierrors.CodeInvalidInput, "invalid file path"))
+		if mapped := mapPathAPIError(err); mapped != nil {
+			writeAPIError(w, mapped)
 			return
 		}
 		slog.Error("error reading file", "file", filePath, "project", projectIdStr, "err", err)
