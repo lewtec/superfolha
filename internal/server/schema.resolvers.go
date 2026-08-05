@@ -18,7 +18,6 @@ import (
 	"github.com/lewtec/superfolha/internal/auth"
 	"github.com/lewtec/superfolha/internal/crdt"
 	"github.com/lewtec/superfolha/internal/db"
-	"github.com/lewtec/superfolha/internal/project"
 )
 
 // Register is the resolver for the register field.
@@ -114,8 +113,8 @@ func (r *mutationResolver) SaveFile(ctx context.Context, projectID string, path 
 		saveErr = r.projectService.SaveFile(projectID, path, content)
 	}
 	if saveErr != nil {
-		if errors.Is(saveErr, project.ErrInvalidPath) {
-			return nil, apierrors.New(apierrors.CodeInvalidInput, "invalid file path")
+		if mapped := mapPathAPIError(saveErr); mapped != nil {
+			return nil, mapped
 		}
 		if errors.Is(saveErr, crdt.ErrTextTooLarge) {
 			return nil, apierrors.New(apierrors.CodeInvalidInput, "text exceeds collab size cap")
@@ -152,11 +151,8 @@ func (r *mutationResolver) DeleteFile(ctx context.Context, projectID string, pat
 		delErr = r.projectService.DeleteFile(projectID, path)
 	}
 	if delErr != nil {
-		if errors.Is(delErr, project.ErrInvalidPath) {
-			return false, apierrors.New(apierrors.CodeInvalidInput, "invalid file path")
-		}
-		if errors.Is(delErr, os.ErrNotExist) {
-			return false, apierrors.New(apierrors.CodeFileNotFound, "file not found")
+		if mapped := mapPathAPIError(delErr); mapped != nil {
+			return false, mapped
 		}
 		return false, apierrors.Internal(delErr)
 	}
@@ -247,11 +243,8 @@ func (r *projectResolver) Files(ctx context.Context, obj *Project) ([]*File, err
 func (r *projectResolver) File(ctx context.Context, obj *Project, path string) (*File, error) {
 	fileReader, fileSize, err := r.projectService.ReadFile(obj.ID, path)
 	if err != nil {
-		if errors.Is(err, project.ErrFileNotFound) {
-			return nil, apierrors.New(apierrors.CodeFileNotFound, "file not found")
-		}
-		if errors.Is(err, project.ErrInvalidPath) {
-			return nil, apierrors.New(apierrors.CodeInvalidInput, "invalid file path")
+		if mapped := mapPathAPIError(err); mapped != nil {
+			return nil, mapped
 		}
 		return nil, apierrors.Internal(err)
 	}
