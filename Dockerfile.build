@@ -15,7 +15,7 @@ COPY frontend/ ./
 RUN bun run build
 
 # Stage 2: build Go binary with release tag (embeds SPA)
-FROM golang:1.25-bookworm AS builder
+FROM golang:1.26-bookworm@sha256:6c5605ab3a9a9fb3c4eafe5b3d63cdbf3881caf113262b67862547b54a9db599 AS builder
 
 WORKDIR /build
 
