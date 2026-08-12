@@ -43,7 +43,7 @@ func hasGitDirComponent(cleaned string) bool {
 		return true
 	}
 	sep := string(filepath.Separator)
-	for _, seg := range strings.Split(cleaned, sep) {
+	for seg := range strings.SplitSeq(cleaned, sep) {
 		if seg == ".git" {
 			return true
 		}
