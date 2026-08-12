@@ -91,12 +91,12 @@ func (e ErrorCode) String() string {
 func (e *ErrorCode) UnmarshalGQL(v any) error {
 	str, ok := v.(string)
 	if !ok {
-		return fmt.Errorf("enums must be strings")
+		return ErrEnumsMustBeStrings
 	}
 
 	*e = ErrorCode(str)
 	if !e.IsValid() {
-		return fmt.Errorf("%s is not a valid ErrorCode", str)
+		return fmt.Errorf("%w: %s", ErrInvalidErrorCode, str)
 	}
 	return nil
 }
