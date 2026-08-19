@@ -33,8 +33,12 @@
   "status_connecting": "Conectando a la sesión…",
   "commit_now": "Commit",
   "chat": "Chat",
-  "chat_empty": "Aún no hay mensajes.",
-  "chat_placeholder": "Mensaje…",
-  "chat_send": "Enviar",
+  "chat_empty": "No messages yet.",
+  "chat_placeholder": "Message…",
+  "chat_send": "Send",
+  "chat_open": "Open chat",
+  "chat_close": "Close chat",
+  "chat_session_hint": "Session only · not saved",
+  "chat_message_label": "Chat message",
   "logs_empty": "Aún no hay registros de compilación."
 }

@@ -31,12 +31,13 @@ interface FileRow {
   isTooBig: boolean;
 }
 
-type EditorTab = "code" | "pdf" | "logs" | "chat";
+type EditorTab = "code" | "pdf" | "logs";
 
 type ChatToast = ChatMessage & { id: number };
 
 const CHAT_TOAST_MS = 5000;
 const CHAT_TOAST_MAX = 3;
+const CHAT_OPEN_KEY = "superfolha-chat-open";
 
 function ChatToastStack({
   toasts,
@@ -147,7 +148,16 @@ export default function EditorPage() {
   const [compiling, setCompiling] = useState(false);
   const [chatInput, setChatInput] = useState("");
   const [chatToasts, setChatToasts] = useState<ChatToast[]>([]);
-  const activeTabRef = useRef<EditorTab>("code");
+  const [chatOpen, setChatOpen] = useState(() => {
+    try {
+      return localStorage.getItem(CHAT_OPEN_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const chatOpenRef = useRef(chatOpen);
+  const chatLogRef = useRef<HTMLDivElement>(null);
+  const chatInputRef = useRef<HTMLInputElement>(null);
   const toastIdRef = useRef(0);
   const toastTimersRef = useRef<number[]>([]);
   const pendingOwnChatRef = useRef<string[]>([]);
@@ -156,7 +166,7 @@ export default function EditorPage() {
       ? window.matchMedia("(min-width: 768px)").matches
       : true,
   );
-  activeTabRef.current = activeTab;
+  chatOpenRef.current = chatOpen;
 
   // Merge GraphQL bootstrap list with live tree.snapshot
   const files: FileRow[] = useMemo(() => {
@@ -315,6 +325,16 @@ export default function EditorPage() {
     setChatInput("");
   }, [chatInput, collab]);
 
+  const persistChatOpen = useCallback((open: boolean) => {
+    setChatOpen(open);
+    try {
+      localStorage.setItem(CHAT_OPEN_KEY, open ? "1" : "0");
+    } catch {
+      /* ignore quota / private mode */
+    }
+    if (open) setChatToasts([]);
+  }, []);
+
   const selectView = useCallback((tab: EditorTab) => {
     setActiveTab(tab);
     if (window.matchMedia("(max-width: 767px)").matches) {
@@ -332,7 +352,7 @@ export default function EditorPage() {
         pending.splice(ownIdx, 1);
         return;
       }
-      if (activeTabRef.current === "chat" && !document.hidden) return;
+      if (chatOpenRef.current && !document.hidden) return;
       const id = ++toastIdRef.current;
       setChatToasts((prev) => [
         ...prev.slice(1 - CHAT_TOAST_MAX),
@@ -350,11 +370,19 @@ export default function EditorPage() {
     };
   }, [collab, email]);
 
+  useEffect(() => {
+    const log = chatLogRef.current;
+    if (log) log.scrollTop = log.scrollHeight;
+  }, [chat, chatOpen]);
+
+  useEffect(() => {
+    if (chatOpen) chatInputRef.current?.focus();
+  }, [chatOpen]);
+
   const viewRows: { id: EditorTab; label: string; icon: typeof Code }[] = [
     { id: "code", label: t("editor:code"), icon: Code },
     { id: "pdf", label: t("editor:pdf"), icon: FileText },
     { id: "logs", label: t("editor:logs"), icon: Terminal },
-    { id: "chat", label: t("editor:chat"), icon: MessageSquare },
   ];
 
   const treeFiles = files.map((f) => ({
@@ -494,6 +522,19 @@ export default function EditorPage() {
               t("editor:compile")
             )}
           </button>
+          <button
+            type="button"
+            className={`btn btn-ghost btn-square min-h-[var(--touch-min)] min-w-[var(--touch-min)] ${chatOpen ? "btn-active" : ""}`}
+            onClick={() => persistChatOpen(!chatOpen)}
+            aria-controls="chat-panel"
+            aria-expanded={chatOpen}
+            aria-label={
+              chatOpen ? t("editor:chat_close") : t("editor:chat_open")
+            }
+            title={t("editor:chat")}
+          >
+            <MessageSquare size={18} />
+          </button>
         </>
       }
     >
@@ -512,10 +553,7 @@ export default function EditorPage() {
 
         <ChatToastStack
           toasts={chatToasts}
-          onOpen={() => {
-            setChatToasts([]);
-            selectView("chat");
-          }}
+          onOpen={() => persistChatOpen(true)}
         />
 
         <div className="flex-1 flex flex-col min-w-0 min-h-0 bg-base-100">
@@ -582,56 +620,87 @@ export default function EditorPage() {
                 {logs || t("editor:logs_empty")}
               </pre>
             </div>
-
-            <div
-              className={`absolute inset-0 min-h-0 flex flex-col ${
-                activeTab === "chat"
-                  ? "z-10"
-                  : "z-0 invisible pointer-events-none"
-              }`}
-              aria-hidden={activeTab !== "chat"}
-            >
-              <div className="flex-1 overflow-auto p-3 space-y-2">
-                {chat.length === 0 ? (
-                  <p className="text-base-content/60 text-sm">
-                    {t("editor:chat_empty")}
-                  </p>
-                ) : (
-                  chat.map((m, i) => (
-                    <div key={`${m.at}-${i}`} className="text-sm">
-                      <span className="font-semibold text-primary">
-                        {m.from}
-                      </span>
-                      <span className="text-base-content/50 text-xs ml-2">
-                        {new Date(m.at).toLocaleTimeString()}
-                      </span>
-                      <p className="whitespace-pre-wrap">{m.text}</p>
-                    </div>
-                  ))
-                )}
-              </div>
-              <div className="p-2 border-t border-base-300 flex gap-2">
-                <input
-                  className="input input-bordered input-sm flex-1"
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") sendChat();
-                  }}
-                  placeholder={t("editor:chat_placeholder")}
-                />
-                <button
-                  type="button"
-                  className="btn btn-primary btn-sm"
-                  onClick={sendChat}
-                >
-                  {t("editor:chat_send")}
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       </div>
+
+      <aside
+        id="chat-panel"
+        className={`fixed inset-x-0 z-40 flex justify-end pointer-events-none ${
+          chatOpen ? "visible" : "invisible"
+        }`}
+        style={{
+          top: "var(--shell-height)",
+          height: "calc(100dvh - var(--shell-height))",
+        }}
+        aria-label={t("editor:chat")}
+        aria-hidden={!chatOpen}
+      >
+        <div
+          className={`pointer-events-auto flex flex-col h-full w-full md:w-96 max-w-full bg-base-100 border-l border-base-300 shadow-lg motion-safe:transition-transform motion-safe:duration-200 motion-safe:ease-out ${
+            chatOpen ? "" : "translate-x-full"
+          }`}
+        >
+          <div className="flex items-center justify-between gap-2 min-h-12 px-3 border-b border-base-300 shrink-0">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold leading-tight">
+                {t("editor:chat")}
+              </div>
+              <div className="text-xs text-base-content/50 leading-tight">
+                {t("editor:chat_session_hint")}
+              </div>
+            </div>
+            <button
+              type="button"
+              className="btn btn-ghost btn-square btn-sm min-h-[var(--touch-min)] min-w-[var(--touch-min)]"
+              onClick={() => persistChatOpen(false)}
+              aria-label={t("editor:chat_close")}
+              title={t("editor:chat_close")}
+            >
+              <X size={18} />
+            </button>
+          </div>
+          <div
+            ref={chatLogRef}
+            className="flex-1 min-h-0 overflow-y-auto px-4 py-3 text-sm"
+            aria-live="polite"
+          >
+            {chat.length === 0 ? (
+              <p className="text-base-content/60">{t("editor:chat_empty")}</p>
+            ) : (
+              chat.map((m, i) => (
+                <div key={`${m.at}-${i}`} className="py-1">
+                  <span className="font-semibold text-primary mr-1.5">
+                    {m.from}
+                  </span>
+                  {m.text}
+                </div>
+              ))
+            )}
+          </div>
+          <form
+            className="flex flex-col gap-2 p-3 border-t border-base-300 shrink-0"
+            onSubmit={(e) => {
+              e.preventDefault();
+              sendChat();
+            }}
+          >
+            <input
+              ref={chatInputRef}
+              type="text"
+              className="input input-bordered input-sm w-full"
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              placeholder={t("editor:chat_placeholder")}
+              aria-label={t("editor:chat_message_label")}
+              autoComplete="off"
+            />
+            <button className="btn btn-primary btn-sm" type="submit">
+              {t("editor:chat_send")}
+            </button>
+          </form>
+        </div>
+      </aside>
     </Layout>
   );
 }
