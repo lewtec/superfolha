@@ -36,5 +36,9 @@
   "chat_empty": "Aún no hay mensajes.",
   "chat_placeholder": "Mensaje…",
   "chat_send": "Enviar",
+  "chat_open": "Abrir chat",
+  "chat_close": "Cerrar chat",
+  "chat_session_hint": "Solo en esta sesión · no se guarda",
+  "chat_message_label": "Mensaje del chat",
   "logs_empty": "Aún no hay registros de compilación."
 }
