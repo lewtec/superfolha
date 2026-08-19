@@ -397,7 +397,7 @@ export default function EditorPage() {
         editor-sidebar bg-base-200 border-r border-base-300 flex flex-col
         fixed md:static inset-y-0 left-0 z-40 w-[min(18rem,85vw)]
         transition-transform duration-150 ease-out
-        ${sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
+        ${sidebarOpen ? "" : "-translate-x-full md:translate-x-0"}
         ${sidebarOpen ? "md:w-64" : "md:w-0 md:border-0 md:overflow-hidden"}
       `}
       style={{
