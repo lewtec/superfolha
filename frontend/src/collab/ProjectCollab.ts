@@ -22,6 +22,7 @@ export type TreeFile = { path: string; size: number };
 export type ChatMessage = { from: string; text: string; at: number };
 
 export type CollabListener = () => void;
+export type ChatListener = (message: ChatMessage) => void;
 
 const COLORS = [
   "#0ea5e9",
@@ -60,6 +61,7 @@ export class ProjectCollab {
 
   private ws: WebSocket | null = null;
   private listeners = new Set<CollabListener>();
+  private chatListeners = new Set<ChatListener>();
   private destroyed = false;
   private email: string;
   /** After hello.ack we must send SyncStep1 so the server returns SyncStep2 with full state. */
@@ -84,6 +86,12 @@ export class ProjectCollab {
   subscribe(fn: CollabListener): () => void {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
+  }
+
+  /** Live `chat.message` only — not the initial `chat.history` snapshot. */
+  subscribeChat(fn: ChatListener): () => void {
+    this.chatListeners.add(fn);
+    return () => this.chatListeners.delete(fn);
   }
 
   private notify() {
@@ -311,15 +319,14 @@ export class ProjectCollab {
         break;
       }
       case "chat.message": {
-        this.chat = [
-          ...this.chat,
-          {
-            from: String(msg.from ?? ""),
-            text: String(msg.text ?? ""),
-            at: Number(msg.at ?? Date.now()),
-          },
-        ];
+        const incoming: ChatMessage = {
+          from: String(msg.from ?? ""),
+          text: String(msg.text ?? ""),
+          at: Number(msg.at ?? Date.now()),
+        };
+        this.chat = [...this.chat, incoming];
         this.notify();
+        for (const fn of this.chatListeners) fn(incoming);
         break;
       }
       case "awareness": {

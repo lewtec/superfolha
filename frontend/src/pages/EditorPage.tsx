@@ -5,7 +5,7 @@ import { translateError, translateGraphQLErrors } from "../i18n/translateError";
 import { useGetProjectQuery } from "../hooks/useGetProjectQuery";
 import { useAuthStatus } from "../hooks/useAuthStatus";
 import { useProjectCollab } from "../hooks/useProjectCollab";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Menu,
   X,
@@ -20,7 +20,7 @@ import PDFViewer from "../components/PDFViewer";
 import BinaryFileViewer from "../components/BinaryFileViewer";
 import Layout from "../components/Layout";
 import { isBinaryContent } from "../utils/fileUtils";
-import type { SyncStatus } from "../collab/ProjectCollab";
+import type { ChatMessage, SyncStatus } from "../collab/ProjectCollab";
 
 interface FileRow {
   path: string;
@@ -32,6 +32,45 @@ interface FileRow {
 }
 
 type EditorTab = "code" | "pdf" | "logs" | "chat";
+
+type ChatToast = ChatMessage & { id: number };
+
+const CHAT_TOAST_MS = 5000;
+const CHAT_TOAST_MAX = 3;
+
+function ChatToastStack({
+  toasts,
+  onOpen,
+}: {
+  toasts: ChatToast[];
+  onOpen: () => void;
+}) {
+  if (toasts.length === 0) return null;
+  return (
+    <div
+      className="toast toast-end toast-bottom z-[60]"
+      aria-live="polite"
+      aria-relevant="additions"
+    >
+      {toasts.map((toast) => (
+        <button
+          key={toast.id}
+          type="button"
+          role="alert"
+          className="alert max-w-xs text-left cursor-pointer"
+          onClick={onOpen}
+        >
+          <span className="flex min-w-0 flex-col gap-0.5">
+            <span className="font-semibold text-primary truncate">
+              {toast.from}
+            </span>
+            <span className="line-clamp-2 break-words">{toast.text}</span>
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
 
 function statusBadge(status: SyncStatus, t: (k: string) => string) {
   switch (status) {
@@ -107,11 +146,17 @@ export default function EditorPage() {
   const [logs, setLogs] = useState("");
   const [compiling, setCompiling] = useState(false);
   const [chatInput, setChatInput] = useState("");
+  const [chatToasts, setChatToasts] = useState<ChatToast[]>([]);
+  const activeTabRef = useRef<EditorTab>("code");
+  const toastIdRef = useRef(0);
+  const toastTimersRef = useRef<number[]>([]);
+  const pendingOwnChatRef = useRef<string[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(() =>
     typeof window !== "undefined"
       ? window.matchMedia("(min-width: 768px)").matches
       : true,
   );
+  activeTabRef.current = activeTab;
 
   // Merge GraphQL bootstrap list with live tree.snapshot
   const files: FileRow[] = useMemo(() => {
@@ -265,9 +310,45 @@ export default function EditorPage() {
   const sendChat = useCallback(() => {
     const text = chatInput.trim();
     if (!text || !collab) return;
+    pendingOwnChatRef.current.push(text);
     collab.sendChat(text);
     setChatInput("");
   }, [chatInput, collab]);
+
+  const selectView = useCallback((tab: EditorTab) => {
+    setActiveTab(tab);
+    if (window.matchMedia("(max-width: 767px)").matches) {
+      setSidebarOpen(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!collab) return;
+    const unsub = collab.subscribeChat((message) => {
+      const pending = pendingOwnChatRef.current;
+      const ownIdx =
+        email && message.from === email ? pending.indexOf(message.text) : -1;
+      if (ownIdx !== -1) {
+        pending.splice(ownIdx, 1);
+        return;
+      }
+      if (activeTabRef.current === "chat" && !document.hidden) return;
+      const id = ++toastIdRef.current;
+      setChatToasts((prev) => [
+        ...prev.slice(1 - CHAT_TOAST_MAX),
+        { ...message, id },
+      ]);
+      const timer = window.setTimeout(() => {
+        setChatToasts((prev) => prev.filter((toast) => toast.id !== id));
+      }, CHAT_TOAST_MS);
+      toastTimersRef.current.push(timer);
+    });
+    return () => {
+      unsub();
+      for (const timer of toastTimersRef.current) window.clearTimeout(timer);
+      toastTimersRef.current = [];
+    };
+  }, [collab, email]);
 
   const viewRows: { id: EditorTab; label: string; icon: typeof Code }[] = [
     { id: "code", label: t("editor:code"), icon: Code },
@@ -275,13 +356,6 @@ export default function EditorPage() {
     { id: "logs", label: t("editor:logs"), icon: Terminal },
     { id: "chat", label: t("editor:chat"), icon: MessageSquare },
   ];
-
-  const selectView = (tab: EditorTab) => {
-    setActiveTab(tab);
-    if (window.matchMedia("(max-width: 767px)").matches) {
-      setSidebarOpen(false);
-    }
-  };
 
   const treeFiles = files.map((f) => ({
     path: f.path,
@@ -435,6 +509,14 @@ export default function EditorPage() {
         ) : null}
 
         {sidebar}
+
+        <ChatToastStack
+          toasts={chatToasts}
+          onOpen={() => {
+            setChatToasts([]);
+            selectView("chat");
+          }}
+        />
 
         <div className="flex-1 flex flex-col min-w-0 min-h-0 bg-base-100">
           {currentFile ? (
