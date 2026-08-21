@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="frontend/public/logo.png" width="128" height="128" alt="Superfolha" />
+</p>
+
 # Superfolha
 
 A complete web-based LaTeX editor with Git version control, real-time compilation, and collaborative features.

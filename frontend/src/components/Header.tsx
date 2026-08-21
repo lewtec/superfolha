@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { BrandMark } from "./Brand";
 import UserMenu from "./UserMenu";
 
 export default function Header() {
@@ -11,9 +12,11 @@ export default function Header() {
         <div className="navbar-start">
           <Link
             to="/"
-            className="btn btn-ghost text-lg font-semibold tracking-tight normal-case min-h-[var(--touch-min)]"
+            aria-label="Superfolha"
+            className="btn btn-ghost gap-2 text-lg font-semibold tracking-tight normal-case min-h-[var(--touch-min)]"
           >
-            Superfolha
+            <BrandMark className="h-8 w-8 shrink-0" />
+            <span className="hidden sm:inline">Superfolha</span>
           </Link>
         </div>
         <div className="navbar-end gap-1 items-center">

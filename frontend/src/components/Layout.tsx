@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { BrandMark } from "./Brand";
 import UserMenu from "./UserMenu";
 import { useAuthStatus } from "../hooks/useAuthStatus";
 
@@ -29,9 +30,11 @@ export default function Layout({
           {navStart}
           <Link
             to={brandTo}
-            className="btn btn-ghost text-base sm:text-lg font-semibold tracking-tight normal-case min-h-[var(--touch-min)] px-2"
+            aria-label={t("app_name")}
+            className="btn btn-ghost gap-2 text-base sm:text-lg font-semibold tracking-tight normal-case min-h-[var(--touch-min)] px-2"
           >
-            {t("app_name")}
+            <BrandMark className="h-8 w-8 shrink-0" />
+            <span className="hidden sm:inline">{t("app_name")}</span>
           </Link>
         </div>
         {navCenter ? <div className="navbar-center">{navCenter}</div> : null}
