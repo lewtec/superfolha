@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import AnimatedSection from "../components/AnimatedSection";
+import { BrandMark } from "../components/Brand";
 
 const Landing: React.FC = () => {
   const { t } = useTranslation("landing");
@@ -17,6 +18,7 @@ const Landing: React.FC = () => {
       <section className="hero min-h-[calc(100dvh-var(--shell-height))] flex-1 bg-base-200">
         <div className="hero-content text-center">
           <div className="max-w-md">
+            <BrandMark className="mx-auto mb-6 h-24 w-24" alt="" />
             <h2 className="text-5xl font-bold">{t("landing_title")}</h2>
             <p className="py-6">{t("landing_subtitle")}</p>
             <Link to="/register" className="btn btn-primary">

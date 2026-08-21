@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { BrandMark } from "../components/Brand";
 import { useLoginMutation } from "../hooks/useLoginMutation";
 import { translateError, translateGraphQLErrors } from "../i18n/translateError";
 
@@ -39,8 +40,13 @@ export default function Login() {
   return (
     <div className="page-fill min-h-dvh flex items-center justify-center bg-base-200">
       <div className="card w-96 bg-base-100 shadow-xl">
+        <figure className="pt-8">
+          <Link to="/" aria-label="Superfolha">
+            <BrandMark className="h-16 w-16" />
+          </Link>
+        </figure>
         <div className="card-body">
-          <h2 className="card-title text-2xl font-bold text-center">
+          <h2 className="card-title text-2xl font-bold justify-center">
             Superfolha
           </h2>
           <p className="text-center text-base-content/70 mb-4">
