@@ -139,6 +139,10 @@ function boot() {
   if (!root) return;
   const projectId = root.dataset.projectId ?? "";
   const email = root.dataset.email ?? "";
+  const compileBase = root.dataset.compile ?? "";
+  const uploadURL = root.dataset.upload ?? "";
+  const downloadPrefix = root.dataset.downloadPrefix ?? "";
+  const wsPath = root.dataset.ws ?? "";
   let msgs: Record<string, string> = {};
   try {
     msgs = JSON.parse(root.dataset.i18n || "{}") as Record<string, string>;
@@ -166,7 +170,7 @@ function boot() {
   let view: EditorView | null = null;
   const expanded = new Set<string>();
 
-  const collab = new ProjectCollab(projectId, email);
+  const collab = new ProjectCollab(projectId, email, wsPath);
   collab.connect();
 
   workspace.innerHTML = `
@@ -285,7 +289,7 @@ function boot() {
     const ytext = collab.getYText(currentPath);
     const body = ytext.toString();
     if (isBinaryContent(body, currentPath) || (file && file.size > 0 && body === "")) {
-      const url = `/api/projects/${projectId}/download/${encodeURIComponent(currentPath)}`;
+      const url = downloadPrefix + encodeURIComponent(currentPath);
       codeHost.innerHTML = `<div class="flex flex-col items-center justify-center h-full p-4">
         <p class="text-lg font-semibold mb-2">${escapeHtml(currentPath)}</p>
         <p class="text-sm text-base-content/70 mb-4">${escapeHtml(t(msgs, "editor.binary_file"))}</p>
@@ -351,7 +355,11 @@ function boot() {
     paintAll();
     try {
       const res = await fetch(
-        `/api/compile?project=${encodeURIComponent(projectId)}&file=${encodeURIComponent(currentPath)}`,
+        (() => {
+          const u = new URL(compileBase, window.location.origin);
+          u.searchParams.set("file", currentPath);
+          return u.pathname + u.search;
+        })(),
         { credentials: "same-origin" },
       );
       const data = await res.json().catch(() => ({}));
@@ -428,7 +436,7 @@ function boot() {
     const form = new FormData();
     form.append("file", file);
     try {
-      const res = await fetch(`/api/projects/${projectId}/upload-file`, {
+      const res = await fetch(uploadURL, {
         method: "POST",
         body: form,
         credentials: "same-origin",

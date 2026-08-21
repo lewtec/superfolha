@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/lewtec/superfolha/internal/appenv"
+	"github.com/lewtec/superfolha/internal/paths"
 	"github.com/lewtec/superfolha/internal/project"
 	"github.com/lewtec/superfolha/internal/session"
 )
@@ -62,7 +63,7 @@ func (s *Server) handleProjectWS(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "collaboration unavailable", http.StatusServiceUnavailable)
 		return
 	}
-	projectID := r.PathValue("projectId")
+	projectID := r.PathValue(paths.ParamID)
 	if projectID == "" {
 		http.Error(w, "missing project id", http.StatusBadRequest)
 		return

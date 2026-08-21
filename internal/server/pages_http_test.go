@@ -9,6 +9,7 @@ import (
 
 	"github.com/lewtec/superfolha/internal/auth"
 	"github.com/lewtec/superfolha/internal/db/sqlite"
+	"github.com/lewtec/superfolha/internal/paths"
 	"github.com/lewtec/superfolha/internal/project"
 )
 
@@ -26,7 +27,7 @@ func testServer(t *testing.T) *Server {
 func TestLandingOK(t *testing.T) {
 	t.Parallel()
 	srv := testServer(t)
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, paths.Landing, nil)
 	rec := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(rec, req)
 	res := rec.Result()
@@ -43,7 +44,7 @@ func TestLandingOK(t *testing.T) {
 func TestProjectsRedirectsAnonymous(t *testing.T) {
 	t.Parallel()
 	srv := testServer(t)
-	req := httptest.NewRequest(http.MethodGet, "/projects", nil)
+	req := httptest.NewRequest(http.MethodGet, paths.Projects(), nil)
 	rec := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(rec, req)
 	res := rec.Result()
@@ -52,7 +53,7 @@ func TestProjectsRedirectsAnonymous(t *testing.T) {
 		t.Fatalf("GET /projects = %d; want 303", res.StatusCode)
 	}
 	loc := res.Header.Get("Location")
-	if !strings.HasPrefix(loc, "/login") {
+	if !strings.HasPrefix(loc, paths.Login()) {
 		t.Fatalf("Location = %q", loc)
 	}
 }

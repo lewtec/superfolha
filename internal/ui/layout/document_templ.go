@@ -8,6 +8,8 @@ package layout
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
+import "github.com/lewtec/superfolha/internal/paths"
+
 func Document(c Chrome) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -36,7 +38,7 @@ func Document(c Chrome) templ.Component {
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.ResolveAttributeValue(c.Lang)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layout/document.templ`, Line: 5, Col: 20}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layout/document.templ`, Line: 7, Col: 20}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var2)
 		if templ_7745c5c3_Err != nil {
@@ -54,7 +56,7 @@ func Document(c Chrome) templ.Component {
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(c.Title)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layout/document.templ`, Line: 10, Col: 20}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layout/document.templ`, Line: 12, Col: 20}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
@@ -70,7 +72,33 @@ func Document(c Chrome) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<link rel=\"icon\" href=\"/static/brand/favicon.png\" type=\"image/png\"><script>\n\t\t\t\t(function () {\n\t\t\t\t\tvar KEY = \"theme\";\n\t\t\t\t\tfunction pref() {\n\t\t\t\t\t\tvar raw = localStorage.getItem(KEY);\n\t\t\t\t\t\tif (raw === \"light\" || raw === \"dark\") return raw;\n\t\t\t\t\t\tif (raw === \"superfolha-dark\" || raw === \"dark\") return \"dark\";\n\t\t\t\t\t\tif (raw === \"superfolha\" || raw === \"light\") return \"light\";\n\t\t\t\t\t\treturn \"system\";\n\t\t\t\t\t}\n\t\t\t\t\tfunction resolve(p) {\n\t\t\t\t\t\tif (p === \"dark\") return \"superfolha-dark\";\n\t\t\t\t\t\tif (p === \"light\") return \"superfolha\";\n\t\t\t\t\t\treturn window.matchMedia(\"(prefers-color-scheme: dark)\").matches\n\t\t\t\t\t\t\t? \"superfolha-dark\"\n\t\t\t\t\t\t\t: \"superfolha\";\n\t\t\t\t\t}\n\t\t\t\t\tfunction apply(name) {\n\t\t\t\t\t\tdocument.documentElement.setAttribute(\"data-theme\", name);\n\t\t\t\t\t}\n\t\t\t\t\twindow.__sfTheme = {\n\t\t\t\t\t\tresolve: function () { return resolve(pref()); },\n\t\t\t\t\t\ttoggle: function () {\n\t\t\t\t\t\t\tvar dark = resolve(pref()) === \"superfolha-dark\";\n\t\t\t\t\t\t\tvar next = dark ? \"light\" : \"dark\";\n\t\t\t\t\t\t\tlocalStorage.setItem(KEY, next);\n\t\t\t\t\t\t\tapply(resolve(next));\n\t\t\t\t\t\t\treturn next;\n\t\t\t\t\t\t},\n\t\t\t\t\t\tapply: apply\n\t\t\t\t\t};\n\t\t\t\t\tapply(resolve(pref()));\n\t\t\t\t})();\n\t\t\t</script><link href=\"/static/style.css\" rel=\"stylesheet\" type=\"text/css\"></head>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<link rel=\"icon\" href=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var4 templ.SafeURL
+		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinURLErrs(paths.Favicon())
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layout/document.templ`, Line: 16, Col: 42}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\" type=\"image/png\"><script>\n\t\t\t\t(function () {\n\t\t\t\t\tvar KEY = \"theme\";\n\t\t\t\t\tfunction pref() {\n\t\t\t\t\t\tvar raw = localStorage.getItem(KEY);\n\t\t\t\t\t\tif (raw === \"light\" || raw === \"dark\") return raw;\n\t\t\t\t\t\tif (raw === \"superfolha-dark\" || raw === \"dark\") return \"dark\";\n\t\t\t\t\t\tif (raw === \"superfolha\" || raw === \"light\") return \"light\";\n\t\t\t\t\t\treturn \"system\";\n\t\t\t\t\t}\n\t\t\t\t\tfunction resolve(p) {\n\t\t\t\t\t\tif (p === \"dark\") return \"superfolha-dark\";\n\t\t\t\t\t\tif (p === \"light\") return \"superfolha\";\n\t\t\t\t\t\treturn window.matchMedia(\"(prefers-color-scheme: dark)\").matches\n\t\t\t\t\t\t\t? \"superfolha-dark\"\n\t\t\t\t\t\t\t: \"superfolha\";\n\t\t\t\t\t}\n\t\t\t\t\tfunction apply(name) {\n\t\t\t\t\t\tdocument.documentElement.setAttribute(\"data-theme\", name);\n\t\t\t\t\t}\n\t\t\t\t\twindow.__sfTheme = {\n\t\t\t\t\t\tresolve: function () { return resolve(pref()); },\n\t\t\t\t\t\ttoggle: function () {\n\t\t\t\t\t\t\tvar dark = resolve(pref()) === \"superfolha-dark\";\n\t\t\t\t\t\t\tvar next = dark ? \"light\" : \"dark\";\n\t\t\t\t\t\t\tlocalStorage.setItem(KEY, next);\n\t\t\t\t\t\t\tapply(resolve(next));\n\t\t\t\t\t\t\treturn next;\n\t\t\t\t\t\t},\n\t\t\t\t\t\tapply: apply\n\t\t\t\t\t};\n\t\t\t\t\tapply(resolve(pref()));\n\t\t\t\t})();\n\t\t\t</script><link href=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var5 templ.SafeURL
+		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinURLErrs(paths.StyleCSS())
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layout/document.templ`, Line: 51, Col: 32}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\" rel=\"stylesheet\" type=\"text/css\"></head>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -78,7 +106,7 @@ func Document(c Chrome) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

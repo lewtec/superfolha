@@ -64,7 +64,7 @@ func (s *Server) handleProjectsPost(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleProjectDelete(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
+	id := r.PathValue(paths.ParamID)
 	project, projectPath, _, err := s.resolver.getAndCheckProject(r.Context(), id)
 	if err != nil {
 		http.Redirect(w, r, paths.ProjectsError(errorID(err)), http.StatusSeeOther)
@@ -85,7 +85,7 @@ func (s *Server) handleProjectDelete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleEditorGet(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
+	id := r.PathValue(paths.ParamID)
 	project, _, user, err := s.resolver.getAndCheckProject(r.Context(), id)
 	if err != nil {
 		if coded, ok := apierrors.As(err); ok && coded.Code == apierrors.CodeUnauthenticated {

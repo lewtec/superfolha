@@ -1,5 +1,7 @@
 package layout
 
+import "github.com/lewtec/superfolha/internal/paths"
+
 templ Document(c Chrome) {
 	<!DOCTYPE html>
 	<html lang={ c.Lang } data-theme="superfolha">
@@ -11,7 +13,7 @@ templ Document(c Chrome) {
 			} else {
 				<title>Superfolha</title>
 			}
-			<link rel="icon" href="/static/brand/favicon.png" type="image/png"/>
+			<link rel="icon" href={ paths.Favicon() } type="image/png"/>
 			<script>
 				(function () {
 					var KEY = "theme";
@@ -46,7 +48,7 @@ templ Document(c Chrome) {
 					apply(resolve(pref()));
 				})();
 			</script>
-			<link href="/static/style.css" rel="stylesheet" type="text/css"/>
+			<link href={ paths.StyleCSS() } rel="stylesheet" type="text/css"/>
 		</head>
 		{ children... }
 	</html>

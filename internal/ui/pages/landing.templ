@@ -10,7 +10,7 @@ templ Landing(c layout.Chrome) {
 		<section class="hero min-h-[calc(100dvh-var(--shell-height))] bg-base-200">
 			<div class="hero-content text-center">
 				<div class="max-w-md">
-					<img src="/static/brand/logo.png" alt="" width="96" height="96" class="mx-auto mb-6 h-24 w-24"/>
+					<img src={ paths.BrandLogo() } alt="" width="96" height="96" class="mx-auto mb-6 h-24 w-24"/>
 					<h1 class="text-5xl font-bold">{ c.T("landing.landing_title") }</h1>
 					<p class="py-6">{ c.T("landing.landing_subtitle") }</p>
 					<a href={ paths.Register() } class="btn btn-primary">{ c.T("landing.landing_cta") }</a>

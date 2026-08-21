@@ -64,12 +64,14 @@ export class ProjectCollab {
   private chatListeners = new Set<ChatListener>();
   private destroyed = false;
   private email: string;
+  private wsPath: string;
   /** After hello.ack we must send SyncStep1 so the server returns SyncStep2 with full state. */
   private fencePassed = false;
 
-  constructor(projectId: string, email: string) {
+  constructor(projectId: string, email: string, wsPath: string) {
     this.projectId = projectId;
     this.email = email || "user";
+    this.wsPath = wsPath;
     this.awareness = new awarenessProtocol.Awareness(this.ydoc);
     const color = pickColor(this.email);
     this.awareness.setLocalStateField("user", {
@@ -110,7 +112,7 @@ export class ProjectCollab {
   connect() {
     if (this.destroyed) return;
     const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const url = `${proto}//${window.location.host}/ws/projects/${this.projectId}`;
+    const url = `${proto}//${window.location.host}${this.wsPath}`;
     this.setStatus("connecting");
     const ws = new WebSocket(url);
     ws.binaryType = "arraybuffer";
