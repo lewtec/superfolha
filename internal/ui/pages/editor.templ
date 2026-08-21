@@ -1,0 +1,44 @@
+package pages
+
+import (
+	"github.com/lewtec/superfolha/internal/paths"
+	"github.com/lewtec/superfolha/internal/ui/layout"
+)
+
+templ Editor(c layout.Chrome, projectID, projectName, email, i18nJSON string) {
+	@layout.EditorShell(c) {
+		<div
+			id="editor-root"
+			class="flex h-dvh min-h-0 flex-col"
+			data-project-id={ projectID }
+			data-project-name={ projectName }
+			data-email={ email }
+			data-projects-url={ paths.Projects() }
+			data-i18n={ i18nJSON }
+		>
+			<header class="navbar app-navbar border-b border-base-300 bg-base-100 px-1 sm:px-3 gap-1 shrink-0">
+				<div class="navbar-start gap-1 min-w-0">
+					<button type="button" id="editor-toggle-sidebar" class="btn btn-ghost btn-square min-h-[var(--touch-min)] min-w-[var(--touch-min)]" aria-label={ c.T("editor.open_sidebar") }></button>
+					<a href={ paths.Projects() } class="btn btn-ghost gap-2 min-h-[var(--touch-min)] px-2" aria-label={ c.T("common.app_name") }>
+						@layout.BrandMark()
+						<span class="hidden sm:inline font-semibold">{ c.T("common.app_name") }</span>
+					</a>
+					<span class="hidden md:inline truncate text-sm text-base-content/70">{ projectName }</span>
+				</div>
+				<div class="navbar-end gap-1 items-center shrink-0">
+					<span id="editor-status" class="badge badge-soft badge-warning whitespace-nowrap">{ c.T("editor.status_connecting") }</span>
+					<button type="button" id="editor-commit" class="btn btn-ghost btn-sm hidden sm:inline-flex">{ c.T("editor.commit_now") }</button>
+					<button type="button" id="editor-compile" class="btn btn-primary btn-sm min-h-[var(--touch-min)]">{ c.T("editor.compile") }</button>
+					<button type="button" id="editor-chat-toggle" class="btn btn-ghost btn-square min-h-[var(--touch-min)]" aria-label={ c.T("editor.chat") } title={ c.T("editor.chat") }></button>
+					@layout.LangSelect(c, paths.Editor(projectID))
+					@layout.ThemeToggle(c)
+					<form method="post" action={ paths.Logout() }>
+						<button class="btn btn-ghost btn-sm" type="submit">{ c.T("common.leave") }</button>
+					</form>
+				</div>
+			</header>
+			<div id="editor-workspace" class="editor-workspace relative flex min-h-0 flex-1 overflow-hidden"></div>
+		</div>
+		<script src="/static/editor.js" type="module"></script>
+	}
+}

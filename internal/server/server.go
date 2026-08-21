@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -11,17 +10,16 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/99designs/gqlgen/graphql"
-	"github.com/99designs/gqlgen/graphql/handler"
-	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/lewtec/superfolha/internal/apierrors"
-	"github.com/lewtec/superfolha/internal/appenv"
 	"github.com/lewtec/superfolha/internal/auth"
 	"github.com/lewtec/superfolha/internal/compiler"
 	"github.com/lewtec/superfolha/internal/db"
+	appi18n "github.com/lewtec/superfolha/internal/i18n"
+	"github.com/lewtec/superfolha/internal/paths"
 	"github.com/lewtec/superfolha/internal/project"
 	"github.com/lewtec/superfolha/internal/session"
-	"github.com/vektah/gqlparser/v2/gqlerror"
+	"github.com/lewtec/superfolha/internal/web"
+	goi18n "github.com/nicksnyder/go-i18n/v2/i18n"
 )
 
 type Server struct {
@@ -31,6 +29,7 @@ type Server struct {
 	projectService *project.Service
 	authService    *auth.Service
 	hubs           *session.Registry
+	bundle         *goi18n.Bundle
 }
 
 func NewServer(repo db.Repository, stateDir string, projectService *project.Service, authService *auth.Service) *Server {
@@ -42,6 +41,7 @@ func NewServer(repo db.Repository, stateDir string, projectService *project.Serv
 		projectService: projectService,
 		authService:    authService,
 		hubs:           hubs,
+		bundle:         appi18n.NewBundle(),
 	}
 }
 
@@ -52,55 +52,34 @@ func (s *Server) CloseHubs() {
 	}
 }
 
-// contextKey is a type for context keys to avoid collisions.
-type contextKey string
-
-// ResponseWriterContextKey is the key to store http.ResponseWriter in context.
-const ResponseWriterContextKey contextKey = "responseWriter"
-
 // maxUploadBytes is the multipart form size limit for handleUploadFile (32 MiB).
 const maxUploadBytes = 32 << 20
-
-// ResponseWriterMiddleware adds the http.ResponseWriter to the request context.
-func ResponseWriterMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := context.WithValue(r.Context(), ResponseWriterContextKey, w)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
-}
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 
-	// GraphQL endpoint
-	srv := handler.NewDefaultServer(NewExecutableSchema(Config{Resolvers: s.resolver}))
-	srv.SetErrorPresenter(codedErrorPresenter)
-	mux.Handle("/api/graphql", ResponseWriterMiddleware(auth.Middleware(srv)))
+	mux.Handle(paths.PatternStatic, http.StripPrefix("/", http.FileServer(http.FS(web.StaticFS))))
 
-	// GraphQL Playground — debug surface; only register in development
-	if appenv.IsDevelopment() {
-		mux.Handle("/api/graphiql", playground.Handler("GraphQL playground", "/api/graphql"))
-	}
+	mux.HandleFunc(paths.PatternLanding, s.handleLanding)
+	mux.HandleFunc(paths.PatternLoginGet, s.handleLoginGet)
+	mux.HandleFunc(paths.PatternLoginPost, s.handleLoginPost)
+	mux.HandleFunc(paths.PatternRegisterGet, s.handleRegisterGet)
+	mux.HandleFunc(paths.PatternRegisterPost, s.handleRegisterPost)
+	mux.HandleFunc(paths.PatternLogout, s.handleLogoutPage)
+	mux.HandleFunc(paths.PatternLang, s.handleLang)
 
-	// Compile endpoint
-	mux.Handle("/api/compile", auth.Middleware(http.HandlerFunc(s.handleCompile)))
+	mux.HandleFunc(paths.PatternProjectsGet, s.requirePageUser(s.handleProjectsGet))
+	mux.HandleFunc(paths.PatternProjectsPost, s.requirePageUser(s.handleProjectsPost))
+	mux.HandleFunc(paths.PatternProjectDelete, s.requirePageUser(s.handleProjectDelete))
+	mux.HandleFunc(paths.PatternEditorGet, s.requirePageUser(s.handleEditorGet))
 
-	// Live collaboration WebSocket (session fence + Yjs binary sync)
-	mux.Handle("GET /ws/projects/{projectId}", auth.Middleware(http.HandlerFunc(s.handleProjectWS)))
+	mux.Handle(paths.PatternCompile, http.HandlerFunc(s.handleCompile))
+	mux.Handle(paths.PatternProjectWS, http.HandlerFunc(s.handleProjectWS))
+	mux.Handle(paths.PatternUpload, http.HandlerFunc(s.handleUploadFile))
+	mux.Handle(paths.PatternDownload, http.HandlerFunc(s.handleDownloadFile))
+	mux.HandleFunc(paths.PatternAPILogout, s.handleLogout)
 
-	// Upload file endpoint
-	mux.Handle("/api/projects/{projectId}/upload-file", auth.Middleware(http.HandlerFunc(s.handleUploadFile)))
-
-	// Download file endpoint
-	mux.Handle("/api/projects/{projectId}/download/{filePath...}", auth.Middleware(http.HandlerFunc(s.handleDownloadFile)))
-
-	// Logout clears the HttpOnly session cookie (must be done server-side).
-	mux.HandleFunc("POST /api/logout", s.handleLogout)
-
-	// Serve Web App
-	mux.Handle("/", GetWebApp())
-
-	return mux
+	return auth.Middleware(mux)
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
@@ -371,25 +350,6 @@ func (s *Server) handleDownloadFile(w http.ResponseWriter, r *http.Request) {
 		slog.Error("error writing file content to response", "file", filePath, "err", err)
 		// No need to set status code again, as headers might have been sent
 	}
-}
-
-func codedErrorPresenter(ctx context.Context, e error) *gqlerror.Error {
-	err := graphql.DefaultErrorPresenter(ctx, e)
-	if coded, ok := apierrors.As(e); ok {
-		if err.Extensions == nil {
-			err.Extensions = map[string]any{}
-		}
-		err.Extensions["code"] = string(coded.Code)
-		err.Message = coded.Message
-		return err
-	}
-	if err.Extensions == nil {
-		err.Extensions = map[string]any{}
-	}
-	if _, has := err.Extensions["code"]; !has {
-		err.Extensions["code"] = string(apierrors.CodeUnknown)
-	}
-	return err
 }
 
 func writeAPIError(w http.ResponseWriter, err error) {

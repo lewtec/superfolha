@@ -13,8 +13,7 @@ tinytex = "2026.02"
 JWT_SECRET = "paçoca"
 
 [tasks."install:frontend"]
-description = "Install frontend dependencies"
-dir = "frontend"
+description = "Install CSS/editor JS dependencies"
 run = "bun install"
 
 [tasks."install:backend"]
@@ -25,19 +24,21 @@ run = "go get ./..."
 description = "Install all dependencies"
 depends = ["install:*"]
 
+[tasks.codegen]
+description = "bun CSS + editor island + templ generate"
+run = "go generate ./..."
+
 [tasks."build:frontend"]
-description = "Build frontend for production"
-# fmt first: do not race prettier rewriting sources while vite reads them.
-depends = ["fmt"]
-wait_for = ["fmt"]
-dir = "frontend"
-run = "bun run build"
+description = "Build CSS and editor island"
+depends = ["codegen"]
+wait_for = ["codegen"]
+run = "true"
 
 [tasks."build:backend"]
-description = "Build backend binary (embeds frontend via -tags release)"
-depends = ["build:frontend"]
-wait_for = ["build:frontend"]
-run = "go build -tags release -o superfolha ./cmd/superfolha"
+description = "Build backend binary (embeds templ CSS + editor.js)"
+depends = ["codegen"]
+wait_for = ["codegen"]
+run = "go build -o superfolha ./cmd/superfolha"
 
 [tasks.build]
 description = "Build complete application"
@@ -47,15 +48,11 @@ run = "echo 'Build complete! Binary: ./superfolha'"
 [tasks."gen:sqlc"]
 run = "sqlc generate"
 
-[tasks."gen:relay"]
-dir = "frontend"
-run = "bun relay"
-
-[tasks."gen:graphql"]
-run = "go run github.com/99designs/gqlgen generate"
+[tasks."gen:templ"]
+run = "go tool templ generate"
 
 [tasks.gen]
-depends = ["gen:*"]
+depends = ["codegen", "gen:sqlc"]
 
 [tasks.docker]
 description = "Build production Docker image from source (multi-stage Dockerfile.build)"
@@ -86,25 +83,12 @@ git push origin "refs/tags/$TAG"
 goreleaser release --clean
 '''
 
-[tasks."fmt:frontend"]
-dir = "frontend"
-run = "bun run format"
-
 [tasks."fmt:backend"]
 run = "go fmt ./..."
 
 [tasks.fmt]
 description = "Format code"
-depends = ["fmt:*"]
-
-# Leaf linters depend on fmt (not on sibling lint:*). mise wait_for only delays
-# *this* task's run — sibling depends still start in parallel, so never put
-# fmt and lint:frontend in the same depends list.
-[tasks."lint:frontend"]
-depends = ["fmt"]
-wait_for = ["fmt"]
-dir = "frontend"
-run = "bun run lint"
+depends = ["fmt:backend"]
 
 [tasks."lint:backend"]
 depends = ["fmt"]
@@ -112,9 +96,9 @@ wait_for = ["fmt"]
 run = "go vet ./..."
 
 [tasks.lint]
-description = "Lint frontend + backend after fmt"
-depends = ["lint:frontend", "lint:backend"]
-wait_for = ["lint:frontend", "lint:backend"]
+description = "Lint after fmt"
+depends = ["lint:backend"]
+wait_for = ["lint:backend"]
 
 [tasks.test]
 description = "Run tests after fmt (no gofmt rewrite mid-test)"
@@ -123,26 +107,16 @@ wait_for = ["fmt"]
 run = "go test ./..."
 
 [tasks.ci]
-description = "fmt once → then lint, test, SPA build (GoReleaser before hook)"
-# Each child waits for fmt; mise dedupes fmt. Then lint:*, test, build:frontend
-# may run in parallel (safe: different tools / outputs).
-depends = ["lint", "test", "build:frontend"]
-wait_for = ["lint", "test", "build:frontend"]
+description = "fmt once → then lint, test, codegen (GoReleaser before hook)"
+depends = ["lint", "test", "codegen"]
+wait_for = ["lint", "test", "codegen"]
 
-# Bundles the SPA into the binary (-tags release) and serves it from Go.
-# Data (SQLite + Git repos) lives under gitignored ./data.
 [tasks.start]
-description = "Build SPA, run server with embedded UI (./data)"
-depends = ["build:frontend"]
-wait_for = ["build:frontend"]
+description = "Codegen + run server (./data)"
+depends = ["codegen"]
+wait_for = ["codegen"]
 env = { GO_ENV = "development" }
-run = "mkdir -p data && go run -tags release ./cmd/superfolha --state-dir=./data"
-
-# Optional: Vite HMR only (Go without -tags release proxies to 127.0.0.1:5174).
-[tasks."start:vite"]
-description = "Vite dev server alone (use with go run without -tags release)"
-dir = "frontend"
-run = "bun run dev"
+run = "mkdir -p data && go run ./cmd/superfolha --state-dir=./data"
 
 [tasks."devdb:up"]
 description = "Start disposable Postgres 18 (uuidv7()) for dual-backend local testing"

@@ -1,0 +1,44 @@
+package pages
+
+import (
+	"github.com/lewtec/superfolha/internal/paths"
+	"github.com/lewtec/superfolha/internal/ui/layout"
+)
+
+templ Register(c layout.Chrome) {
+	@layout.AuthShell(c) {
+		<div class="min-h-[calc(100dvh-var(--shell-height))] flex items-center justify-center px-4 py-10">
+			<div class="card w-full max-w-md bg-base-100 shadow-xl">
+				<figure class="pt-8">
+					<a href={ paths.Landing } aria-label="Superfolha">
+						<img src="/static/brand/logo.png" alt="" width="64" height="64" class="h-16 w-16"/>
+					</a>
+				</figure>
+				<div class="card-body">
+					<h1 class="card-title text-2xl font-bold justify-center">Superfolha</h1>
+					<p class="text-center text-base-content/70 mb-4">{ c.T("auth.register_title") }</p>
+					<form method="post" action={ paths.Register() } class="space-y-4">
+						<label class="form-control w-full">
+							<span class="label-text">{ c.T("auth.email_label") }</span>
+							<input class="input input-bordered w-full" type="email" name="email" required autocomplete="username"/>
+						</label>
+						<label class="form-control w-full">
+							<span class="label-text">{ c.T("auth.password_label") }</span>
+							<input class="input input-bordered w-full" type="password" name="password" required autocomplete="new-password" minlength="8"/>
+						</label>
+						<label class="form-control w-full">
+							<span class="label-text">{ c.T("auth.confirm_password_label") }</span>
+							<input class="input input-bordered w-full" type="password" name="confirm" required autocomplete="new-password" minlength="8"/>
+						</label>
+						<button class="btn btn-primary w-full" type="submit">{ c.T("auth.register_button") }</button>
+					</form>
+					<div class="divider">{ c.T("common.or") }</div>
+					<p class="text-center">
+						{ c.T("auth.already_have_account") }
+						<a href={ paths.Login() } class="link link-primary">{ c.T("auth.login_button") }</a>
+					</p>
+				</div>
+			</div>
+		</div>
+	}
+}
