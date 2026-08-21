@@ -79,7 +79,24 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle(paths.PatternDownload, http.HandlerFunc(s.handleDownloadFile))
 	mux.HandleFunc(paths.PatternAPILogout, s.handleLogout)
 
-	return auth.Middleware(mux)
+	return auth.Middleware(s.dropGhostUsers(mux))
+}
+
+// dropGhostUsers treats a valid JWT for a missing user as anonymous and
+// clears the cookie (fresh state-dir after a leftover authToken).
+func (s *Server) dropGhostUsers(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		u, ok := auth.GetUserFromContext(r.Context())
+		if !ok {
+			next.ServeHTTP(w, r)
+			return
+		}
+		if _, err := s.repo.GetUserByID(r.Context(), u.UserID); err != nil {
+			auth.ClearAuthCookie(w)
+			r = r.WithContext(auth.ContextWithoutUser(r.Context()))
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {

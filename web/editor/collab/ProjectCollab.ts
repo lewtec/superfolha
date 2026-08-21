@@ -105,6 +105,13 @@ export class ProjectCollab {
     this.notify();
   }
 
+  /** Drop a failed mutation so the badge can recover on a valid file. */
+  clearError() {
+    if (this.status !== "error") return;
+    this.errorMessage = "";
+    this.setStatus(this.initialSynced ? "synced" : "syncing");
+  }
+
   getYText(path: string): Y.Text {
     return this.ydoc.getText(textKey(path));
   }

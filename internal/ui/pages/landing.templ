@@ -13,7 +13,11 @@ templ Landing(c layout.Chrome) {
 					<img src={ paths.BrandLogo() } alt="" width="96" height="96" class="mx-auto mb-6 h-24 w-24"/>
 					<h1 class="text-5xl font-bold">{ c.T("landing.landing_title") }</h1>
 					<p class="py-6">{ c.T("landing.landing_subtitle") }</p>
-					<a href={ paths.Register() } class="btn btn-primary">{ c.T("landing.landing_cta") }</a>
+					if c.LoggedIn {
+						<a href={ paths.Projects() } class="btn btn-primary">{ c.T("common.my_projects") }</a>
+					} else {
+						<a href={ paths.Register() } class="btn btn-primary">{ c.T("landing.landing_cta") }</a>
+					}
 				</div>
 			</div>
 		</section>
@@ -68,7 +72,11 @@ templ Landing(c layout.Chrome) {
 		<section class="container mx-auto px-4 py-20 text-center">
 			<h2 class="text-4xl font-bold mb-4">{ c.T("landing.final_cta_title") }</h2>
 			<p class="text-xl mb-8">{ c.T("landing.final_cta_subtitle") }</p>
-			<a href={ paths.Register() } class="btn btn-primary">{ c.T("landing.final_cta_button") }</a>
+			if c.LoggedIn {
+				<a href={ paths.Projects() } class="btn btn-primary">{ c.T("common.my_projects") }</a>
+			} else {
+				<a href={ paths.Register() } class="btn btn-primary">{ c.T("landing.final_cta_button") }</a>
+			}
 		</section>
 		<footer class="bg-base-300 text-base-content">
 			<div class="container mx-auto px-4 py-6 text-center">
