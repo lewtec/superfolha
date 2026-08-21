@@ -85,6 +85,7 @@
   "projects.name_placeholder": "Mi documento LaTeX",
   "projects.name_required": "El nombre del proyecto es obligatorio",
   "projects.delete_confirm": "¿Seguro que quieres eliminar este proyecto?",
+  "projects.deleted": "Proyecto eliminado.",
   "projects.create_failed": "No se pudo crear el proyecto",
   "projects.delete_failed": "No se pudo eliminar el proyecto",
   "landing.landing_title": "El Futuro de la Edición LaTeX es Colaborativo",

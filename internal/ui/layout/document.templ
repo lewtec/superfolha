@@ -48,6 +48,14 @@ templ Document(c Chrome) {
 					apply(resolve(pref()));
 				})();
 			</script>
+			<script>
+				(function () {
+					var q = location.search;
+					if (q && (q.indexOf("error=") !== -1 || q.indexOf("flash=") !== -1)) {
+						history.replaceState(null, "", location.pathname);
+					}
+				})();
+			</script>
 			<link href={ paths.StyleCSS() } rel="stylesheet" type="text/css"/>
 		</head>
 		{ children... }

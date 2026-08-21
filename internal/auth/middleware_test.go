@@ -155,3 +155,10 @@ func TestGetUserFromContext_Empty(t *testing.T) {
 		t.Fatalf("expected empty context, got user=%v ok=%v", user, ok)
 	}
 }
+
+func TestGetUserFromContext_NilPointer(t *testing.T) {
+	ctx := ContextWithoutUser(httptest.NewRequest(http.MethodGet, "/", nil).Context())
+	if user, ok := GetUserFromContext(ctx); ok || user != nil {
+		t.Fatalf("nil user pointer must be anonymous, got user=%v ok=%v", user, ok)
+	}
+}

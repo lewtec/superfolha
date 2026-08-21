@@ -55,8 +55,16 @@ func Middleware(next http.Handler) http.Handler {
 	})
 }
 
-// GetUserFromContext extracts user info from context
+// GetUserFromContext extracts user info from context.
 func GetUserFromContext(ctx context.Context) (*UserContext, bool) {
 	user, ok := ctx.Value(UserContextKey).(*UserContext)
-	return user, ok
+	if !ok || user == nil {
+		return nil, false
+	}
+	return user, true
+}
+
+// ContextWithoutUser clears a previously injected user (ghost JWT after DB wipe).
+func ContextWithoutUser(ctx context.Context) context.Context {
+	return context.WithValue(ctx, UserContextKey, (*UserContext)(nil))
 }

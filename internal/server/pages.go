@@ -38,14 +38,22 @@ func (s *Server) chrome(r *http.Request, title string) layout.Chrome {
 		c.Email = u.Email
 	}
 	if c.Error != "" {
-		// Allow either a raw message or an errors.* / auth.* message id.
-		if translated := appi18n.T(loc, c.Error); translated != c.Error {
-			c.Error = translated
-		} else if translated := appi18n.T(loc, "errors."+c.Error); translated != "errors."+c.Error {
-			c.Error = translated
-		}
+		c.Error = localizeMessage(loc, c.Error)
+	}
+	if c.Flash != "" {
+		c.Flash = localizeMessage(loc, c.Flash)
 	}
 	return c
+}
+
+func localizeMessage(loc *i18n.Localizer, raw string) string {
+	if translated := appi18n.T(loc, raw); translated != raw {
+		return translated
+	}
+	if translated := appi18n.T(loc, "errors."+raw); translated != "errors."+raw {
+		return translated
+	}
+	return raw
 }
 
 func (s *Server) render(w http.ResponseWriter, r *http.Request, c templ.Component) {

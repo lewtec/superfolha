@@ -3,6 +3,7 @@ package server
 import (
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/lewtec/superfolha/internal/apierrors"
@@ -25,7 +26,7 @@ func (s *Server) handleProjectsGet(w http.ResponseWriter, r *http.Request) {
 	updated := make([]string, len(items))
 	for i, p := range items {
 		updated[i] = appi18n.TData(loc, "projects.updated", map[string]any{
-			"Date": p.UpdatedAt.Format("2006-01-02"),
+			"Date": formatProjectDate(p.UpdatedAt, s.lang(r)),
 		})
 	}
 	c := s.chrome(r, appi18n.T(loc, "projects.title"))
@@ -81,7 +82,16 @@ func (s *Server) handleProjectDelete(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, paths.ProjectsError("errors.INTERNAL"), http.StatusSeeOther)
 		return
 	}
-	http.Redirect(w, r, paths.ProjectsFlash("ok"), http.StatusSeeOther)
+	http.Redirect(w, r, paths.ProjectsFlash("projects.deleted"), http.StatusSeeOther)
+}
+
+func formatProjectDate(t time.Time, lang string) string {
+	switch lang {
+	case "pt", "es":
+		return t.Format("02/01/2006")
+	default:
+		return t.Format("Jan 2, 2006")
+	}
 }
 
 func (s *Server) handleEditorGet(w http.ResponseWriter, r *http.Request) {

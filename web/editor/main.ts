@@ -160,8 +160,10 @@ function boot() {
   toggleBtn.innerHTML = icon(ICO.menu);
   chatToggle.innerHTML = icon(ICO.chat);
 
+  const chatKey = `superfolha-chat-open:${projectId}`;
   let sidebarOpen = true;
-  let chatOpen = localStorage.getItem("superfolha-chat-open") === "1";
+  let chatOpen = localStorage.getItem(chatKey) === "1";
+  let pendingCreate: string | null = null;
   let tab: Tab = "code";
   let currentPath: string | null = null;
   let compiling = false;
@@ -312,6 +314,13 @@ function boot() {
   }
 
   function paintAll() {
+    if (pendingCreate && collab.files.some((f) => f.path === pendingCreate)) {
+      currentPath = pendingCreate;
+      pendingCreate = null;
+      showTab("code");
+    } else if (pendingCreate && collab.status === "error") {
+      pendingCreate = null;
+    }
     if (!currentPath && collab.files.length) {
       currentPath = collab.files[0]!.path;
     }
@@ -340,7 +349,7 @@ function boot() {
   commitBtn.addEventListener("click", () => collab.commitNow());
   chatToggle.addEventListener("click", () => {
     chatOpen = !chatOpen;
-    localStorage.setItem("superfolha-chat-open", chatOpen ? "1" : "0");
+    localStorage.setItem(chatKey, chatOpen ? "1" : "0");
     paintAll();
   });
   compileBtn.addEventListener("click", async () => {
@@ -397,6 +406,7 @@ function boot() {
     const fileBtn = el.closest("[data-file]") as HTMLElement | null;
     if (fileBtn?.dataset.file) {
       currentPath = fileBtn.dataset.file;
+      collab.clearError();
       showTab("code");
       paintAll();
       return;
@@ -418,9 +428,8 @@ function boot() {
     if (el.id === "sf-new" || el.closest("#sf-new")) {
       const name = prompt(t(msgs, "editor.enter_file_name"));
       if (name) {
+        pendingCreate = name;
         collab.createFile(name, "");
-        currentPath = name;
-        showTab("code");
       }
       return;
     }
@@ -465,7 +474,7 @@ function boot() {
   chatEl.addEventListener("click", (ev) => {
     if ((ev.target as HTMLElement).closest("#sf-chat-close")) {
       chatOpen = false;
-      localStorage.setItem("superfolha-chat-open", "0");
+      localStorage.setItem(chatKey, "0");
       paintAll();
     }
   });
