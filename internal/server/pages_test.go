@@ -1,18 +1,22 @@
 package server
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/lewtec/superfolha/internal/paths"
+)
 
 func TestSafeNext(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		in, want string
 	}{
-		{"", "/projects"},
-		{"/projects", "/projects"},
-		{"/editor/abc", "/editor/abc"},
-		{"https://evil.example/phish", "/projects"},
-		{"//evil.example", "/projects"},
-		{"/login?x=1", "/login?x=1"},
+		{"", paths.Projects()},
+		{paths.Projects(), paths.Projects()},
+		{paths.Editor("abc"), paths.Editor("abc")},
+		{"https://evil.example/phish", paths.Projects()},
+		{"//evil.example", paths.Projects()},
+		{paths.Login() + "?x=1", paths.Login() + "?x=1"},
 	}
 	for _, tt := range tests {
 		if got := safeNext(tt.in); got != tt.want {

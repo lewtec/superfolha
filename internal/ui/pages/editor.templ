@@ -14,6 +14,10 @@ templ Editor(c layout.Chrome, projectID, projectName, email, i18nJSON string) {
 			data-project-name={ projectName }
 			data-email={ email }
 			data-projects-url={ paths.Projects() }
+			data-compile={ paths.Compile(projectID, "") }
+			data-upload={ paths.Upload(projectID) }
+			data-download-prefix={ paths.Download(projectID, "") }
+			data-ws={ paths.ProjectWS(projectID) }
 			data-i18n={ i18nJSON }
 		>
 			<header class="navbar app-navbar border-b border-base-300 bg-base-100 px-1 sm:px-3 gap-1 shrink-0">
@@ -39,6 +43,6 @@ templ Editor(c layout.Chrome, projectID, projectName, email, i18nJSON string) {
 			</header>
 			<div id="editor-workspace" class="editor-workspace relative flex min-h-0 flex-1 overflow-hidden"></div>
 		</div>
-		<script src="/static/editor.js" type="module"></script>
+		<script src={ paths.EditorJS() } type="module"></script>
 	}
 }

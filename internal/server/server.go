@@ -156,7 +156,7 @@ func (s *Server) handleUploadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	projectIdStr := r.PathValue("projectId")
+	projectIdStr := r.PathValue(paths.ParamID)
 	if projectIdStr == "" {
 		writeAPIError(w, apierrors.New(apierrors.CodeInvalidInput, "missing project ID"))
 		return
@@ -262,7 +262,7 @@ func (s *Server) handleDownloadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	projectIdStr := r.PathValue("projectId")
+	projectIdStr := r.PathValue(paths.ParamID)
 	if projectIdStr == "" {
 		writeAPIError(w, apierrors.New(apierrors.CodeInvalidInput, "missing project ID"))
 		return
@@ -274,9 +274,8 @@ func (s *Server) handleDownloadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Route is /api/projects/{projectId}/download/{filePath...}; PathValue returns the
-	// wildcard segment (ServeMux unescapes path elements; same as projectId).
-	rawFilePath := r.PathValue("filePath")
+	// Wildcard filePath: ServeMux unescapes path elements (same as id).
+	rawFilePath := r.PathValue(paths.ParamFilePath)
 	if rawFilePath == "" {
 		writeAPIError(w, apierrors.New(apierrors.CodeInvalidInput, "missing file path"))
 		return

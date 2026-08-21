@@ -10,6 +10,11 @@ import (
 const (
 	Landing    = "/"
 	LangCookie = "lang"
+
+	// Mux path-value names. Pattern* strings interpolate these so PathValue
+	// and the ServeMux pattern cannot drift.
+	ParamID       = "id"
+	ParamFilePath = "filePath"
 )
 
 func withQuery(p string, q url.Values) string {
@@ -24,9 +29,11 @@ func Register() string { return "/register" }
 func Logout() string   { return "/logout" }
 func Lang() string     { return "/lang" }
 func Projects() string { return "/projects" }
+
 func Editor(id string) string {
 	return path.Join("/editor", id)
 }
+
 func ProjectDelete(id string) string {
 	return path.Join("/projects", id, "delete")
 }
@@ -54,6 +61,52 @@ func ProjectsFlash(flash string) string {
 	return withQuery(Projects(), url.Values{"flash": {flash}})
 }
 
+// --- Static (embedded /static) ---
+
+func Static(elem ...string) string {
+	parts := make([]string, 0, len(elem)+1)
+	parts = append(parts, "/static")
+	parts = append(parts, elem...)
+	return path.Join(parts...)
+}
+
+func StyleCSS() string  { return Static("style.css") }
+func EditorJS() string  { return Static("editor.js") }
+func BrandLogo() string { return Static("brand", "logo.png") }
+func Favicon() string   { return Static("brand", "favicon.png") }
+
+// --- JSON / WS APIs used by the editor island ---
+
+func APILogout() string { return "/api/logout" }
+
+func Compile(projectID, file string) string {
+	q := url.Values{}
+	if projectID != "" {
+		q.Set("project", projectID)
+	}
+	if file != "" {
+		q.Set("file", file)
+	}
+	return withQuery("/api/compile", q)
+}
+
+func Upload(id string) string {
+	return path.Join("/api/projects", id, "upload-file")
+}
+
+func Download(id, filePath string) string {
+	base := path.Join("/api/projects", id, "download")
+	if filePath == "" {
+		return base + "/"
+	}
+	return base + "/" + url.PathEscape(filePath)
+}
+
+func ProjectWS(id string) string {
+	return path.Join("/ws/projects", id)
+}
+
+// Mux patterns (method + path). Register only these.
 const (
 	PatternLanding       = "GET /{$}"
 	PatternLoginGet      = "GET /login"
@@ -64,12 +117,13 @@ const (
 	PatternLang          = "POST /lang"
 	PatternProjectsGet   = "GET /projects"
 	PatternProjectsPost  = "POST /projects"
-	PatternProjectDelete = "POST /projects/{id}/delete"
-	PatternEditorGet     = "GET /editor/{id}"
+	PatternProjectDelete = "POST /projects/{" + ParamID + "}/delete"
+	PatternEditorGet     = "GET /editor/{" + ParamID + "}"
 	PatternStatic        = "GET /static/"
-	PatternAPILogout     = "POST /api/logout"
-	PatternCompile       = "GET /api/compile"
-	PatternUpload        = "POST /api/projects/{projectId}/upload-file"
-	PatternDownload      = "GET /api/projects/{projectId}/download/{filePath...}"
-	PatternProjectWS     = "GET /ws/projects/{projectId}"
+
+	PatternAPILogout = "POST /api/logout"
+	PatternCompile   = "GET /api/compile"
+	PatternUpload    = "POST /api/projects/{" + ParamID + "}/upload-file"
+	PatternDownload  = "GET /api/projects/{" + ParamID + "}/download/{" + ParamFilePath + "...}"
+	PatternProjectWS = "GET /ws/projects/{" + ParamID + "}"
 )
