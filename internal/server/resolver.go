@@ -3,19 +3,16 @@ package server
 import (
 	"context"
 	"embed"
+	"errors"
 	"fmt"
 	"io/fs"
-	"log/slog"
-	"net/http"
 	"os"
 	"strings"
 
-	"errors"
 	"github.com/google/uuid"
 	"github.com/lewtec/superfolha/internal/apierrors"
 	"github.com/lewtec/superfolha/internal/auth"
 	"github.com/lewtec/superfolha/internal/db"
-	igit "github.com/lewtec/superfolha/internal/git"
 	"github.com/lewtec/superfolha/internal/project"
 	"github.com/lewtec/superfolha/internal/session"
 )
@@ -48,55 +45,6 @@ func NewResolver(repo db.Repository, stateDir string, projectService *project.Se
 		authService:    authService,
 		hubs:           hubs,
 	}
-}
-
-// requireUser returns the authenticated user, or an error if missing/invalid.
-// Me intentionally does not use this: unauthenticated Me returns (nil, nil).
-func requireUser(ctx context.Context) (*auth.UserContext, error) {
-	user, ok := auth.GetUserFromContext(ctx)
-	if !ok {
-		return nil, apierrors.WithStatus(apierrors.CodeUnauthenticated, "not authenticated", 401)
-	}
-	if _, err := uuid.Parse(user.UserID); err != nil {
-		return nil, apierrors.New(apierrors.CodeInvalidInput, "invalid user ID")
-	}
-	return user, nil
-}
-
-func toGraphQLUser(id, email string) *User {
-	return &User{ID: id, Email: email}
-}
-
-func toGraphQLProject(p db.Project) *Project {
-	return &Project{
-		ID:        p.ID,
-		Name:      p.Name,
-		CreatedAt: p.CreatedAt,
-		UpdatedAt: p.UpdatedAt,
-	}
-}
-
-func toGraphQLCommit(c *igit.Commit) *Commit {
-	return &Commit{
-		Hash:    c.Hash,
-		Message: c.Message,
-		Author:  c.Author,
-		Date:    c.Date,
-	}
-}
-
-// authPayloadFromResponse sets the session cookie and builds AuthPayload.
-// op is used only in the missing-ResponseWriter log line (e.g. "Register", "Login").
-func authPayloadFromResponse(ctx context.Context, authResp *auth.AuthResponse, op string) (*AuthPayload, error) {
-	w, ok := ctx.Value(ResponseWriterContextKey).(http.ResponseWriter)
-	if !ok {
-		slog.Error("http.ResponseWriter not found in context", "op", op)
-		return nil, apierrors.New(apierrors.CodeInternal, "response writer not available")
-	}
-	auth.SetAuthCookie(w, authResp.Token)
-	return &AuthPayload{
-		User: toGraphQLUser(authResp.User.ID, authResp.User.Email),
-	}, nil
 }
 
 func (r *Resolver) getAndCheckProject(ctx context.Context, projectID string) (*db.Project, string, *auth.UserContext, error) {

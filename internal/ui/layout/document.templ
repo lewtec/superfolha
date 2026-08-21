@@ -1,0 +1,53 @@
+package layout
+
+templ Document(c Chrome) {
+	<!DOCTYPE html>
+	<html lang={ c.Lang } data-theme="superfolha">
+		<head>
+			<meta charset="utf-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			if c.Title != "" {
+				<title>{ c.Title } · Superfolha</title>
+			} else {
+				<title>Superfolha</title>
+			}
+			<link rel="icon" href="/static/brand/favicon.png" type="image/png"/>
+			<script>
+				(function () {
+					var KEY = "theme";
+					function pref() {
+						var raw = localStorage.getItem(KEY);
+						if (raw === "light" || raw === "dark") return raw;
+						if (raw === "superfolha-dark" || raw === "dark") return "dark";
+						if (raw === "superfolha" || raw === "light") return "light";
+						return "system";
+					}
+					function resolve(p) {
+						if (p === "dark") return "superfolha-dark";
+						if (p === "light") return "superfolha";
+						return window.matchMedia("(prefers-color-scheme: dark)").matches
+							? "superfolha-dark"
+							: "superfolha";
+					}
+					function apply(name) {
+						document.documentElement.setAttribute("data-theme", name);
+					}
+					window.__sfTheme = {
+						resolve: function () { return resolve(pref()); },
+						toggle: function () {
+							var dark = resolve(pref()) === "superfolha-dark";
+							var next = dark ? "light" : "dark";
+							localStorage.setItem(KEY, next);
+							apply(resolve(next));
+							return next;
+						},
+						apply: apply
+					};
+					apply(resolve(pref()));
+				})();
+			</script>
+			<link href="/static/style.css" rel="stylesheet" type="text/css"/>
+		</head>
+		{ children... }
+	</html>
+}

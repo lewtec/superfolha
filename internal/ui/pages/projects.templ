@@ -1,0 +1,59 @@
+package pages
+
+import (
+	"github.com/lewtec/superfolha/internal/db"
+	"github.com/lewtec/superfolha/internal/paths"
+	"github.com/lewtec/superfolha/internal/ui/layout"
+)
+
+templ Projects(c layout.Chrome, items []db.Project, updated []string) {
+	@layout.AppShell(c) {
+		<div class="container mx-auto px-4 py-8">
+			<div class="flex justify-between items-center mb-6 gap-2 flex-wrap">
+				<h1 class="text-3xl font-bold">{ c.T("projects.title") }</h1>
+				<button type="button" class="btn btn-primary" onclick="document.getElementById('create-project').showModal()">{ c.T("projects.new_project") }</button>
+			</div>
+			if len(items) == 0 {
+				<div class="text-center py-16">
+					<p class="text-lg text-base-content/70 mb-4">{ c.T("projects.empty") }</p>
+					<button type="button" class="btn btn-primary" onclick="document.getElementById('create-project').showModal()">{ c.T("projects.create_first") }</button>
+				</div>
+			} else {
+				<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+					for i, p := range items {
+						<div class="card bg-base-100 shadow-xl">
+							<div class="card-body">
+								<h2 class="card-title">{ p.Name }</h2>
+								<p class="text-sm text-base-content/70">{ updated[i] }</p>
+								<div class="card-actions justify-end mt-4">
+									<a class="btn btn-primary btn-sm" href={ paths.Editor(p.ID) }>{ c.T("common.open") }</a>
+									<form method="post" action={ paths.ProjectDelete(p.ID) } onsubmit="return confirm(this.dataset.confirm)" data-confirm={ c.T("projects.delete_confirm") }>
+										<button class="btn btn-error btn-sm" type="submit">{ c.T("common.delete") }</button>
+									</form>
+								</div>
+							</div>
+						</div>
+					}
+				</div>
+			}
+			<dialog id="create-project" class="modal">
+				<div class="modal-box">
+					<h3 class="font-bold text-lg mb-4">{ c.T("projects.create_modal_title") }</h3>
+					<form method="post" action={ paths.Projects() }>
+						<label class="form-control w-full">
+							<span class="label-text">{ c.T("projects.name_label") }</span>
+							<input class="input input-bordered w-full" type="text" name="name" required placeholder={ c.T("projects.name_placeholder") }/>
+						</label>
+						<div class="modal-action">
+							<button type="button" class="btn" onclick="document.getElementById('create-project').close()">{ c.T("common.cancel") }</button>
+							<button class="btn btn-primary" type="submit">{ c.T("common.create") }</button>
+						</div>
+					</form>
+				</div>
+				<form method="dialog" class="modal-backdrop">
+					<button>{ c.T("common.cancel") }</button>
+				</form>
+			</dialog>
+		</div>
+	}
+}

@@ -1,4 +1,0 @@
-node_modules
-dist
-src/**/__generated__
-bun.lock

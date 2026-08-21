@@ -41,7 +41,7 @@ Prior art: Overleaf (collab LaTeX), Yjs/y-websocket, gaderno, CodeMirror 6 colla
 2. **Server is king:** ygo is canonical live state for text; clients are followers except optimistic text speculation.
 3. **CRDT in server RAM** via **ygo**; browser **Yjs** speaks the same update protocol.
 4. **One WebSocket per project hub** for CRDT, awareness, chat, tree events, compile control.
-5. **GraphQL for non-live** work: auth, project list/CRUD, git history, cold metadata.
+5. **HTML forms for non-live** work: auth, project list/CRUD; live editor stays on the project WebSocket.
 6. **Git** remains the durable, user-visible VCS for project files (working tree + commits).
 7. **Compile** via existing **`GET /api/compile`**, after hub flush when live; project files from working tree (not client tarball). Artifacts-outside-git remains allowed for aux/last-PDF caching.
 8. **Same access boundary** for project APIs and the CRDT stream (whoever may open the project may join the hub).
@@ -84,7 +84,7 @@ Prior art: Overleaf (collab LaTeX), Yjs/y-websocket, gaderno, CodeMirror 6 colla
 | 5 | **v1 project ACL** = today’s owner-only; multi-user sharing later without redesigning the stream gate. |
 | 6 | **Write model like gaderno:** speculate on **text**; server may reject; compile/git/blob bytes are server-mediated. |
 | 7 | Library = **ygo + Yjs** (same as gaderno). |
-| 8 | **Live = project WebSocket**; **non-live = GraphQL**. |
+| 8 | **Live = project WebSocket**; **non-live = HTML forms + REST compile/upload/download**. |
 | 9 | **Single-instance** Superfolha; one process owns all hubs. |
 | 9b | **Postgres deprecated** — log a deprecation warning when the postgres driver is used; target SQLite. |
 | 10 | **File tree truth = Git working tree** (list paths from disk projection). |
@@ -135,7 +135,7 @@ Prior art: Overleaf (collab LaTeX), Yjs/y-websocket, gaderno, CodeMirror 6 colla
 |-------|--------|
 | Language | Go (`github.com/lewtec/superfolha`) |
 | HTTP | stdlib `ServeMux` |
-| API (non-live) | GraphQL via **gqlgen** |
+| API (non-live) | HTML forms + 303 (templ); REST compile/upload/download |
 | DB | **SQLite** (`modernc.org/sqlite`) + sqlc; migrations on boot |
 | DB (legacy) | Postgres driver still present → **deprecation warning** when selected |
 | Git | **go-git** (not libgit2; older drafts were wrong) |
@@ -148,13 +148,12 @@ Prior art: Overleaf (collab LaTeX), Yjs/y-websocket, gaderno, CodeMirror 6 colla
 
 | Piece | Choice |
 |-------|--------|
-| UI | React + TypeScript, Vite |
-| GraphQL client | Relay (codegen) for non-live |
+| UI | templ pages + one bun-built JS island |
 | Live | Yjs + CodeMirror 6 binding (`y-codemirror` or equivalent) |
-| UI kit | DaisyUI + Tailwind |
-| PDF | PDF.js |
-| Routing | React Router |
-| i18n | Existing locale files (en/es/pt) |
+| UI kit | DaisyUI 5 + Tailwind 4 |
+| PDF | Browser PDF engine (blob iframe) |
+| Routing | Server routes (`internal/paths`) |
+| i18n | go-i18n (en/es/pt) |
 
 ### Deploy
 
@@ -472,13 +471,13 @@ Error codes: keep `ErrorCode` enum + i18n mapping (`UNAUTHENTICATED`, `PROJECT_N
 | Method | Path | Purpose |
 |--------|------|---------|
 | GET | `/*` | SPA (non-API) |
-| POST | `/api/graphql` | GraphQL |
+| POST | `/login` `/register` `/projects` `/logout` `/lang` | HTML forms |
 | POST | `/api/logout` | Clear auth cookie |
 | GET | `/ws/projects/{id}` | **Project WebSocket** (live) |
 | GET | `/api/compile` | **Compile** (`?project=&file=`); flush hub first if live; JSON + base64 PDF/logs |
 | GET | `/api/projects/{id}/pdf` | Optional later: durable last PDF from artifacts |
 | GET | `/api/projects/{id}/artifacts/...` | Optional later: logs/synctex |
-| GET | `/playground` | GraphQL playground (dev only) |
+| GET | `/editor/{id}` | templ chrome + editor island |
 | GET | `/healthz` | Liveness (optional) |
 
 ### 11. Module layout (target)

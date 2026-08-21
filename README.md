@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="frontend/public/logo.png" width="128" height="128" alt="Superfolha" />
+  <img src="internal/web/static/brand/logo.png" width="128" height="128" alt="Superfolha" />
 </p>
 
 # Superfolha
@@ -27,13 +27,12 @@ A complete web-based LaTeX editor with Git version control, real-time compilatio
 - JWT authentication
 - LaTeX compilation with latexmk / TeX Live
 
-### Frontend (React + TypeScript)
-- Vite build tool
-- Relay GraphQL client
-- DaisyUI + Tailwind CSS
-- CodeMirror 6 editor
-- PDF.js viewer
-- React Router
+### Frontend (templ + JS island)
+- Server-rendered [templ](https://templ.guide) pages (Backstage-style forms + 303)
+- DaisyUI 5 + Tailwind 4 (bun → `/static/style.css`)
+- CodeMirror 6 + Yjs editor island (`/static/editor.js`)
+- Browser PDF viewer (blob iframe)
+- go-i18n (en / es / pt)
 
 ## Development
 
@@ -51,6 +50,9 @@ mise run install
 
 export JWT_SECRET="dev-secret-key-change-in-production"
 export GO_ENV="development"
+
+# CSS + editor island + templ
+mise run codegen
 
 # SQLite (default)
 go run ./cmd/superfolha --state-dir=./data
@@ -85,8 +87,8 @@ mise run lint
 mise run build
 
 # or
-cd frontend && bun run build && cd ..
-go build -tags release -o superfolha ./cmd/superfolha
+go generate ./...
+go build -o superfolha ./cmd/superfolha
 
 ./superfolha --state-dir=/var/superfolha --db=/var/superfolha/superfolha.db
 ```
@@ -183,12 +185,13 @@ export DATABASE_URL="/var/superfolha/superfolha.db"
 
 ## API Endpoints
 
-- `GET /`: Serves SPA
-- `POST /api/graphql`: GraphQL API
+- `GET /`: Landing
+- `GET/POST /login`, `/register`; `POST /logout`; `POST /lang`
+- `GET/POST /projects`; `POST /projects/{id}/delete`
+- `GET /editor/{id}`: templ chrome + editor island
 - `GET /api/compile`: LaTeX compilation (`?project=&file=`); flushes live CRDT hub first when present
 - `GET /ws/projects/{id}`: Live collaboration WebSocket (JWT session; hello/hello.ack fence + Yjs)
 - `POST /api/logout`: Clears session cookie
-- `GET /playground`: GraphQL playground (development)
 
 Live collab is documented in `SPEC.md` (ygo server CRDT, Git working tree projection, single-instance).
 
