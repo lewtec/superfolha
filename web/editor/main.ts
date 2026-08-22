@@ -345,7 +345,7 @@ function boot() {
     compileBtn.textContent = compiling ? t(msgs, "editor.compiling") : t(msgs, "editor.compile");
     compileBtn.classList.toggle("btn-disabled", compiling);
     sidebar.classList.toggle("hidden", !sidebarOpen);
-    toggleBtn.innerHTML = icon(sidebarOpen ? ICO.x : ICO.menu);
+    toggleBtn.innerHTML = icon(ICO.menu);
     toggleBtn.setAttribute(
       "aria-label",
       t(msgs, sidebarOpen ? "editor.close_sidebar" : "editor.open_sidebar"),
