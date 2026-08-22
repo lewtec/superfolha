@@ -92,7 +92,7 @@ func (s *Server) dropGhostUsers(next http.Handler) http.Handler {
 			return
 		}
 		if _, err := s.repo.GetUserByID(r.Context(), u.UserID); err != nil {
-			auth.ClearAuthCookie(w)
+			auth.ClearAuthCookie(w, r)
 			r = r.WithContext(auth.ContextWithoutUser(r.Context()))
 		}
 		next.ServeHTTP(w, r)
@@ -100,7 +100,7 @@ func (s *Server) dropGhostUsers(next http.Handler) http.Handler {
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
-	auth.ClearAuthCookie(w)
+	auth.ClearAuthCookie(w, r)
 	w.WriteHeader(http.StatusNoContent)
 }
 

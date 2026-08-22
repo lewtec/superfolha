@@ -47,7 +47,7 @@ func Middleware(next http.Handler) http.Handler {
 				r = r.WithContext(ctx)
 			} else if cookie != nil {
 				// Invalid cookie token: clear with the same flags as Set/logout.
-				ClearAuthCookie(w)
+				ClearAuthCookie(w, r)
 			}
 		}
 
