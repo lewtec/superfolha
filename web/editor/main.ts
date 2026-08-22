@@ -170,6 +170,7 @@ function boot() {
   let logs = "";
   let pdfUrl: string | null = null;
   let view: EditorView | null = null;
+  let mountedKey = "";
   const expanded = new Set<string>();
 
   const collab = new ProjectCollab(projectId, email, wsPath);
@@ -277,20 +278,36 @@ function boot() {
     if (log) log.scrollTop = log.scrollHeight;
   }
 
-  function paintCode() {
-    pathEl.classList.toggle("hidden", !currentPath);
-    pathEl.textContent = currentPath ?? "";
-    view?.destroy();
-    view = null;
-    codeHost.replaceChildren();
-    if (!currentPath) {
-      codeHost.innerHTML = `<div class="flex items-center justify-center h-full text-base-content/70 p-4">${escapeHtml(t(msgs, "editor.select_file"))}</div>`;
-      return;
-    }
+  function codeMountKey(): string {
+    if (!currentPath) return "empty";
+    if (!collab.initialSynced) return "syncing";
     const file = collab.files.find((f) => f.path === currentPath);
     const ytext = collab.getYText(currentPath);
     const body = ytext.toString();
     if (isBinaryContent(body, currentPath) || (file && file.size > 0 && body === "")) {
+      return `bin:${currentPath}`;
+    }
+    return `cm:${currentPath}:${collab.sessionId}`;
+  }
+
+  function paintCode() {
+    pathEl.classList.toggle("hidden", !currentPath);
+    pathEl.textContent = currentPath ?? "";
+    const key = codeMountKey();
+    if (key === mountedKey) return;
+    view?.destroy();
+    view = null;
+    codeHost.replaceChildren();
+    mountedKey = key;
+    if (!currentPath) {
+      codeHost.innerHTML = `<div class="flex items-center justify-center h-full text-base-content/70 p-4">${escapeHtml(t(msgs, "editor.select_file"))}</div>`;
+      return;
+    }
+    if (key === "syncing") {
+      codeHost.innerHTML = `<div class="flex items-center justify-center h-full text-base-content/70 p-4">${escapeHtml(t(msgs, "editor.status_syncing"))}</div>`;
+      return;
+    }
+    if (key.startsWith("bin:")) {
       const url = downloadPrefix + encodeURIComponent(currentPath);
       codeHost.innerHTML = `<div class="flex flex-col items-center justify-center h-full p-4">
         <p class="text-lg font-semibold mb-2">${escapeHtml(currentPath)}</p>
@@ -299,14 +316,10 @@ function boot() {
       </div>`;
       return;
     }
-    if (!collab.initialSynced) {
-      codeHost.innerHTML = `<div class="flex items-center justify-center h-full text-base-content/70 p-4">${escapeHtml(t(msgs, "editor.status_syncing"))}</div>`;
-      return;
-    }
     const host = document.createElement("div");
     host.className = "h-full min-h-0";
     codeHost.appendChild(host);
-    view = mountEditor(host, ytext, collab.awareness, currentPath);
+    view = mountEditor(host, collab.getYText(currentPath), collab.awareness, currentPath);
   }
 
   function paintLogs() {
