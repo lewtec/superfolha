@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/lewtec/superfolha/internal/project"
 	"errors"
+	"github.com/lewtec/superfolha/internal/project"
 	"io/fs"
 )
 
