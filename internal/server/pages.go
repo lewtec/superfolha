@@ -100,7 +100,7 @@ func (s *Server) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, paths.LoginError(errorID(err)), http.StatusSeeOther)
 		return
 	}
-	auth.SetAuthCookie(w, resp.Token)
+	auth.SetAuthCookie(w, r, resp.Token)
 	http.Redirect(w, r, next, http.StatusSeeOther)
 }
 
@@ -130,12 +130,12 @@ func (s *Server) handleRegisterPost(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, paths.RegisterError(errorID(err)), http.StatusSeeOther)
 		return
 	}
-	auth.SetAuthCookie(w, resp.Token)
+	auth.SetAuthCookie(w, r, resp.Token)
 	http.Redirect(w, r, paths.Projects(), http.StatusSeeOther)
 }
 
 func (s *Server) handleLogoutPage(w http.ResponseWriter, r *http.Request) {
-	auth.ClearAuthCookie(w)
+	auth.ClearAuthCookie(w, r)
 	http.Redirect(w, r, paths.Landing, http.StatusSeeOther)
 }
 

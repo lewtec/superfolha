@@ -91,6 +91,34 @@ func TestLandingLoggedInPointsAtProjects(t *testing.T) {
 	}
 }
 
+func TestRegisterCookieWorksOnHTTPWithoutGOEnv(t *testing.T) {
+	t.Setenv("JWT_SECRET", "rod-play-secret")
+	t.Setenv("GO_ENV", "")
+	srv := testServer(t)
+	form := strings.NewReader("email=http@example.com&password=testhorses1&confirm=testhorses1")
+	req := httptest.NewRequest(http.MethodPost, paths.Register(), form)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("register status = %d", rec.Code)
+	}
+	setCookie := rec.Header().Get("Set-Cookie")
+	if setCookie == "" {
+		t.Fatal("register must Set-Cookie")
+	}
+	if strings.Contains(setCookie, "Secure") {
+		t.Fatalf("HTTP register cookie must not be Secure: %q", setCookie)
+	}
+	follow := httptest.NewRequest(http.MethodGet, paths.Projects(), nil)
+	follow.Header.Set("Cookie", setCookie)
+	out := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(out, follow)
+	if out.Code != http.StatusOK {
+		t.Fatalf("GET /projects with session = %d; want 200 (got Location %q)", out.Code, out.Header().Get("Location"))
+	}
+}
+
 func TestProjectsRedirectsAnonymous(t *testing.T) {
 	t.Parallel()
 	srv := testServer(t)
