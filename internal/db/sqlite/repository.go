@@ -17,10 +17,10 @@ import (
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/google/uuid"
 	"github.com/lewtec/superfolha/internal/db"
+	"io/fs"
 	"modernc.org/sqlite"
 	_ "modernc.org/sqlite"
 	sqlite3 "modernc.org/sqlite/lib"
-	"io/fs"
 )
 
 //go:embed migrations/*.sql
