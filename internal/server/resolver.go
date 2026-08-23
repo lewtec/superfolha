@@ -20,15 +20,6 @@ import (
 //go:embed templates
 var templatesFS embed.FS
 
-// MaxGraphQLFileSize defines the maximum file size (in bytes) for content to be returned directly via GraphQL.
-const MaxGraphQLFileSize = project.MaxCollabTextBytes
-
-// HasBinary reports whether content should be treated as binary.
-// Delegates to project.IsBinary (shared with CRDT collab classification).
-func HasBinary(content []byte, filename string) bool {
-	return project.IsBinary(content, filename)
-}
-
 type Resolver struct {
 	Repo           db.Repository
 	StateDir       string
