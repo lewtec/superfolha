@@ -1,10 +1,10 @@
-package server
+package project
 
 import (
 	"testing"
 )
 
-func TestHasBinary(t *testing.T) {
+func TestIsBinary(t *testing.T) {
 	t.Parallel()
 
 	// Minimal PNG signature; DetectContentType returns image/png.
@@ -70,9 +70,9 @@ func TestHasBinary(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := HasBinary(tt.content, tt.filename)
+			got := IsBinary(tt.content, tt.filename)
 			if got != tt.want {
-				t.Errorf("HasBinary(%q, %q) = %v, want %v", tt.content, tt.filename, got, tt.want)
+				t.Errorf("IsBinary(%q, %q) = %v, want %v", tt.content, tt.filename, got, tt.want)
 			}
 		})
 	}
