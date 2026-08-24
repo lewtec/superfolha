@@ -2,12 +2,6 @@ package server
 
 import (
 	"context"
-	"embed"
-	"errors"
-	"fmt"
-	"io/fs"
-	"os"
-	"strings"
 
 	"github.com/google/uuid"
 	"github.com/lewtec/superfolha/internal/apierrors"
@@ -16,9 +10,6 @@ import (
 	"github.com/lewtec/superfolha/internal/project"
 	"github.com/lewtec/superfolha/internal/session"
 )
-
-//go:embed templates
-var templatesFS embed.FS
 
 type Resolver struct {
 	Repo           db.Repository
@@ -48,49 +39,19 @@ func (r *Resolver) getAndCheckProject(ctx context.Context, projectID string) (*d
 		return nil, "", nil, apierrors.New(apierrors.CodeInvalidInput, "invalid project ID")
 	}
 
-	project, err := r.Repo.GetProject(ctx, projectID)
-	if err != nil {
-		return nil, "", nil, apierrors.New(apierrors.CodeProjectNotFound, "project not found")
+	info, live := r.hubs.Live(projectID)
+	if !live {
+		return nil, "", nil, apierrors.New(apierrors.CodeProjectNotFound, "session not found")
 	}
-
-	if project.UserID != user.UserID {
+	if !r.hubs.CanOpen(projectID, user.Email) {
 		return nil, "", nil, apierrors.WithStatus(apierrors.CodeUnauthorized, "not authorized", 403)
 	}
-
 	projectPath := r.projectService.GetProjectPath(projectID)
-	if _, err := os.Stat(projectPath); errors.Is(err, fs.ErrNotExist) {
-		if err := r.projectService.InitProjectRepo(projectID); err != nil {
-			return nil, "", nil, apierrors.Internal(err)
-		}
-
-		templateDir := "templates/simple"
-		err = fs.WalkDir(templatesFS, templateDir, func(path string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-			if d.IsDir() {
-				return nil
-			}
-
-			content, err := templatesFS.ReadFile(path)
-			if err != nil {
-				return fmt.Errorf("read template file %s: %w", path, err)
-			}
-
-			relativePath := strings.TrimPrefix(path, templateDir+"/")
-			if err := r.projectService.SaveFile(projectID, relativePath, string(content)); err != nil {
-				return fmt.Errorf("write template file %s: %w", relativePath, err)
-			}
-			return nil
-		})
-		if err != nil {
-			return nil, "", nil, apierrors.Internal(err)
-		}
-		_, err = r.projectService.CommitChanges(projectID, user.Email, "Initial commit")
-		if err != nil {
-			return nil, "", nil, apierrors.Internal(err)
-		}
+	proj := db.Project{
+		ID:      info.ID,
+		UserID:  info.HostLogin,
+		Name:    info.Remote,
+		GitPath: projectPath,
 	}
-
-	return &project, projectPath, user, nil
+	return &proj, projectPath, user, nil
 }

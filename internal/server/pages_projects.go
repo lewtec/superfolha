@@ -1,36 +1,25 @@
 package server
 
 import (
+	"errors"
 	"net/http"
 	"strings"
-	"time"
 
-	"github.com/google/uuid"
-	"github.com/lewtec/superfolha/internal/apierrors"
 	"github.com/lewtec/superfolha/internal/auth"
-	"github.com/lewtec/superfolha/internal/db"
+	"github.com/lewtec/superfolha/internal/git"
+	"github.com/lewtec/superfolha/internal/githubapp"
 	appi18n "github.com/lewtec/superfolha/internal/i18n"
 	"github.com/lewtec/superfolha/internal/paths"
+	"github.com/lewtec/superfolha/internal/remote"
+	"github.com/lewtec/superfolha/internal/session"
 	"github.com/lewtec/superfolha/internal/ui/pages"
-	"os"
 )
 
 func (s *Server) handleProjectsGet(w http.ResponseWriter, r *http.Request) {
 	user, _ := auth.GetUserFromContext(r.Context())
-	items, err := s.repo.GetUserProjects(r.Context(), user.UserID)
-	if err != nil {
-		http.Redirect(w, r, paths.ProjectsError("errors.INTERNAL"), http.StatusSeeOther)
-		return
-	}
-	loc := s.loc(r)
-	updated := make([]string, len(items))
-	for i, p := range items {
-		updated[i] = appi18n.TData(loc, "projects.updated", map[string]any{
-			"Date": formatProjectDate(p.UpdatedAt, s.lang(r)),
-		})
-	}
-	c := s.chrome(r, appi18n.T(loc, "projects.title"))
-	s.render(w, r, pages.Projects(c, items, updated))
+	items := s.hubs.ListFor(user.Email)
+	c := s.chrome(r, appi18n.T(s.loc(r), "sessions.title"))
+	s.render(w, r, pages.Sessions(c, items))
 }
 
 func (s *Server) handleProjectsPost(w http.ResponseWriter, r *http.Request) {
@@ -39,72 +28,144 @@ func (s *Server) handleProjectsPost(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, paths.ProjectsError("errors.INVALID_INPUT"), http.StatusSeeOther)
 		return
 	}
-	name := strings.TrimSpace(r.FormValue("name"))
-	if name == "" {
-		http.Redirect(w, r, paths.ProjectsError("projects.name_required"), http.StatusSeeOther)
+	raw := strings.TrimSpace(r.FormValue("remote"))
+	branch := strings.TrimSpace(r.FormValue("branch"))
+	if branch == "" {
+		branch = "main"
+	}
+	token := strings.TrimSpace(r.FormValue("token"))
+	if err := remote.Validate(raw); err != nil {
+		http.Redirect(w, r, paths.ProjectsError("sessions.remote_required"), http.StatusSeeOther)
 		return
 	}
-	projectUUID, err := uuid.NewV7()
+	authz, err := s.cloneAuth(raw, token)
 	if err != nil {
-		http.Redirect(w, r, paths.ProjectsError("errors.INTERNAL"), http.StatusSeeOther)
+		if errors.Is(err, githubapp.ErrNeedInstall) {
+			http.Redirect(w, r, s.github.InstallURL(), http.StatusSeeOther)
+			return
+		}
+		http.Redirect(w, r, paths.ProjectsError("sessions.clone_failed"), http.StatusSeeOther)
 		return
 	}
-	projectID := projectUUID.String()
-	projectPath := s.projectService.GetProjectPath(projectID)
-	_, err = s.repo.CreateProject(r.Context(), db.CreateProjectParams{
-		ID:      projectID,
-		UserID:  user.UserID,
-		Name:    name,
-		GitPath: projectPath,
-	})
+	live, err := s.hubs.Create(user.Email, raw, branch, authz)
 	if err != nil {
-		http.Redirect(w, r, paths.ProjectsError("errors.INTERNAL"), http.StatusSeeOther)
+		if errors.Is(err, session.ErrAlreadyLive) {
+			http.Redirect(w, r, paths.ProjectsError("sessions.already_live"), http.StatusSeeOther)
+			return
+		}
+		http.Redirect(w, r, paths.ProjectsError("sessions.clone_failed"), http.StatusSeeOther)
 		return
 	}
-	http.Redirect(w, r, paths.Editor(projectID), http.StatusSeeOther)
+	http.Redirect(w, r, paths.Editor(live.ID), http.StatusSeeOther)
+}
+
+func (s *Server) cloneAuth(raw, pastedToken string) (*git.HTTPAuth, error) {
+	if pastedToken != "" {
+		return &git.HTTPAuth{Username: "x-access-token", Password: pastedToken}, nil
+	}
+	owner, repo, ok := remote.ParseGitHub(raw)
+	if !ok {
+		return nil, nil
+	}
+	if s.github.PrivateKey == nil {
+		return nil, nil
+	}
+	return s.github.InstallationAuth(owner, repo)
 }
 
 func (s *Server) handleProjectDelete(w http.ResponseWriter, r *http.Request) {
+	user, _ := auth.GetUserFromContext(r.Context())
 	id := r.PathValue(paths.ParamID)
-	project, projectPath, _, err := s.resolver.getAndCheckProject(r.Context(), id)
-	if err != nil {
+	if err := s.hubs.End(id, user.Email); err != nil {
 		http.Redirect(w, r, paths.ProjectsError(errorID(err)), http.StatusSeeOther)
 		return
 	}
-	if s.hubs != nil {
-		s.hubs.CloseProject(project.ID)
-	}
-	if err := s.repo.DeleteProject(r.Context(), project.ID); err != nil {
-		http.Redirect(w, r, paths.ProjectsError("errors.INTERNAL"), http.StatusSeeOther)
-		return
-	}
-	if err := os.RemoveAll(projectPath); err != nil {
-		http.Redirect(w, r, paths.ProjectsError("errors.INTERNAL"), http.StatusSeeOther)
-		return
-	}
-	http.Redirect(w, r, paths.ProjectsFlash("projects.deleted"), http.StatusSeeOther)
+	http.Redirect(w, r, paths.ProjectsFlash("sessions.ended"), http.StatusSeeOther)
 }
 
-func formatProjectDate(t time.Time, lang string) string {
-	switch lang {
-	case "pt", "es":
-		return t.Format("02/01/2006")
-	default:
-		return t.Format("Jan 2, 2006")
+func (s *Server) handleSessionPreauth(w http.ResponseWriter, r *http.Request) {
+	user, _ := auth.GetUserFromContext(r.Context())
+	id := r.PathValue(paths.ParamID)
+	info, ok := s.hubs.Live(id)
+	if !ok || info.HostLogin != user.Email {
+		http.Redirect(w, r, paths.ProjectsError("errors.UNAUTHORIZED"), http.StatusSeeOther)
+		return
 	}
+	tok, err := session.MintPreauth(id)
+	if err != nil {
+		http.Redirect(w, r, paths.ProjectsError("errors.INTERNAL"), http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, paths.Editor(id)+"?preauth="+tok+"&flash=sessions.preauth_ready", http.StatusSeeOther)
+}
+
+func (s *Server) handleSessionKnock(w http.ResponseWriter, r *http.Request) {
+	user, _ := auth.GetUserFromContext(r.Context())
+	id := r.PathValue(paths.ParamID)
+	if err := s.hubs.Knock(id, user.Email); err != nil {
+		http.Redirect(w, r, paths.ProjectsError("sessions.knock_closed"), http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, paths.ProjectsFlash("sessions.knock_sent"), http.StatusSeeOther)
+}
+
+func (s *Server) handleSessionAdmit(w http.ResponseWriter, r *http.Request) {
+	user, _ := auth.GetUserFromContext(r.Context())
+	if err := r.ParseForm(); err != nil {
+		http.Redirect(w, r, paths.ProjectsError("errors.INVALID_INPUT"), http.StatusSeeOther)
+		return
+	}
+	id := r.PathValue(paths.ParamID)
+	if err := s.hubs.Admit(id, user.Email, strings.TrimSpace(r.FormValue("login"))); err != nil {
+		http.Redirect(w, r, paths.ProjectsError(errorID(err)), http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, paths.Editor(id), http.StatusSeeOther)
+}
+
+func (s *Server) handleSessionKick(w http.ResponseWriter, r *http.Request) {
+	user, _ := auth.GetUserFromContext(r.Context())
+	id := r.PathValue(paths.ParamID)
+	if err := s.hubs.KickAll(id, user.Email); err != nil {
+		http.Redirect(w, r, paths.ProjectsError(errorID(err)), http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, paths.Editor(id), http.StatusSeeOther)
+}
+
+func (s *Server) handleSessionKnockMode(w http.ResponseWriter, r *http.Request) {
+	user, _ := auth.GetUserFromContext(r.Context())
+	if err := r.ParseForm(); err != nil {
+		http.Redirect(w, r, paths.ProjectsError("errors.INVALID_INPUT"), http.StatusSeeOther)
+		return
+	}
+	id := r.PathValue(paths.ParamID)
+	on := r.FormValue("on") == "1"
+	if err := s.hubs.SetKnock(id, user.Email, on); err != nil {
+		http.Redirect(w, r, paths.ProjectsError(errorID(err)), http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, paths.Editor(id), http.StatusSeeOther)
 }
 
 func (s *Server) handleEditorGet(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue(paths.ParamID)
-	project, _, user, err := s.resolver.getAndCheckProject(r.Context(), id)
-	if err != nil {
-		if coded, ok := apierrors.As(err); ok && coded.Code == apierrors.CodeUnauthenticated {
-			http.Redirect(w, r, paths.LoginNext(r.URL.RequestURI()), http.StatusSeeOther)
+	user, _ := auth.GetUserFromContext(r.Context())
+	if tok := r.URL.Query().Get("preauth"); tok != "" {
+		if err := s.hubs.RedeemPreauth(id, user.Email, tok); err != nil {
+			http.Redirect(w, r, paths.ProjectsError("sessions.preauth_invalid"), http.StatusSeeOther)
 			return
 		}
-		http.Redirect(w, r, paths.ProjectsError(errorID(err)), http.StatusSeeOther)
+	}
+	info, ok := s.hubs.Live(id)
+	if !ok {
+		http.Redirect(w, r, paths.ProjectsError("errors.PROJECT_NOT_FOUND"), http.StatusSeeOther)
 		return
 	}
-	c := s.chrome(r, project.Name)
-	s.render(w, r, pages.Editor(c, project.ID, project.Name, user.Email, pages.MarshalI18n(appi18n.Map(s.bundle, s.lang(r)))))
+	if !s.hubs.CanOpen(id, user.Email) {
+		http.Redirect(w, r, paths.ProjectsError("errors.UNAUTHORIZED"), http.StatusSeeOther)
+		return
+	}
+	c := s.chrome(r, info.Remote)
+	s.render(w, r, pages.Editor(c, info.ID, info.Remote, user.Email, pages.MarshalI18n(appi18n.Map(s.bundle, s.lang(r)))))
 }

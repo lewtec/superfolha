@@ -68,8 +68,7 @@ templ AuthShell(c Chrome) {
 					if c.LoggedIn {
 						<a class="btn btn-sm btn-primary" href={ paths.Projects() }>{ c.T("common.my_projects") }</a>
 					} else {
-						<a class="btn btn-sm btn-ghost" href={ paths.Login() }>{ c.T("auth.login_button") }</a>
-						<a class="btn btn-sm btn-primary" href={ paths.Register() }>{ c.T("auth.register_button") }</a>
+						<a class="btn btn-sm btn-primary" href={ paths.Login() }>{ c.T("auth.login_button") }</a>
 					}
 				</div>
 			</header>

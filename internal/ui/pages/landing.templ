@@ -16,7 +16,7 @@ templ Landing(c layout.Chrome) {
 					if c.LoggedIn {
 						<a href={ paths.Projects() } class="btn btn-primary">{ c.T("common.my_projects") }</a>
 					} else {
-						<a href={ paths.Register() } class="btn btn-primary">{ c.T("landing.landing_cta") }</a>
+						<a href={ paths.Login() } class="btn btn-primary">{ c.T("landing.landing_cta") }</a>
 					}
 				</div>
 			</div>
@@ -75,7 +75,7 @@ templ Landing(c layout.Chrome) {
 			if c.LoggedIn {
 				<a href={ paths.Projects() } class="btn btn-primary">{ c.T("common.my_projects") }</a>
 			} else {
-				<a href={ paths.Register() } class="btn btn-primary">{ c.T("landing.final_cta_button") }</a>
+				<a href={ paths.Login() } class="btn btn-primary">{ c.T("landing.final_cta_button") }</a>
 			}
 		</section>
 		<footer class="bg-base-300 text-base-content">

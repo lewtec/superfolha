@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -75,25 +74,12 @@ func (s *Server) handleProjectWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Owner email for auto-commit (v1 owner-only access ⇒ user is owner).
-	ownerEmail := user.Email
-	if owner, err := s.repo.GetUserByID(r.Context(), proj.UserID); err == nil {
-		ownerEmail = owner.Email
-	}
-
-	hub, err := s.hubs.GetOrOpen(projectID, ownerEmail)
+	hub, err := s.hubs.GetOrOpen(projectID, proj.UserID)
 	if err != nil {
 		slog.Error("hub open", "project", projectID, "user", user.UserID, "err", err)
 		http.Error(w, "failed to open project session", http.StatusInternalServerError)
 		return
 	}
-	// Detach from request cancel so post-close commits still update timestamps.
-	commitCtx := context.WithoutCancel(r.Context())
-	hub.SetOnCommitted(func() {
-		if err := s.repo.UpdateProjectTimestamp(commitCtx, projectID); err != nil {
-			slog.Warn("project timestamp after hub commit", "project", projectID, "err", err)
-		}
-	})
 
 	conn, err := wsUpgrader.Upgrade(w, r, nil)
 	if err != nil {

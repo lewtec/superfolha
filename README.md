@@ -8,7 +8,7 @@ A complete web-based LaTeX editor with Git version control, real-time compilatio
 
 ## Features
 
-- **Authentication**: JWT-based user authentication
+- **Authentication**: GitHub App OAuth (identity). HTTP clone starts a session.
 - **Projects**: Create and manage multiple LaTeX projects
 - **File Management**: Full file explorer with Git integration
 - **Editor**: CodeMirror 6 with LaTeX syntax highlighting and autocomplete
@@ -151,6 +151,7 @@ Use root `railway.toml`. Attach a volume at `/data`, set `JWT_SECRET`. SQLite de
 - `DB_DRIVER` / `DATABASE_DRIVER`: `sqlite` (default) or `postgres`
 - `DATABASE_URL` / `DATABASE_DSN`: SQLite path/`file:` DSN, or `postgres://...` URL
 - `JWT_SECRET`: Secret key for JWT token signing (required in production)
+- `GITHUB_APP_ID`, `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_CLIENT_SECRET`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_APP_SLUG`: GitHub App for login and installation tokens
 - `STATE_DIR`: Root for Git repositories (default: `./data`; Docker: `/data`). Projects live at `{STATE_DIR}/repos/{uuid}`
 - `PORT`: Used as listen port when `--addr` is not set (platforms like Railway inject this)
 - `GO_ENV`: Set to `development` for dev mode only (allows JWT_SECRET fallback)

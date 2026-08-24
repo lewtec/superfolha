@@ -2,7 +2,6 @@ package server
 
 import (
 	"testing"
-	"time"
 
 	"github.com/lewtec/superfolha/internal/paths"
 )
@@ -23,17 +22,6 @@ func TestSafeNext(t *testing.T) {
 		if got := safeNext(tt.in); got != tt.want {
 			t.Errorf("safeNext(%q) = %q; want %q", tt.in, got, tt.want)
 		}
-	}
-}
-
-func TestFormatProjectDate(t *testing.T) {
-	t.Parallel()
-	ts := time.Date(2026, 8, 21, 0, 0, 0, 0, time.UTC)
-	if got := formatProjectDate(ts, "en"); got != "Aug 21, 2026" {
-		t.Fatalf("en = %q", got)
-	}
-	if got := formatProjectDate(ts, "pt"); got != "21/08/2026" {
-		t.Fatalf("pt = %q", got)
 	}
 }
 
