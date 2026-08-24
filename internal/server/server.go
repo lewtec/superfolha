@@ -70,6 +70,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc(paths.PatternLanding, s.handleLanding)
 	mux.HandleFunc(paths.PatternLoginGet, s.handleLoginGet)
 	mux.HandleFunc(paths.PatternLoginPost, s.handleLoginPost)
+	mux.HandleFunc(paths.PatternLoginChallenge, s.handleLoginChallenge)
+	mux.HandleFunc(paths.PatternLoginVerify, s.handleLoginVerify)
 	mux.HandleFunc(paths.PatternGitHubLogin, s.handleGitHubLogin)
 	mux.HandleFunc(paths.PatternGitHubCallback, s.handleGitHubCallback)
 	mux.HandleFunc(paths.PatternRegisterGet, s.handleRegisterGet)
@@ -86,6 +88,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc(paths.PatternSessionAdmit, s.requirePageUser(s.handleSessionAdmit))
 	mux.HandleFunc(paths.PatternSessionKick, s.requirePageUser(s.handleSessionKick))
 	mux.HandleFunc(paths.PatternSessionKnockMode, s.requirePageUser(s.handleSessionKnockMode))
+	mux.HandleFunc(paths.PatternSessionRetry, s.requirePageUser(s.handleSessionRetry))
 	mux.HandleFunc(paths.PatternEditorGet, s.requirePageUser(s.handleEditorGet))
 
 	mux.Handle(paths.PatternCompile, http.HandlerFunc(s.handleCompile))

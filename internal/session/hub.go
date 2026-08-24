@@ -58,6 +58,7 @@ type Hub struct {
 	Root       string
 	OwnerEmail string
 	Auth       *igit.HTTPAuth
+	SSH        *igit.SSHKey
 	Branch     string
 
 	svc *project.Service
@@ -208,8 +209,8 @@ func (h *Hub) Commit(message, author string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if h.Auth != nil {
-		if err := igit.PushOrigin(h.Root, h.Branch, h.Auth); err != nil {
+	if h.Auth != nil || h.SSH != nil {
+		if err := igit.Push(h.Root, h.Branch, h.Auth, h.SSH); err != nil {
 			return "", err
 		}
 	}

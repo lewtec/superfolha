@@ -8,7 +8,7 @@ A complete web-based LaTeX editor with Git version control, real-time compilatio
 
 ## Features
 
-- **Authentication**: GitHub App OAuth (identity). HTTP clone starts a session.
+- **Authentication**: Ed25519 challenge-sign in the browser. Each session has its own SSH key for git.
 - **Projects**: Create and manage multiple LaTeX projects
 - **File Management**: Full file explorer with Git integration
 - **Editor**: CodeMirror 6 with LaTeX syntax highlighting and autocomplete

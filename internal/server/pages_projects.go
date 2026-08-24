@@ -56,7 +56,21 @@ func (s *Server) handleProjectsPost(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, paths.ProjectsError("sessions.clone_failed"), http.StatusSeeOther)
 		return
 	}
+	if !live.Ready {
+		http.Redirect(w, r, paths.ProjectsFlash("sessions.add_ssh_key"), http.StatusSeeOther)
+		return
+	}
 	http.Redirect(w, r, paths.Editor(live.ID), http.StatusSeeOther)
+}
+
+func (s *Server) handleSessionRetry(w http.ResponseWriter, r *http.Request) {
+	user, _ := auth.GetUserFromContext(r.Context())
+	id := r.PathValue(paths.ParamID)
+	if err := s.hubs.RetryClone(id, user.Email, nil); err != nil {
+		http.Redirect(w, r, paths.ProjectsError("sessions.clone_failed"), http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, paths.Editor(id), http.StatusSeeOther)
 }
 
 func (s *Server) cloneAuth(raw, pastedToken string) (*git.HTTPAuth, error) {
@@ -164,6 +178,10 @@ func (s *Server) handleEditorGet(w http.ResponseWriter, r *http.Request) {
 	}
 	if !s.hubs.CanOpen(id, user.Email) {
 		http.Redirect(w, r, paths.ProjectsError("errors.UNAUTHORIZED"), http.StatusSeeOther)
+		return
+	}
+	if !info.Ready {
+		http.Redirect(w, r, paths.ProjectsFlash("sessions.add_ssh_key"), http.StatusSeeOther)
 		return
 	}
 	c := s.chrome(r, info.Remote)

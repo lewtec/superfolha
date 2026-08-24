@@ -140,7 +140,7 @@ func TestRegistryCloseProject(t *testing.T) {
 	state := t.TempDir()
 	svc := project.NewService(state)
 	reg := NewRegistry(svc)
-	reg.SetCloner(func(dest, _, _ string, _ *igit.HTTPAuth) error {
+	reg.SetCloner(func(dest, _, _ string, _ *igit.HTTPAuth, _ *igit.SSHKey) error {
 		if err := igit.InitRepo(dest); err != nil {
 			return err
 		}

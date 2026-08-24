@@ -10,7 +10,7 @@ import (
 	"github.com/lewtec/superfolha/internal/project"
 )
 
-func stubClone(dest, _, _ string, _ *igit.HTTPAuth) error {
+func stubClone(dest, _, _ string, _ *igit.HTTPAuth, _ *igit.SSHKey) error {
 	if err := igit.InitRepo(dest); err != nil {
 		return err
 	}

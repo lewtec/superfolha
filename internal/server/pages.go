@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -90,6 +91,42 @@ func (s *Server) handleLoginGet(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, paths.Login(), http.StatusSeeOther)
+}
+
+func (s *Server) handleLoginChallenge(w http.ResponseWriter, r *http.Request) {
+	ch, err := auth.NewChallenge()
+	if err != nil {
+		writeAPIError(w, apierrors.Internal(err))
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	fmt.Fprintf(w, `{"challenge":%q}`, ch)
+}
+
+func (s *Server) handleLoginVerify(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Challenge string `json:"challenge"`
+		PublicKey string `json:"public_key"`
+		Signature string `json:"signature"`
+		Next      string `json:"next"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeAPIError(w, apierrors.New(apierrors.CodeInvalidInput, "invalid body"))
+		return
+	}
+	id, err := auth.VerifyChallenge(body.Challenge, body.PublicKey, body.Signature)
+	if err != nil {
+		writeAPIError(w, apierrors.WithStatus(apierrors.CodeInvalidCredentials, err.Error(), http.StatusUnauthorized))
+		return
+	}
+	token, err := auth.GenerateToken(id.ID, id.Login)
+	if err != nil {
+		writeAPIError(w, apierrors.Internal(err))
+		return
+	}
+	auth.SetAuthCookie(w, r, token)
+	w.Header().Set("Content-Type", "application/json")
+	fmt.Fprintf(w, `{"ok":true,"next":%q}`, safeNext(body.Next))
 }
 
 func (s *Server) handleRegisterGet(w http.ResponseWriter, r *http.Request) {
