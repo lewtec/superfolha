@@ -15,18 +15,15 @@ templ Sessions(c layout.Chrome, items []session.Info) {
 			<div class="card bg-base-100 shadow-xl mb-8">
 				<div class="card-body">
 					<h2 class="card-title">{ c.T("sessions.start") }</h2>
+					<p class="text-sm text-base-content/70">{ c.T("sessions.start_hint") }</p>
 					<form method="post" action={ paths.Projects() } class="space-y-4">
 						<label class="form-control w-full">
 							<span class="label-text">{ c.T("sessions.remote_label") }</span>
-							<input class="input input-bordered w-full" type="url" name="remote" required placeholder="https://github.com/org/paper"/>
+							<input class="input input-bordered w-full font-mono" type="text" name="remote" required placeholder="git@github.com:org/paper" spellcheck="false" autocomplete="off"/>
 						</label>
 						<label class="form-control w-full">
 							<span class="label-text">{ c.T("sessions.branch_label") }</span>
 							<input class="input input-bordered w-full" type="text" name="branch" placeholder="main"/>
-						</label>
-						<label class="form-control w-full">
-							<span class="label-text">{ c.T("sessions.token_label") }</span>
-							<input class="input input-bordered w-full" type="password" name="token" autocomplete="off"/>
 						</label>
 						<button class="btn btn-primary" type="submit">{ c.T("sessions.clone") }</button>
 					</form>
@@ -39,7 +36,7 @@ templ Sessions(c layout.Chrome, items []session.Info) {
 					for _, item := range items {
 						<div class="card bg-base-100 shadow-xl">
 							<div class="card-body">
-								<h2 class="card-title break-all">{ item.Remote }</h2>
+								<h2 class="card-title break-all">{ sessionTitle(item) }</h2>
 								<p class="text-sm text-base-content/70">{ item.Branch }</p>
 								<p class="text-xs font-mono text-base-content/50 break-all">{ item.ID }</p>
 								if item.SSHPublic != "" {
@@ -73,4 +70,11 @@ templ Sessions(c layout.Chrome, items []session.Info) {
 			}
 		</div>
 	}
+}
+
+func sessionTitle(item session.Info) string {
+	if item.CloneURL != "" {
+		return item.CloneURL
+	}
+	return item.Remote
 }
