@@ -58,6 +58,7 @@ export class ProjectCollab {
   clientId = "";
   sessionId = "";
   errorMessage = "";
+  sshPublic = "";
 
   private ws: WebSocket | null = null;
   private listeners = new Set<CollabListener>();
@@ -350,6 +351,12 @@ export class ProjectCollab {
         } catch {
           /* ignore */
         }
+        break;
+      }
+      case "push.error": {
+        this.sshPublic = String(msg.ssh_public ?? "");
+        this.errorMessage = String(msg.message ?? "push failed");
+        this.setStatus("commit_error");
         break;
       }
       case "error": {

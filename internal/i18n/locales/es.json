@@ -98,6 +98,7 @@
   "sessions.preauth_ready": "Comparte el enlace de la barra de dirección para invitar.",
   "sessions.preauth_invalid": "Esa invitación no es válida.",
   "sessions.ssh_key": "Añade esta clave SSH pública al remoto y vuelve a clonar",
+  "sessions.copy_key": "Copiar clave",
   "sessions.retry_clone": "Reintentar clon",
   "sessions.add_ssh_key": "Añade la clave SSH de la sesión en el remoto y vuelve a clonar.",
   "projects.title": "Sesiones",

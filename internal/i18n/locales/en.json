@@ -98,6 +98,7 @@
   "sessions.preauth_ready": "Share the address bar link to invite.",
   "sessions.preauth_invalid": "That invite is not valid.",
   "sessions.ssh_key": "Add this SSH public key to the remote, then retry clone",
+  "sessions.copy_key": "Copy key",
   "sessions.retry_clone": "Retry clone",
   "sessions.add_ssh_key": "Add the session SSH key on the remote, then retry clone.",
   "projects.title": "Sessions",

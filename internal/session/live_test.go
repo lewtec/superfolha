@@ -43,6 +43,30 @@ func TestCreateDuplicateFails(t *testing.T) {
 	}
 }
 
+func TestSSHCreateWaitsForDeployKey(t *testing.T) {
+	t.Setenv("JWT_SECRET", "test-secret-for-session")
+	t.Setenv("GO_ENV", "development")
+	cloned := false
+	reg := NewRegistry(project.NewService(t.TempDir()))
+	reg.SetCloner(func(dest, _, _ string, _ *igit.HTTPAuth, _ *igit.SSHKey) error {
+		cloned = true
+		return stubClone(dest, "", "", nil, nil)
+	})
+	live, err := reg.Create("alice", "git@github.com:t/paper", "main", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cloned {
+		t.Fatal("SSH create must not clone before the deploy key is added")
+	}
+	if live.Ready {
+		t.Fatal("SSH session should stay pending")
+	}
+	if live.SSHPublic == "" {
+		t.Fatal("expected session public key")
+	}
+}
+
 func TestKnockClosedAndPreauth(t *testing.T) {
 	t.Setenv("JWT_SECRET", "test-secret-for-session")
 	t.Setenv("GO_ENV", "development")
