@@ -71,6 +71,7 @@ type Hub struct {
 	syncLocked    bool
 	closing       bool
 	dirty         bool
+	authChecked   bool
 	pushFailUntil time.Time
 	chat          []ChatMessage
 	onCommitted   func() // optional hook (e.g. touch project timestamp)
@@ -249,6 +250,19 @@ func (h *Hub) Commit(message, author string) (string, error) {
 		"author":  author,
 	}, "")
 	return c.Hash, nil
+}
+
+// EnsureAuthPush runs one idempotent commit+push after the first client joins
+// so a missing or read-only deploy key fails immediately.
+func (h *Hub) EnsureAuthPush() {
+	h.mu.Lock()
+	if h.authChecked || h.closing {
+		h.mu.Unlock()
+		return
+	}
+	h.authChecked = true
+	h.mu.Unlock()
+	_, _ = h.Commit(autoCommitMsg, "")
 }
 
 // SaveTextFile writes text to CRDT + disk (common path for GraphQL/WS).

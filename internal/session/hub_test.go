@@ -175,3 +175,28 @@ func TestRegistryCloseProject(t *testing.T) {
 	// Safe to call again.
 	reg.CloseProject(projectID)
 }
+
+func TestEnsureAuthPushOnce(t *testing.T) {
+	state := t.TempDir()
+	svc := project.NewService(state)
+	id := "55555555-5555-5555-5555-555555555555"
+	if err := svc.InitProjectRepo(id); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.SaveFile(id, "main.tex", "hello\n"); err != nil {
+		t.Fatal(err)
+	}
+	h, err := Open(svc, id, "owner@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer h.Close()
+	h.EnsureAuthPush()
+	if !h.authChecked {
+		t.Fatal("first join should mark auth checked")
+	}
+	h.EnsureAuthPush()
+	if !h.authChecked {
+		t.Fatal("second call must stay checked")
+	}
+}

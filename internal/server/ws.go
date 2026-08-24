@@ -188,6 +188,7 @@ func (s *Server) handleProjectWS(w http.ResponseWriter, r *http.Request) {
 				case client.Out <- session.Outbound{Binary: true, Data: hub.EncodeSyncStep1()}:
 				default:
 				}
+				go hub.EnsureAuthPush()
 				continue
 			}
 			if !hub.ClientReady(clientID) {
