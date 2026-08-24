@@ -156,6 +156,8 @@ function boot() {
   const compileBtn = document.getElementById("editor-compile") as HTMLButtonElement;
   const commitBtn = document.getElementById("editor-commit") as HTMLButtonElement;
   const chatToggle = document.getElementById("editor-chat-toggle") as HTMLButtonElement;
+  const deployEl = document.getElementById("editor-deploy-key");
+  const initialSSH = root.dataset.sshPublic ?? "";
 
   toggleBtn.innerHTML = icon(ICO.menu);
   chatToggle.innerHTML = icon(ICO.chat);
@@ -209,6 +211,13 @@ function boot() {
   function paintStatus() {
     statusEl.className = `badge badge-soft ${statusClass(collab.status)} whitespace-nowrap`;
     statusEl.textContent = t(msgs, statusKey(collab.status));
+    const key = collab.sshPublic || initialSSH;
+    if (deployEl && key && (collab.status === "commit_error" || collab.status === "error")) {
+      deployEl.classList.remove("hidden");
+      deployEl.innerHTML = `<p class="font-semibold mb-1">${escapeAttr(t(msgs, "sessions.add_ssh_key"))}</p>
+        <textarea class="textarea textarea-bordered font-mono text-xs w-full" readonly rows="3">${escapeAttr(key)}</textarea>
+        <p class="text-xs mt-1">${escapeAttr(collab.errorMessage || "")}</p>`;
+    }
   }
 
   function paintSidebar() {

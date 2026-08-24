@@ -185,5 +185,5 @@ func (s *Server) handleEditorGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c := s.chrome(r, info.Remote)
-	s.render(w, r, pages.Editor(c, info.ID, info.Remote, user.Email, pages.MarshalI18n(appi18n.Map(s.bundle, s.lang(r)))))
+	s.render(w, r, pages.Editor(c, info.ID, info.Remote, user.Email, info.SSHPublic, pages.MarshalI18n(appi18n.Map(s.bundle, s.lang(r)))))
 }

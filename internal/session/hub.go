@@ -211,6 +211,15 @@ func (h *Hub) Commit(message, author string) (string, error) {
 	}
 	if h.Auth != nil || h.SSH != nil {
 		if err := igit.Push(h.Root, h.Branch, h.Auth, h.SSH); err != nil {
+			pub := ""
+			if h.SSH != nil {
+				pub = h.SSH.Authorized
+			}
+			h.broadcastJSONMap(map[string]any{
+				"type":       "push.error",
+				"message":    err.Error(),
+				"ssh_public": pub,
+			}, "")
 			return "", err
 		}
 	}

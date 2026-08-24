@@ -5,7 +5,7 @@ import (
 	"github.com/lewtec/superfolha/internal/ui/layout"
 )
 
-templ Editor(c layout.Chrome, projectID, projectName, email, i18nJSON string) {
+templ Editor(c layout.Chrome, projectID, projectName, email, sshPublic, i18nJSON string) {
 	@layout.EditorShell(c) {
 		<div
 			id="editor-root"
@@ -13,6 +13,7 @@ templ Editor(c layout.Chrome, projectID, projectName, email, i18nJSON string) {
 			data-project-id={ projectID }
 			data-project-name={ projectName }
 			data-email={ email }
+			data-ssh-public={ sshPublic }
 			data-projects-url={ paths.Projects() }
 			data-compile={ paths.Compile(projectID, "") }
 			data-upload={ paths.Upload(projectID) }
@@ -41,6 +42,7 @@ templ Editor(c layout.Chrome, projectID, projectName, email, i18nJSON string) {
 					</form>
 				</div>
 			</header>
+			<div id="editor-deploy-key" class="hidden shrink-0 px-3 py-2 bg-warning/20 border-b border-warning text-sm"></div>
 			<div id="editor-workspace" class="editor-workspace relative flex min-h-0 flex-1 overflow-hidden"></div>
 		</div>
 		<script src={ paths.EditorJS() } type="module"></script>

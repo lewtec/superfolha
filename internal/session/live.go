@@ -13,11 +13,12 @@ import (
 )
 
 var (
-	ErrAlreadyLive = errors.New("session already live for remote and branch")
-	ErrNotFound    = errors.New("session not found")
-	ErrNotHost     = errors.New("not session host")
-	ErrKnockClosed = errors.New("knock is disabled")
-	ErrClone       = errors.New("clone failed")
+	ErrAlreadyLive      = errors.New("session already live for remote and branch")
+	ErrNotFound         = errors.New("session not found")
+	ErrNotHost          = errors.New("not session host")
+	ErrKnockClosed      = errors.New("knock is disabled")
+	ErrClone            = errors.New("clone failed")
+	errWaitingDeployKey = errors.New("waiting for deploy key")
 )
 
 // Live is RAM metadata for one session incarnation.
@@ -144,10 +145,16 @@ func (r *Registry) Create(hostLogin, rawRemote, branch string, auth *igit.HTTPAu
 	}
 	sessionID := id.String()
 	dest := r.svc.GetProjectPath(sessionID)
-	cloneErr := r.cloner(dest, cloneURL, branch, auth, sshKey)
-	if cloneErr != nil {
-		if rmErr := os.RemoveAll(dest); rmErr != nil {
-			slog.Error("remove failed clone dest", "path", dest, "err", rmErr)
+	// SSH remotes need the session pubkey on the forge first. Do not clone yet.
+	var cloneErr error
+	if remote.IsSSH(rawRemote) {
+		cloneErr = errWaitingDeployKey
+	} else {
+		cloneErr = r.cloner(dest, cloneURL, branch, auth, sshKey)
+		if cloneErr != nil {
+			if rmErr := os.RemoveAll(dest); rmErr != nil {
+				slog.Error("remove failed clone dest", "path", dest, "err", rmErr)
+			}
 		}
 	}
 

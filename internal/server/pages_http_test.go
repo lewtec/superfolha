@@ -156,6 +156,33 @@ func TestChallengeSignLoginSetsCookie(t *testing.T) {
 	}
 }
 
+func TestSSHCreateStaysOnSessionsWithKey(t *testing.T) {
+	t.Setenv("JWT_SECRET", "rod-play-secret")
+	t.Setenv("GO_ENV", "development")
+	srv := testServer(t)
+	alice := signIn(t, "alice")
+	form := strings.NewReader("remote=git@github.com:t/paper&branch=main")
+	req := httptest.NewRequest(http.MethodPost, paths.Projects(), form)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{Name: auth.AuthCookieName, Value: alice})
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("create = %d", rec.Code)
+	}
+	if strings.HasPrefix(rec.Header().Get("Location"), "/editor/") {
+		t.Fatalf("SSH create must not open editor before deploy key: %q", rec.Header().Get("Location"))
+	}
+	list := httptest.NewRequest(http.MethodGet, paths.Projects(), nil)
+	list.AddCookie(&http.Cookie{Name: auth.AuthCookieName, Value: alice})
+	out := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(out, list)
+	body, _ := io.ReadAll(out.Body)
+	if !strings.Contains(string(body), "ssh-ed25519") && !strings.Contains(string(body), "ssh-") {
+		t.Fatalf("sessions page should show deploy public key: %s", truncateForTest(body, 400))
+	}
+}
+
 func TestCloneCreatesSessionAndSecondUserFails(t *testing.T) {
 	t.Setenv("JWT_SECRET", "rod-play-secret")
 	t.Setenv("GO_ENV", "development")
