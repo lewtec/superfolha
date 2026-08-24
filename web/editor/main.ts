@@ -103,6 +103,27 @@ function escapeHtml(s: string): string {
   );
 }
 
+function copyText(text: string, field?: HTMLTextAreaElement | null): void {
+  if (window.isSecureContext && navigator.clipboard && navigator.clipboard.writeText) {
+    void navigator.clipboard.writeText(text);
+    return;
+  }
+  const el = field ?? document.createElement("textarea");
+  const created = field == null;
+  if (created) {
+    el.value = text;
+    el.setAttribute("readonly", "");
+    el.style.position = "fixed";
+    el.style.left = "-9999px";
+    document.body.appendChild(el);
+  }
+  el.focus();
+  el.select();
+  el.setSelectionRange(0, el.value.length);
+  document.execCommand("copy");
+  if (created) el.remove();
+}
+
 function escapeAttr(s: string): string {
   return escapeHtml(s);
 }
@@ -374,7 +395,7 @@ function boot() {
 
   collab.subscribe(() => paintAll());
   sshCopy?.addEventListener("click", () => {
-    if (sshKeyEl?.value) void navigator.clipboard.writeText(sshKeyEl.value);
+    if (sshKeyEl?.value) copyText(sshKeyEl.value, sshKeyEl);
   });
 
   toggleBtn.addEventListener("click", () => {

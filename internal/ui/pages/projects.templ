@@ -92,10 +92,21 @@ templ Sessions(c layout.Chrome, items []session.Info) {
 		</div>
 		<script>
 			document.addEventListener("click", function (e) {
-				var b = e.target.closest("[data-copy-ssh]");
+				var t = e.target;
+				if (t && t.nodeType !== 1) t = t.parentElement;
+				if (!t || !t.closest) return;
+				var b = t.closest("[data-copy-ssh]");
 				if (!b) return;
 				var el = document.getElementById(b.getAttribute("data-copy-ssh"));
-				if (el) navigator.clipboard.writeText(el.value);
+				if (!el) return;
+				if (window.isSecureContext && navigator.clipboard && navigator.clipboard.writeText) {
+					navigator.clipboard.writeText(el.value);
+					return;
+				}
+				el.focus();
+				el.select();
+				el.setSelectionRange(0, el.value.length);
+				document.execCommand("copy");
 			});
 		</script>
 	}
