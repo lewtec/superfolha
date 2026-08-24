@@ -1,59 +1,64 @@
 package pages
 
 import (
-	"github.com/lewtec/superfolha/internal/db"
 	"github.com/lewtec/superfolha/internal/paths"
+	"github.com/lewtec/superfolha/internal/session"
 	"github.com/lewtec/superfolha/internal/ui/layout"
 )
 
-templ Projects(c layout.Chrome, items []db.Project, updated []string) {
+templ Sessions(c layout.Chrome, items []session.Info) {
 	@layout.AppShell(c) {
 		<div class="container mx-auto px-4 py-8">
 			<div class="flex justify-between items-center mb-6 gap-2 flex-wrap">
-				<h1 class="text-3xl font-bold">{ c.T("projects.title") }</h1>
-				<button type="button" class="btn btn-primary" onclick="document.getElementById('create-project').showModal()">{ c.T("projects.new_project") }</button>
+				<h1 class="text-3xl font-bold">{ c.T("sessions.title") }</h1>
+			</div>
+			<div class="card bg-base-100 shadow-xl mb-8">
+				<div class="card-body">
+					<h2 class="card-title">{ c.T("sessions.start") }</h2>
+					<form method="post" action={ paths.Projects() } class="space-y-4">
+						<label class="form-control w-full">
+							<span class="label-text">{ c.T("sessions.remote_label") }</span>
+							<input class="input input-bordered w-full" type="url" name="remote" required placeholder="https://github.com/org/paper"/>
+						</label>
+						<label class="form-control w-full">
+							<span class="label-text">{ c.T("sessions.branch_label") }</span>
+							<input class="input input-bordered w-full" type="text" name="branch" placeholder="main"/>
+						</label>
+						<label class="form-control w-full">
+							<span class="label-text">{ c.T("sessions.token_label") }</span>
+							<input class="input input-bordered w-full" type="password" name="token" autocomplete="off"/>
+						</label>
+						<button class="btn btn-primary" type="submit">{ c.T("sessions.clone") }</button>
+					</form>
+				</div>
 			</div>
 			if len(items) == 0 {
-				<div class="text-center py-16">
-					<p class="text-lg text-base-content/70 mb-4">{ c.T("projects.empty") }</p>
-					<button type="button" class="btn btn-primary" onclick="document.getElementById('create-project').showModal()">{ c.T("projects.create_first") }</button>
-				</div>
+				<p class="text-center text-base-content/70">{ c.T("sessions.empty") }</p>
 			} else {
 				<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-					for i, p := range items {
+					for _, item := range items {
 						<div class="card bg-base-100 shadow-xl">
 							<div class="card-body">
-								<h2 class="card-title">{ p.Name }</h2>
-								<p class="text-sm text-base-content/70">{ updated[i] }</p>
+								<h2 class="card-title break-all">{ item.Remote }</h2>
+								<p class="text-sm text-base-content/70">{ item.Branch }</p>
+								<p class="text-xs font-mono text-base-content/50 break-all">{ item.ID }</p>
 								<div class="card-actions justify-end mt-4">
-									<a class="btn btn-primary btn-sm" href={ paths.Editor(p.ID) }>{ c.T("common.open") }</a>
-									<form method="post" action={ paths.ProjectDelete(p.ID) } onsubmit="return confirm(this.dataset.confirm)" data-confirm={ c.T("projects.delete_confirm") }>
-										<button class="btn btn-error btn-sm" type="submit">{ c.T("common.delete") }</button>
-									</form>
+									<a class="btn btn-primary btn-sm" href={ paths.Editor(item.ID) }>{ c.T("common.open") }</a>
+									if item.HostLogin == c.Email {
+										<form method="post" action={ paths.ProjectDelete(item.ID) } onsubmit="return confirm(this.dataset.confirm)" data-confirm={ c.T("sessions.end_confirm") }>
+											<button class="btn btn-error btn-sm" type="submit">{ c.T("sessions.end") }</button>
+										</form>
+									} else {
+										<form method="post" action={ paths.SessionKnock(item.ID) }>
+											<button class="btn btn-ghost btn-sm" type="submit">{ c.T("sessions.knock") }</button>
+										</form>
+									}
 								</div>
 							</div>
 						</div>
 					}
 				</div>
 			}
-			<dialog id="create-project" class="modal">
-				<div class="modal-box">
-					<h3 class="font-bold text-lg mb-4">{ c.T("projects.create_modal_title") }</h3>
-					<form method="post" action={ paths.Projects() }>
-						<label class="form-control w-full">
-							<span class="label-text">{ c.T("projects.name_label") }</span>
-							<input class="input input-bordered w-full" type="text" name="name" required placeholder={ c.T("projects.name_placeholder") }/>
-						</label>
-						<div class="modal-action">
-							<button type="button" class="btn" onclick="document.getElementById('create-project').close()">{ c.T("common.cancel") }</button>
-							<button class="btn btn-primary" type="submit">{ c.T("common.create") }</button>
-						</div>
-					</form>
-				</div>
-				<form method="dialog" class="modal-backdrop">
-					<button>{ c.T("common.cancel") }</button>
-				</form>
-			</dialog>
 		</div>
 	}
 }

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -88,50 +89,70 @@ func (s *Server) handleLoginGet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleLoginPost(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		http.Redirect(w, r, paths.LoginError("errors.INVALID_INPUT"), http.StatusSeeOther)
-		return
-	}
-	email := strings.TrimSpace(r.FormValue("email"))
-	password := r.FormValue("password")
-	next := safeNext(r.FormValue("next"))
-	resp, err := s.authService.Login(r.Context(), email, password)
-	if err != nil {
-		http.Redirect(w, r, paths.LoginError(errorID(err)), http.StatusSeeOther)
-		return
-	}
-	auth.SetAuthCookie(w, r, resp.Token)
-	http.Redirect(w, r, next, http.StatusSeeOther)
+	http.Redirect(w, r, paths.Login(), http.StatusSeeOther)
 }
 
 func (s *Server) handleRegisterGet(w http.ResponseWriter, r *http.Request) {
-	if _, ok := auth.GetUserFromContext(r.Context()); ok {
-		http.Redirect(w, r, paths.Projects(), http.StatusSeeOther)
-		return
-	}
-	c := s.chrome(r, appi18n.T(s.loc(r), "auth.register_button"))
-	s.render(w, r, pages.Register(c))
+	http.Redirect(w, r, paths.Login(), http.StatusSeeOther)
 }
 
 func (s *Server) handleRegisterPost(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		http.Redirect(w, r, paths.RegisterError("errors.INVALID_INPUT"), http.StatusSeeOther)
+	http.Redirect(w, r, paths.Login(), http.StatusSeeOther)
+}
+
+func (s *Server) handleGitHubLogin(w http.ResponseWriter, r *http.Request) {
+	if !s.github.Enabled() {
+		http.Redirect(w, r, paths.LoginError("errors.GITHUB_NOT_CONFIGURED"), http.StatusSeeOther)
 		return
 	}
-	email := strings.TrimSpace(r.FormValue("email"))
-	password := r.FormValue("password")
-	confirm := r.FormValue("confirm")
-	if password != confirm {
-		http.Redirect(w, r, paths.RegisterError("auth.passwords_do_not_match"), http.StatusSeeOther)
-		return
-	}
-	resp, err := s.authService.Register(r.Context(), email, password)
+	next := safeNext(r.URL.Query().Get("next"))
+	state, err := auth.MintOAuthState(next)
 	if err != nil {
-		http.Redirect(w, r, paths.RegisterError(errorID(err)), http.StatusSeeOther)
+		http.Redirect(w, r, paths.LoginError("errors.INTERNAL"), http.StatusSeeOther)
 		return
 	}
-	auth.SetAuthCookie(w, r, resp.Token)
-	http.Redirect(w, r, paths.Projects(), http.StatusSeeOther)
+	redirectURI := githubCallbackURL(r)
+	http.Redirect(w, r, s.github.AuthCodeURL(state, redirectURI), http.StatusSeeOther)
+}
+
+func (s *Server) handleGitHubCallback(w http.ResponseWriter, r *http.Request) {
+	if !s.github.Enabled() {
+		http.Redirect(w, r, paths.LoginError("errors.GITHUB_NOT_CONFIGURED"), http.StatusSeeOther)
+		return
+	}
+	if r.URL.Query().Get("error") != "" {
+		http.Redirect(w, r, paths.LoginError("errors.GITHUB_OAUTH"), http.StatusSeeOther)
+		return
+	}
+	next, err := auth.ParseOAuthState(r.URL.Query().Get("state"))
+	if err != nil {
+		http.Redirect(w, r, paths.LoginError("errors.GITHUB_OAUTH"), http.StatusSeeOther)
+		return
+	}
+	id, err := s.github.Exchange(r.URL.Query().Get("code"), githubCallbackURL(r))
+	if err != nil {
+		http.Redirect(w, r, paths.LoginError("errors.GITHUB_OAUTH"), http.StatusSeeOther)
+		return
+	}
+	token, err := auth.GenerateToken(fmt.Sprintf("%d", id.ID), id.Login)
+	if err != nil {
+		http.Redirect(w, r, paths.LoginError("errors.INTERNAL"), http.StatusSeeOther)
+		return
+	}
+	auth.SetAuthCookie(w, r, token)
+	http.Redirect(w, r, safeNext(next), http.StatusSeeOther)
+}
+
+func githubCallbackURL(r *http.Request) string {
+	scheme := "https"
+	if r.TLS == nil {
+		if proto := r.Header.Get("X-Forwarded-Proto"); proto != "" {
+			scheme = proto
+		} else {
+			scheme = "http"
+		}
+	}
+	return scheme + "://" + r.Host + paths.GitHubCallback()
 }
 
 func (s *Server) handleLogoutPage(w http.ResponseWriter, r *http.Request) {

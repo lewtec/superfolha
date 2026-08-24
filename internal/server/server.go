@@ -14,6 +14,7 @@ import (
 	"github.com/lewtec/superfolha/internal/auth"
 	"github.com/lewtec/superfolha/internal/compiler"
 	"github.com/lewtec/superfolha/internal/db"
+	"github.com/lewtec/superfolha/internal/githubapp"
 	appi18n "github.com/lewtec/superfolha/internal/i18n"
 	"github.com/lewtec/superfolha/internal/paths"
 	"github.com/lewtec/superfolha/internal/project"
@@ -30,10 +31,15 @@ type Server struct {
 	authService    *auth.Service
 	hubs           *session.Registry
 	bundle         *goi18n.Bundle
+	github         githubapp.Config
 }
 
 func NewServer(repo db.Repository, stateDir string, projectService *project.Service, authService *auth.Service) *Server {
 	hubs := session.NewRegistry(projectService)
+	gh, err := githubapp.ConfigFromEnv()
+	if err != nil {
+		slog.Error("github app config", "err", err)
+	}
 	return &Server{
 		repo:           repo,
 		stateDir:       stateDir,
@@ -42,6 +48,7 @@ func NewServer(repo db.Repository, stateDir string, projectService *project.Serv
 		authService:    authService,
 		hubs:           hubs,
 		bundle:         appi18n.NewBundle(),
+		github:         gh,
 	}
 }
 
@@ -63,14 +70,22 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc(paths.PatternLanding, s.handleLanding)
 	mux.HandleFunc(paths.PatternLoginGet, s.handleLoginGet)
 	mux.HandleFunc(paths.PatternLoginPost, s.handleLoginPost)
+	mux.HandleFunc(paths.PatternGitHubLogin, s.handleGitHubLogin)
+	mux.HandleFunc(paths.PatternGitHubCallback, s.handleGitHubCallback)
 	mux.HandleFunc(paths.PatternRegisterGet, s.handleRegisterGet)
 	mux.HandleFunc(paths.PatternRegisterPost, s.handleRegisterPost)
 	mux.HandleFunc(paths.PatternLogout, s.handleLogoutPage)
 	mux.HandleFunc(paths.PatternLang, s.handleLang)
 
 	mux.HandleFunc(paths.PatternProjectsGet, s.requirePageUser(s.handleProjectsGet))
+	mux.HandleFunc(paths.PatternProjectsAlias, s.requirePageUser(s.handleProjectsGet))
 	mux.HandleFunc(paths.PatternProjectsPost, s.requirePageUser(s.handleProjectsPost))
 	mux.HandleFunc(paths.PatternProjectDelete, s.requirePageUser(s.handleProjectDelete))
+	mux.HandleFunc(paths.PatternSessionPreauth, s.requirePageUser(s.handleSessionPreauth))
+	mux.HandleFunc(paths.PatternSessionKnock, s.requirePageUser(s.handleSessionKnock))
+	mux.HandleFunc(paths.PatternSessionAdmit, s.requirePageUser(s.handleSessionAdmit))
+	mux.HandleFunc(paths.PatternSessionKick, s.requirePageUser(s.handleSessionKick))
+	mux.HandleFunc(paths.PatternSessionKnockMode, s.requirePageUser(s.handleSessionKnockMode))
 	mux.HandleFunc(paths.PatternEditorGet, s.requirePageUser(s.handleEditorGet))
 
 	mux.Handle(paths.PatternCompile, http.HandlerFunc(s.handleCompile))
@@ -79,24 +94,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle(paths.PatternDownload, http.HandlerFunc(s.handleDownloadFile))
 	mux.HandleFunc(paths.PatternAPILogout, s.handleLogout)
 
-	return auth.Middleware(s.dropGhostUsers(mux))
-}
-
-// dropGhostUsers treats a valid JWT for a missing user as anonymous and
-// clears the cookie (fresh state-dir after a leftover authToken).
-func (s *Server) dropGhostUsers(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		u, ok := auth.GetUserFromContext(r.Context())
-		if !ok {
-			next.ServeHTTP(w, r)
-			return
-		}
-		if _, err := s.repo.GetUserByID(r.Context(), u.UserID); err != nil {
-			auth.ClearAuthCookie(w, r)
-			r = r.WithContext(auth.ContextWithoutUser(r.Context()))
-		}
-		next.ServeHTTP(w, r)
-	})
+	return auth.Middleware(mux)
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {

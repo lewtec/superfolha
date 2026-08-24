@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/lewtec/superfolha/internal/crdt"
+	igit "github.com/lewtec/superfolha/internal/git"
 	"github.com/lewtec/superfolha/internal/project"
 	ycrdt "github.com/reearth/ygo/crdt"
 	ysync "github.com/reearth/ygo/sync"
@@ -138,23 +139,24 @@ func TestHubBootstrapFullStateAndClientStep1(t *testing.T) {
 func TestRegistryCloseProject(t *testing.T) {
 	state := t.TempDir()
 	svc := project.NewService(state)
-	projectID := "33333333-3333-3333-3333-333333333333"
-	if err := svc.InitProjectRepo(projectID); err != nil {
-		t.Fatal(err)
-	}
-	if err := svc.SaveFile(projectID, "main.tex", "body\n"); err != nil {
-		t.Fatal(err)
-	}
-
 	reg := NewRegistry(svc)
-	reg.CloseProject(projectID) // no-op when cold
-
+	reg.SetCloner(func(dest, _, _ string, _ *igit.HTTPAuth) error {
+		if err := igit.InitRepo(dest); err != nil {
+			return err
+		}
+		return os.WriteFile(filepath.Join(dest, "main.tex"), []byte("body\n"), 0o644)
+	})
+	live, err := reg.Create("owner@example.com", "https://github.com/t/paper", "main", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	projectID := live.ID
 	h, err := reg.GetOrOpen(projectID, "owner@example.com")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if reg.GetIfLive(projectID) != h {
-		t.Fatal("hub should be live after GetOrOpen")
+		t.Fatal("hub should be live after Create")
 	}
 	c := h.AddClient("c1")
 	if c == nil {

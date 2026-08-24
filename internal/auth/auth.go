@@ -56,6 +56,11 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
+// JWTSecret returns the signing secret for cookies and preauth tokens.
+func JWTSecret() ([]byte, error) {
+	return getJWTSecret()
+}
+
 // getJWTSecret retrieves the JWT secret from the environment once and caches it.
 // Logs only on the first resolution so authenticated requests do not spam logs.
 func getJWTSecret() ([]byte, error) {

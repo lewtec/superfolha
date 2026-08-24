@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/lewtec/superfolha/internal/crdt"
+	igit "github.com/lewtec/superfolha/internal/git"
 	"github.com/lewtec/superfolha/internal/project"
 	ysync "github.com/reearth/ygo/sync"
 )
@@ -57,6 +57,8 @@ type Hub struct {
 	Doc        *crdt.ProjectDoc
 	Root       string
 	OwnerEmail string
+	Auth       *igit.HTTPAuth
+	Branch     string
 
 	svc *project.Service
 
@@ -84,7 +86,7 @@ func Open(svc *project.Service, projectID, ownerEmail string) (*Hub, error) {
 	}
 	h := &Hub{
 		ProjectID:  projectID,
-		SessionID:  uuid.NewString(),
+		SessionID:  projectID,
 		Doc:        doc,
 		Root:       svc.GetProjectPath(projectID),
 		OwnerEmail: ownerEmail,
@@ -206,6 +208,11 @@ func (h *Hub) Commit(message, author string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if h.Auth != nil {
+		if err := igit.PushOrigin(h.Root, h.Branch, h.Auth); err != nil {
+			return "", err
+		}
+	}
 	h.mu.Lock()
 	h.dirty = false
 	if h.commitTimer != nil {
@@ -284,6 +291,16 @@ func (h *Hub) SyncLocked() bool {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	return h.syncLocked
+}
+
+// DisconnectAll closes every peer channel (kick everyone).
+func (h *Hub) DisconnectAll() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for id, c := range h.clients {
+		close(c.Out)
+		delete(h.clients, id)
+	}
 }
 
 // AddClient registers a peer (not Ready until hello.ack).

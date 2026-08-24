@@ -7,13 +7,13 @@ import (
 
 func TestBuilders(t *testing.T) {
 	t.Parallel()
-	if Login() != "/login" || Register() != "/register" || Projects() != "/projects" {
+	if Login() != "/login" || Register() != "/register" || Projects() != "/sessions" {
 		t.Fatal("root builders")
 	}
 	if got := Editor("abc"); got != "/editor/abc" {
 		t.Fatalf("Editor = %q", got)
 	}
-	if got := ProjectDelete("abc"); got != "/projects/abc/delete" {
+	if got := ProjectDelete("abc"); got != "/sessions/abc/end" {
 		t.Fatalf("ProjectDelete = %q", got)
 	}
 	if got := BrandLogo(); got != "/static/brand/logo.png" {

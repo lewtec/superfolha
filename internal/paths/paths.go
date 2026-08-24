@@ -24,18 +24,44 @@ func withQuery(p string, q url.Values) string {
 	return p + "?" + q.Encode()
 }
 
-func Login() string    { return "/login" }
-func Register() string { return "/register" }
-func Logout() string   { return "/logout" }
-func Lang() string     { return "/lang" }
-func Projects() string { return "/projects" }
+func Login() string          { return "/login" }
+func Register() string       { return "/register" }
+func Logout() string         { return "/logout" }
+func Lang() string           { return "/lang" }
+func Projects() string       { return "/sessions" }
+func GitHubLogin() string    { return "/login/github" }
+func GitHubCallback() string { return "/login/github/callback" }
+
+func SessionEnd(id string) string {
+	return path.Join("/sessions", id, "end")
+}
+
+func SessionPreauth(id string) string {
+	return path.Join("/sessions", id, "preauth")
+}
+
+func SessionKnock(id string) string {
+	return path.Join("/sessions", id, "knock")
+}
+
+func SessionAdmit(id string) string {
+	return path.Join("/sessions", id, "admit")
+}
+
+func SessionKick(id string) string {
+	return path.Join("/sessions", id, "kick")
+}
+
+func SessionKnockMode(id string) string {
+	return path.Join("/sessions", id, "knock-mode")
+}
 
 func Editor(id string) string {
 	return path.Join("/editor", id)
 }
 
 func ProjectDelete(id string) string {
-	return path.Join("/projects", id, "delete")
+	return SessionEnd(id)
 }
 
 func LoginNext(next string) string {
@@ -43,6 +69,13 @@ func LoginNext(next string) string {
 		return Login()
 	}
 	return withQuery(Login(), url.Values{"next": {next}})
+}
+
+func GitHubLoginNext(next string) string {
+	if next == "" {
+		return GitHubLogin()
+	}
+	return withQuery(GitHubLogin(), url.Values{"next": {next}})
 }
 
 func LoginError(err string) string {
@@ -108,18 +141,26 @@ func ProjectWS(id string) string {
 
 // Mux patterns (method + path). Register only these.
 const (
-	PatternLanding       = "GET /{$}"
-	PatternLoginGet      = "GET /login"
-	PatternLoginPost     = "POST /login"
-	PatternRegisterGet   = "GET /register"
-	PatternRegisterPost  = "POST /register"
-	PatternLogout        = "POST /logout"
-	PatternLang          = "POST /lang"
-	PatternProjectsGet   = "GET /projects"
-	PatternProjectsPost  = "POST /projects"
-	PatternProjectDelete = "POST /projects/{" + ParamID + "}/delete"
-	PatternEditorGet     = "GET /editor/{" + ParamID + "}"
-	PatternStatic        = "GET /static/"
+	PatternLanding          = "GET /{$}"
+	PatternLoginGet         = "GET /login"
+	PatternLoginPost        = "POST /login"
+	PatternGitHubLogin      = "GET /login/github"
+	PatternGitHubCallback   = "GET /login/github/callback"
+	PatternRegisterGet      = "GET /register"
+	PatternRegisterPost     = "POST /register"
+	PatternLogout           = "POST /logout"
+	PatternLang             = "POST /lang"
+	PatternProjectsGet      = "GET /sessions"
+	PatternProjectsPost     = "POST /sessions"
+	PatternProjectsAlias    = "GET /projects"
+	PatternProjectDelete    = "POST /sessions/{" + ParamID + "}/end"
+	PatternSessionPreauth   = "POST /sessions/{" + ParamID + "}/preauth"
+	PatternSessionKnock     = "POST /sessions/{" + ParamID + "}/knock"
+	PatternSessionAdmit     = "POST /sessions/{" + ParamID + "}/admit"
+	PatternSessionKick      = "POST /sessions/{" + ParamID + "}/kick"
+	PatternSessionKnockMode = "POST /sessions/{" + ParamID + "}/knock-mode"
+	PatternEditorGet        = "GET /editor/{" + ParamID + "}"
+	PatternStatic           = "GET /static/"
 
 	PatternAPILogout = "POST /api/logout"
 	PatternCompile   = "GET /api/compile"
