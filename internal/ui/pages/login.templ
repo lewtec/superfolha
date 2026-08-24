@@ -26,11 +26,11 @@ templ Login(c layout.Chrome, next string) {
 				>
 					<h1 class="card-title text-2xl font-bold justify-center">Superfolha</h1>
 					<p class="text-center text-base-content/70 mb-4">{ c.T("auth.login_title") }</p>
-					<button id="sf-login-btn" class="btn btn-primary w-full" type="button">{ c.T("auth.key_button") }</button>
+					<button id="sf-login-btn" class="btn btn-primary w-full" type="button" onclick="window.__sfLogin && window.__sfLogin()">{ c.T("auth.key_button") }</button>
 					<p id="sf-login-status" class="text-center text-sm text-base-content/70 mt-4"></p>
 				</div>
 			</div>
 		</div>
-		<script src={ paths.LoginJS() } defer></script>
+		<script src={ paths.LoginJS() }></script>
 	}
 }
