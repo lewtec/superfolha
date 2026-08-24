@@ -1,9 +1,11 @@
 package git
 
 import (
+	"errors"
 	"fmt"
 
 	gogit "github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
@@ -43,7 +45,27 @@ func CloneHTTP(dest, remoteURL, branch string, auth *HTTPAuth) error {
 	return nil
 }
 
-// PushOrigin pushes the current HEAD branch to origin.
+// PushOrigin pushes the current HEAD branch to origin over HTTP.
 func PushOrigin(repoPath, branch string, auth *HTTPAuth) error {
-	return Push(repoPath, branch, auth, nil)
+	r, err := openRepo(repoPath)
+	if err != nil {
+		return err
+	}
+	ref := branch
+	if ref == "" {
+		head, herr := r.Head()
+		if herr != nil {
+			return fmt.Errorf("head: %w", herr)
+		}
+		ref = head.Name().Short()
+	}
+	err = r.Push(&gogit.PushOptions{
+		RemoteName: "origin",
+		RefSpecs:   []config.RefSpec{config.RefSpec("refs/heads/" + ref + ":refs/heads/" + ref)},
+		Auth:       auth.method(),
+	})
+	if err != nil && !errors.Is(err, gogit.NoErrAlreadyUpToDate) {
+		return fmt.Errorf("push origin: %w", err)
+	}
+	return nil
 }

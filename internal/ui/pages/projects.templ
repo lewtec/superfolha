@@ -11,20 +11,33 @@ templ Sessions(c layout.Chrome, items []session.Info) {
 		<div class="container mx-auto px-4 py-8">
 			<div class="flex justify-between items-center mb-6 gap-2 flex-wrap">
 				<h1 class="text-3xl font-bold">{ c.T("sessions.title") }</h1>
+				<p class="sf-clone-status text-sm w-full" data-working={ c.T("sessions.cloning") } data-failed={ c.T("sessions.clone_failed") } data-timeout={ c.T("sessions.clone_timeout") }></p>
 			</div>
 			<div class="card bg-base-100 shadow-xl mb-8">
 				<div class="card-body">
 					<h2 class="card-title">{ c.T("sessions.start") }</h2>
 					<p class="text-sm text-base-content/70">{ c.T("sessions.start_hint") }</p>
-					<form method="post" action={ paths.Projects() } class="space-y-4">
+					<form id="sf-session-form" method="post" action={ paths.Projects() } class="space-y-4">
 						<label class="form-control w-full">
 							<span class="label-text">{ c.T("sessions.remote_label") }</span>
-							<input class="input input-bordered w-full font-mono" type="text" name="remote" required placeholder="git@github.com:org/paper" spellcheck="false" autocomplete="off"/>
+							<input id="sf-remote" class="input input-bordered w-full font-mono" type="text" name="remote" required placeholder="git@github.com:org/paper" spellcheck="false" autocomplete="off"/>
 						</label>
 						<label class="form-control w-full">
 							<span class="label-text">{ c.T("sessions.branch_label") }</span>
-							<input class="input input-bordered w-full" type="text" name="branch" placeholder="main"/>
+							<input id="sf-branch" class="input input-bordered w-full" type="text" name="branch" placeholder="main"/>
 						</label>
+						<fieldset class="fieldset">
+							<legend class="fieldset-legend">{ c.T("sessions.ssh_key_local") }</legend>
+							<textarea id="sf-ssh-pub" class="textarea textarea-bordered font-mono text-xs w-full" readonly rows="3"></textarea>
+							<input type="hidden" name="ssh_public" id="sf-ssh-public"/>
+							<input type="file" id="sf-ssh-file" class="hidden" accept="application/json,.json"/>
+							<div class="flex flex-wrap gap-2 mt-2">
+								<button type="button" class="btn" id="sf-ssh-store">{ c.T("sessions.ssh_store") }</button>
+								<button type="button" class="btn" id="sf-ssh-load">{ c.T("sessions.ssh_load") }</button>
+								<button type="button" class="btn" data-copy-ssh="sf-ssh-pub">{ c.T("sessions.copy_key") }</button>
+							</div>
+							<p class="label">{ c.T("sessions.ssh_key_hint") }</p>
+						</fieldset>
 						<button class="btn btn-primary" type="submit">{ c.T("sessions.clone") }</button>
 					</form>
 				</div>
@@ -38,11 +51,10 @@ templ Sessions(c layout.Chrome, items []session.Info) {
 							<span class="label-text">{ c.T("sessions.ssh_key") }</span>
 							<textarea class="textarea textarea-bordered font-mono text-xs w-full" readonly rows="4" id={ "ssh-" + first.ID }>{ first.SSHPublic }</textarea>
 						</label>
+						<p class="sf-clone-status text-sm py-2" data-working={ c.T("sessions.cloning") } data-failed={ c.T("sessions.clone_failed") } data-timeout={ c.T("sessions.clone_timeout") }></p>
 						<div class="modal-action">
 							<button type="button" class="btn" data-copy-ssh={ "ssh-" + first.ID }>{ c.T("sessions.copy_key") }</button>
-							<form method="post" action={ paths.SessionRetry(first.ID) }>
-								<button class="btn btn-primary" type="submit">{ c.T("sessions.retry_clone") }</button>
-							</form>
+							<button type="button" class="btn btn-primary" id="sf-ssh-retry" data-ws={ paths.SessionWS(first.ID) } data-editor={ paths.Editor(first.ID) } data-remote={ first.CloneURL } data-branch={ first.Branch }>{ c.T("sessions.retry_clone") }</button>
 							<form method="dialog">
 								<button class="btn btn-ghost">{ c.T("common.cancel") }</button>
 							</form>
@@ -70,9 +82,7 @@ templ Sessions(c layout.Chrome, items []session.Info) {
 									if item.Ready {
 										<a class="btn btn-primary btn-sm" href={ paths.Editor(item.ID) }>{ c.T("common.open") }</a>
 									} else if item.HostLogin == c.Email {
-										<form method="post" action={ paths.SessionRetry(item.ID) }>
-											<button class="btn btn-primary btn-sm" type="submit">{ c.T("sessions.retry_clone") }</button>
-										</form>
+										<button type="button" class="btn btn-primary btn-sm" data-ws={ paths.SessionWS(item.ID) } data-editor={ paths.Editor(item.ID) } data-remote={ item.CloneURL } data-branch={ item.Branch } data-retry-clone>{ c.T("sessions.retry_clone") }</button>
 									}
 									if item.HostLogin == c.Email {
 										<form method="post" action={ paths.ProjectDelete(item.ID) } onsubmit="return confirm(this.dataset.confirm)" data-confirm={ c.T("sessions.end_confirm") }>
@@ -109,6 +119,7 @@ templ Sessions(c layout.Chrome, items []session.Info) {
 				document.execCommand("copy");
 			});
 		</script>
+		<script src={ paths.SessionsJS() }></script>
 	}
 }
 

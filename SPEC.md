@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|-------|
 | **Title** | Superfolha Product & Architecture Spec |
-| **Status** | Draft (ephemeral forge, post grill 2026-08-24) |
+| **Status** | Draft (ephemeral forge, signer-socket grill 2026-08-24) |
 | **Date** | 2026-08-24 |
 | **Repo** | `/home/lucasew/WORKSPACE/OPENSOURCE-own/superfolha` |
 | **Audience** | Engineers implementing Superfolha |
@@ -18,10 +18,11 @@ This document is the product and architecture specification. It replaces the Jul
 |------|---------|
 | **session** | One live editor for one `remote + branch`. Identity is a UUIDv7. |
 | **host** | First GitHub user who created this incarnation by cloning. The host seat does not transfer while the process holds the session. |
-| **remote** | Canonical HTTP git URL (no `.git` suffix). |
+| **remote** | Canonical identity of a git repo (HTTPS form, no `.git`). Transport is always SSH. |
+| **session key** | Ed25519 seed in the browser, keyed by remote+branch. Used only for git SSH. Not the login key. |
+| **signer tab** | The browser tab that started clone or Persist. Only that tab may `sign()`. |
 | **preauth** | Signed token the host mints so another signed-in user can join this session. |
 | **knock** | Join request that uses only the session UUIDv7. The host can disable knocks (auto-reject). |
-| **installation token** | Short-lived GitHub App token. Held in hub RAM. Used for HTTP clone and push. |
 | **hub** | In-process actor: ygo CRDT, clients, flush, commit+push lock. |
 
 Do not use “room”, “project row”, or “owner” for these ideas. GitHub repo admin is not the Superfolha host.
@@ -32,7 +33,7 @@ Do not use “room”, “project row”, or “owner” for these ideas. GitHub
 
 Superfolha is a web LaTeX editor. Durable paper state is the git remote. The server process is disposable.
 
-A user signs in with GitHub. That login is identity. Starting work is an HTTP clone. GitHub App grant-on-use fills the clone credential for GitHub remotes. The clone creates a session. Collaborators join with a preauth token or, if the host allows it, a knock on the session id.
+A user signs in with an Ed25519 key in the browser. Starting work is an SSH clone. The browser holds the session key and signs git. Superfolha opens TCP to the forge and asks that tab to `sign()`. Collaborators join with a preauth token or, if the host allows it, a knock on the session id.
 
 If the process dies, RAM dies. The next writer clones again from the remote. Unpushed work is gone.
 
@@ -40,12 +41,12 @@ If the process dies, RAM dies. The next writer clones again from the remote. Unp
 
 ## Goals
 
-1. GitHub App OAuth is the only identity.
-2. HTTP clone creates a session (UUIDv7).
+1. Ed25519 challenge-sign is identity. The login private key never leaves the browser.
+2. SSH clone creates a session (UUIDv7). The form does not clone.
 3. At most one live session per `remote + branch`. A second create fails. It does not join.
 4. Session lives until the host ends it. No idle-evict.
-5. Clone credentials live in hub RAM. Never disk. Never SQLite.
-6. Anyone in the session can ask to persist. The hub also auto-commits and pushes. Both use one singleflight.
+5. The session private key never enters hub RAM. The server asks a signer tab to `sign()`.
+6. Persist is started by a seed-holding tab. That same tab signs. Guests cannot persist.
 7. Preauth and optional knock are the join doors. Clone is create-only.
 8. Live multi-client CRDT editing stays (ygo + Yjs, one hub per session).
 9. Single-instance process.
@@ -54,7 +55,8 @@ If the process dies, RAM dies. The next writer clones again from the remote. Unp
 
 - Password or email accounts.
 - Superfolha-owned project rows as source of truth.
-- User Ed25519 / deploy-key identity.
+- User login Ed25519 reused as a git deploy key.
+- HTTP clone or a pasted token.
 - Per-invite revoke lists and invite-epoch files (kick-everyone only).
 - Multi-instance hubs.
 - Durable CRDT snapshots.
@@ -66,10 +68,10 @@ If the process dies, RAM dies. The next writer clones again from the remote. Unp
 | # | Decision |
 |---|----------|
 | F1 | **Forge-native.** The git remote is the paper. Superfolha does not own a second copy of truth. |
-| F2 | **HTTP clone is the primitive.** GitHub login is identity plus sugar that fills the clone URL and credential. |
-| F3 | **Ed25519 challenge-sign identity.** The browser holds the private key. Login is nonce + signature. No GitHub App required to sign in. Fingerprint is the display name. |
-| F4 | **Do not delegate the identity private key.** Git uses a different per-session SSH key in hub RAM. The host adds that pubkey on the remote. |
-| F5 | **SSH remotes** clone/push with the session key. HTTP remotes still accept a pasted token. GitHub App install tokens stay optional sugar. |
+| F2 | **SSH clone is the primitive.** The form is SSH only. No token. No `https://` clone. |
+| F3 | **Ed25519 challenge-sign identity.** The browser holds the login private key. Login is nonce + signature. Fingerprint is the display name. |
+| F4 | **Session key stays in the browser.** IndexedDB, per remote+branch. Load/store is JSON. Create posts only the public line. The server never receives the seed. Superfolha opens SSH and asks the signer tab to `sign()`. |
+| F5 | **Signer tab.** Only the tab that started clone or Persist may sign. A second open tab does not sign for it. Close that tab and that action stops. |
 | F6 | **Clone creates a session** with a UUIDv7. Disk path `{state-dir}/repos/{sessionID}`. |
 | F7 | **Uniqueness:** at most one live session per `remote + branch`. Second clone **fails**. Do not put the UUIDv7 in that error. Host retry (same GitHub login) returns the existing session. |
 | F8 | **No join via clone.** Join is preauth or knock. |
@@ -78,9 +80,11 @@ If the process dies, RAM dies. The next writer clones again from the remote. Unp
 | F11 | **Knock is opt-in.** Auto-reject closes only the knock door. |
 | F12 | **Walk-in:** host, users already admitted (preauth redeem), and (if knock is on) users the host admits. GitHub write on the remote does **not** walk in through the clone form. |
 | F13 | **v1 revoke:** kick everyone (drop live clients). Preauth TTL/epoch later. |
-| F14 | **Persist:** anyone may ask. Quiet auto-commit+push as well. One singleflight (existing commit lock). Commit author = host GitHub login. Pusher = installation token or the RAM HTTP credential. |
-| F15 | **GitHub only.** Delete password register/login. No dual auth. Local UUID projects are not a product path. |
-| F16 | No user Ed25519 as login. GitHub deploy keys cannot reuse one pubkey across repos. |
+| F14 | **Persist:** a seed-holding tab owns a 30s dirty cooldown and the Persist button. That tab asks and signs. Guest Persist is an error: no commit, no push. Guest keystrokes dirty the host tab’s doc; the host tab’s cooldown may persist. Server singleflight only. No server auto-push. |
+| F15 | **GitHub App leftover is unused.** No OAuth identity. No installation token for clone. |
+| F16 | Login key and session key are different. One session pubkey per remote+branch (GitHub deploy keys cannot be reused across repos). |
+| F17 | **Create stays pending.** Sessions page opens a signer socket. Retry clone uses that socket. After clone, the same tab signs a probe push of current HEAD. Fail → key modal, stay on sessions. Success → editor. |
+| F18 | If `main.tex` is missing after clone, write the default template locally. It is committed on the first Persist. |
 
 CRDT decisions that still hold: one Y.Doc per session; CRDT is RAM-only; Git working tree is the disk projection; stream access = session access; flush before compile; lock CRDT sync while commit+push runs; Synced = server ack, not push; artifacts stay outside git; single instance.
 
@@ -91,22 +95,23 @@ CRDT decisions that still hold: one Y.Doc per session; CRDT is RAM-only; Git wor
 1. User opens `/login`. The browser creates or reuses an Ed25519 key in IndexedDB.
 2. `GET /login/challenge` returns a short-lived signed nonce. The browser signs it. `POST /login/verify` checks the signature.
 3. Superfolha sets a JWT cookie: `{key_fingerprint_id, login}`. No user row. The identity private key never leaves the browser.
-4. Each session mints a **different** SSH key in hub RAM. The host adds that public key on the remote, then clones.
+4. The browser holds a **session** Ed25519 seed (IndexedDB, per remote+branch). Create posts only the public line. The host adds that public key on the remote. Clone and push ask that tab to `sign()`. The login key is never uploaded.
 
-Public GitHub remotes still require this login. They do not require an App grant.
+Public remotes still require this login.
 
 ---
 
 ## Start a session
 
-1. Signed-in user submits an HTTP git URL and a branch (default `main`).
-2. Server canonicalizes the remote. If a live session exists for that pair:
+1. Signed-in user pastes an SSH remote and a branch (default `main`). The browser loads or mints a session seed for that pair and shows the public key. Load/store export that seed as JSON.
+2. Submit posts `{remote, branch, ssh_public}`. No seed.
+3. Server canonicalizes the remote. If a live session exists for that pair:
    - same host login → return that session
    - anyone else → fail, no id
-3. GitHub host/path remote: if the App cannot yet see the repo, send the user to the App install/update URL for that repo, then retry.
-4. Mint an installation token (GitHub) or use the pasted token (other forges). Public clone may use no token.
-5. HTTP clone into `{state-dir}/repos/{uuidv7}`. Hold the credential on the hub.
-6. Open the CRDT hub. The host is admitted. Redirect to `/editor/{sessionID}`.
+4. Server stores a **pending** session. It does not clone. Redirect stays on `/sessions`. The host adds the public key on the remote.
+5. The sessions page opens `GET /ws/sessions/{id}`. That tab is the signer. The server clones over SSH, asking the tab to `sign()`.
+6. After clone, if `main.tex` is missing, write the default template. Then the same tab signs a probe push of current HEAD.
+7. Probe fail → error + key modal. Stay pending. Probe success → open the hub. Redirect to `/editor/{sessionID}`.
 
 ---
 
@@ -128,21 +133,29 @@ Do not treat the UUIDv7 as a secret capability by itself unless knock is on.
 ## Persist
 
 ```text
-ask or auto-timer
+seed-holding tab: Persist click or 30s dirty cooldown
+    → that tab asks (commit.now)
     → singleflight
     → flush CRDT → git commit (author = host login) → git push
+         (each SSH sign() is a WS round-trip to that same tab)
     → unlock
 ```
 
-If push fails, keep the local commit, report the error, unlock. Do not start a second commit+push while one flight is running.
+Dirty means the Yjs doc, including peer edits. Only a tab that holds the seed runs the cooldown.
+
+Guest Persist → error. No commit. No push. The server does not ask another tab to sign.
+
+If push fails, keep the local commit, report the error, unlock. No second commit+push while one flight is running.
+
+The server does not auto-commit. Close the signer tab and push stops.
 
 ---
 
 ## Process death
 
-Gone: hubs, CRDT, RAM credentials, working trees, knock queues, in-memory admits.
+Gone: hubs, CRDT, working trees, knock queues, in-memory admits.
 
-Still valid: git remotes, GitHub App install, JWT cookie (until expiry), deploy secrets.
+Still valid: git remotes, JWT cookie (until expiry), session seed in the host browser, deploy secrets.
 
 Next writer signs in, clones the same remote+branch, becomes host of a new UUIDv7.
 
@@ -166,7 +179,8 @@ Hub idle-evict from the July spec is **withdrawn**. The host ends the session.
 | GET | `/login/github/callback` | OAuth callback |
 | POST | `/logout` | Clear cookie |
 | GET | `/sessions` | Live sessions this user may open |
-| POST | `/sessions` | Create (clone) |
+| POST | `/sessions` | Create pending session |
+| GET | `/ws/sessions/{id}` | Host signer socket: clone + probe push |
 | POST | `/sessions/{id}/end` | Host ends session |
 | POST | `/sessions/{id}/preauth` | Host mints preauth |
 | POST | `/sessions/{id}/knock` | Request admit |
@@ -179,6 +193,14 @@ Hub idle-evict from the July spec is **withdrawn**. The host ends the session.
 
 `/register` is gone. `/projects` redirects to `/sessions`.
 
+### Signer wire
+
+Tab → server: `clone` `{public}`, `hello.ack` `{session_id, ssh_public}`, `commit.now`, `ssh.sign.ok` `{id, signature}`, `ssh.sign.err` `{id, message}`.
+
+Server → tab: `ssh.sign` `{id, data}`, `clone.ok`, `clone.err` `{message, ssh_public}`, `error` `{message}` (`persist.no_key` when the tab has no session key).
+
+`data` and `signature` are standard base64. `signature` is the raw 64-byte Ed25519 signature.
+
 ---
 
 ## Configuration
@@ -186,11 +208,6 @@ Hub idle-evict from the July spec is **withdrawn**. The host ends the session.
 | Env | Role |
 |-----|------|
 | `JWT_SECRET` | Cookie and preauth signatures (required in production) |
-| `GITHUB_APP_ID` | GitHub App id |
-| `GITHUB_APP_CLIENT_ID` | OAuth client id |
-| `GITHUB_APP_CLIENT_SECRET` | OAuth client secret |
-| `GITHUB_APP_PRIVATE_KEY` | PEM for installation tokens |
-| `GITHUB_APP_SLUG` | Install URL (`https://github.com/apps/{slug}/installations/new`) |
 | `STATE_DIR` | Working trees + artifacts |
 | `GO_ENV=development` | Allows JWT fallback |
 
@@ -201,10 +218,9 @@ SQLite/Postgres user and project tables are not used for identity or session lis
 ## Module layout (added)
 
 ```text
-internal/remote/      # canonicalize git HTTP URLs; parse GitHub owner/repo
-internal/githubapp/   # OAuth, App JWT, installation token, install URL
-internal/session/     # hub + live registry (uniqueness, admit, knock, RAM creds)
-internal/git/         # clone, commit, push
+internal/remote/      # canonicalize remotes; SSH-only validate
+internal/session/     # hub + live registry (uniqueness, admit, knock, signer clone)
+internal/git/         # clone, commit, push; SessionSSH (tab signer or test key)
 ```
 
 ---
@@ -213,10 +229,10 @@ internal/git/         # clone, commit, push
 
 | Risk | Mitigation |
 |------|------------|
-| Unpushed work lost on nuke | Auto-push + singleflight; UI says Synced ≠ pushed |
-| Installation token is the App | Never give it to browsers. Admit is identity-only |
+| Unpushed work lost on nuke | Signer-tab cooldown + Persist; UI says Synced ≠ pushed |
 | Guessable session URL | Knock off by default. Fail-on-duplicate does not leak the id |
-| App not installed | Redirect to grant that repo, then retry clone |
+| Read-only deploy key | Probe push after clone, before the editor |
+| Host tab closed | No `sign()`. Persist and clone wait. |
 | Two writers race create | Registry lock on `remote + branch` |
 
 ---
@@ -229,10 +245,10 @@ internal/git/         # clone, commit, push
 | session registry | Duplicate create fails; host retry returns same id; preauth admit; knock off rejects |
 | git | Clone from a local remote; commit+push singleflight |
 | githubapp | httptest for OAuth exchange and installation token |
-| HTTP | GitHub-only login page; clone form creates session; second user cannot clone-join |
+| HTTP | Login page; SSH form creates pending session; signer WS clones; second user cannot clone-join |
 
 ---
 
 ## Grill log (2026-08-24)
 
-Forge-native → HTTP clone primitive, GitHub identity sugar → GitHub App grant-on-use, install token in RAM → clone creates UUIDv7 session → one live session per remote+branch, second create fails (no join) → host is first writer of this incarnation, no transfer → knock opt-in, auto-reject closes lobby only → preauth + admitted walk in → persist = ask + auto, singleflight → GitHub only, drop passwords → no user Ed25519 (deploy-key uniqueness).
+Forge-native → Ed25519 login, session SSH key in the browser → SSH only → create pending, sessions signer socket clones then probe-pushes → one live session per remote+branch → host is first writer of this incarnation → knock opt-in → persist = signer tab (click or 30s dirty cooldown), guest Persist errors → seed never POSTed, load/store JSON → main.tex seeded locally if missing.

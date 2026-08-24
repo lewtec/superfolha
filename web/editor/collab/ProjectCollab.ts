@@ -4,6 +4,7 @@ import * as syncProtocol from "y-protocols/sync";
 import * as encoding from "lib0/encoding";
 import * as decoding from "lib0/decoding";
 import { textKey } from "./textKey";
+import { decodeStdB64, encodeStdB64, signSSH } from "../../ssh/sessionKey";
 
 export type SyncStatus =
   | "connecting"
@@ -68,6 +69,10 @@ export class ProjectCollab {
   private wsPath: string;
   /** After hello.ack we must send SyncStep1 so the server returns SyncStep2 with full state. */
   private fencePassed = false;
+  private persistTimer: ReturnType<typeof setTimeout> | null = null;
+  private seed: Uint8Array | null = null;
+  private offeredPub = "";
+  canSign = false;
 
   constructor(projectId: string, email: string, wsPath: string) {
     this.projectId = projectId;
@@ -83,7 +88,14 @@ export class ProjectCollab {
     });
 
     this.ydoc.on("update", this.onLocalDocUpdate);
+    this.ydoc.on("update", this.onAnyDocUpdate);
     this.awareness.on("update", this.onLocalAwareness);
+  }
+
+  setSigner(seed: Uint8Array, pub: string) {
+    this.seed = seed;
+    this.offeredPub = pub;
+    this.canSign = seed.length === 32 && pub !== "";
   }
 
   subscribe(fn: CollabListener): () => void {
@@ -157,6 +169,8 @@ export class ProjectCollab {
   destroy() {
     this.destroyed = true;
     this.ydoc.off("update", this.onLocalDocUpdate);
+    this.ydoc.off("update", this.onAnyDocUpdate);
+    if (this.persistTimer) clearTimeout(this.persistTimer);
     this.awareness.off("update", this.onLocalAwareness);
     try {
       awarenessProtocol.removeAwarenessStates(
@@ -267,7 +281,11 @@ export class ProjectCollab {
           return;
         }
         sessionStorage.setItem(key, sid);
-        this.sendJSON({ type: "hello.ack", session_id: sid });
+        this.sendJSON({
+          type: "hello.ack",
+          session_id: sid,
+          ssh_public: this.offeredPub,
+        });
         this.fencePassed = true;
         this.initialSynced = false;
         this.setStatus("syncing");
@@ -364,6 +382,25 @@ export class ProjectCollab {
         this.setStatus("error");
         break;
       }
+      case "ssh.sign": {
+        const id = String(msg.id ?? "");
+        const data = String(msg.data ?? "");
+        if (!id || !data || !this.seed) {
+          this.sendJSON({ type: "ssh.sign.err", id, message: "no session key" });
+          break;
+        }
+        try {
+          const sig = signSSH(this.seed, decodeStdB64(data));
+          this.sendJSON({ type: "ssh.sign.ok", id, signature: encodeStdB64(sig) });
+        } catch (err) {
+          this.sendJSON({
+            type: "ssh.sign.err",
+            id,
+            message: err instanceof Error ? err.message : "sign failed",
+          });
+        }
+        break;
+      }
       case "pong":
         break;
       default:
@@ -379,7 +416,29 @@ export class ProjectCollab {
     this.sendJSON({ type: "file.delete", path });
   }
 
+  private onAnyDocUpdate = () => {
+    this.armPersist();
+  };
+
+  private armPersist() {
+    if (!this.canSign || !this.initialSynced || this.destroyed) return;
+    if (this.status === "committing") return;
+    if (this.persistTimer) clearTimeout(this.persistTimer);
+    this.persistTimer = setTimeout(() => {
+      this.commitNow();
+    }, 30_000);
+  }
+
   commitNow(message?: string) {
+    if (!this.canSign) {
+      this.errorMessage = "persist.no_key";
+      this.setStatus("error");
+      return;
+    }
+    if (this.persistTimer) {
+      clearTimeout(this.persistTimer);
+      this.persistTimer = null;
+    }
     this.sendJSON({ type: "commit.now", message: message || "Manual commit" });
   }
 

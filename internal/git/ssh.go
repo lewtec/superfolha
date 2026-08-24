@@ -6,9 +6,11 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"strings"
 	"sync"
+	"time"
 
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
@@ -18,18 +20,42 @@ import (
 	cryptossh "golang.org/x/crypto/ssh"
 )
 
-// SSHKey is a per-session Ed25519 key held in RAM.
+// ErrBadSSHSeed is returned when a session seed is not 32 bytes.
+var ErrBadSSHSeed = errors.New("invalid ssh seed")
+
+// ErrBadSSHPublic is returned when an authorized_keys line is not ssh-ed25519.
+var ErrBadSSHPublic = errors.New("invalid ssh public key")
+
+// SessionSSH is git SSH auth. Product path is a tab signer; tests may use SSHKey.
+type SessionSSH interface {
+	AuthMethod() transport.AuthMethod
+	AuthorizedKey() string
+}
+
+// SSHKey is a full Ed25519 key (tests). The product path does not store the private half.
 type SSHKey struct {
 	Signer     cryptossh.Signer
 	Authorized string
 }
 
-// NewSessionSSHKey mints a key for one session. The private half never leaves the process.
+// NewSessionSSHKey mints a key for one session.
 func NewSessionSSHKey() (*SSHKey, error) {
 	_, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		return nil, err
 	}
+	return sshKeyFromPriv(priv)
+}
+
+// ParseSessionSSHKey rebuilds a session key from a 32-byte seed.
+func ParseSessionSSHKey(seed []byte) (*SSHKey, error) {
+	if len(seed) != ed25519.SeedSize {
+		return nil, ErrBadSSHSeed
+	}
+	return sshKeyFromPriv(ed25519.NewKeyFromSeed(seed))
+}
+
+func sshKeyFromPriv(priv ed25519.PrivateKey) (*SSHKey, error) {
 	signer, err := cryptossh.NewSignerFromKey(priv)
 	if err != nil {
 		return nil, err
@@ -41,13 +67,99 @@ func NewSessionSSHKey() (*SSHKey, error) {
 	}, nil
 }
 
-func (k *SSHKey) method() transport.AuthMethod {
+func (k *SSHKey) AuthMethod() transport.AuthMethod {
 	if k == nil || k.Signer == nil {
 		return nil
 	}
-	pk := &gitssh.PublicKeys{User: "git", Signer: k.Signer}
+	return publicKeys(k.Signer)
+}
+
+func (k *SSHKey) AuthorizedKey() string {
+	if k == nil {
+		return ""
+	}
+	return k.Authorized
+}
+
+var _ gitssh.AuthMethod = (*timedSSH)(nil)
+
+func publicKeys(signer cryptossh.Signer) transport.AuthMethod {
+	if signer == nil {
+		return nil
+	}
+	pk := &gitssh.PublicKeys{User: "git", Signer: signer}
 	pk.HostKeyCallback = tofuCallback
-	return pk
+	return &timedSSH{inner: pk}
+}
+
+const sshDialTimeout = 20 * time.Second
+
+type timedSSH struct {
+	inner *gitssh.PublicKeys
+}
+
+func (t *timedSSH) Name() string   { return t.inner.Name() }
+func (t *timedSSH) String() string { return t.inner.String() }
+
+func (t *timedSSH) ClientConfig() (*cryptossh.ClientConfig, error) {
+	cfg, err := t.inner.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+	cfg.Timeout = sshDialTimeout
+	return cfg, nil
+}
+
+// ParseAuthorized accepts an ssh-ed25519 authorized_keys line.
+func ParseAuthorized(line string) (cryptossh.PublicKey, string, error) {
+	line = strings.TrimSpace(line)
+	if line == "" {
+		return nil, "", ErrBadSSHPublic
+	}
+	pub, comment, _, _, err := cryptossh.ParseAuthorizedKey([]byte(line))
+	if err != nil {
+		return nil, "", ErrBadSSHPublic
+	}
+	if pub.Type() != cryptossh.KeyAlgoED25519 {
+		return nil, "", ErrBadSSHPublic
+	}
+	out := strings.TrimSpace(string(cryptossh.MarshalAuthorizedKey(pub)))
+	if comment == "" {
+		comment = "superfolha-session"
+	}
+	return pub, out + " " + comment, nil
+}
+
+// TabSigner asks a browser tab to sign SSH session data.
+type TabSigner struct {
+	Pub  cryptossh.PublicKey
+	Line string
+	Ask  func(data []byte) ([]byte, error)
+}
+
+func (t *TabSigner) PublicKey() cryptossh.PublicKey { return t.Pub }
+
+func (t *TabSigner) Sign(_ io.Reader, data []byte) (*cryptossh.Signature, error) {
+	if t == nil || t.Ask == nil {
+		return nil, errors.New("no signer tab")
+	}
+	sig, err := t.Ask(data)
+	if err != nil {
+		return nil, err
+	}
+	if len(sig) != ed25519.SignatureSize {
+		return nil, errors.New("bad ssh signature")
+	}
+	return &cryptossh.Signature{Format: cryptossh.KeyAlgoED25519, Blob: sig}, nil
+}
+
+func (t *TabSigner) AuthMethod() transport.AuthMethod { return publicKeys(t) }
+
+func (t *TabSigner) AuthorizedKey() string {
+	if t == nil {
+		return ""
+	}
+	return t.Line
 }
 
 var tofu sync.Map // hostname → marshaled host key
@@ -69,13 +181,11 @@ func tofuCallback(hostname string, _ net.Addr, key cryptossh.PublicKey) error {
 	return fmt.Errorf("ssh host key changed for %s", host)
 }
 
-// Clone copies remote@branch into dest using HTTP and/or SSH auth.
-func Clone(dest, remoteURL, branch string, httpAuth *HTTPAuth, sshKey *SSHKey) error {
+// Clone copies remote@branch into dest over SSH.
+func Clone(dest, remoteURL, branch string, ssh SessionSSH) error {
 	auth := transport.AuthMethod(nil)
-	if isSSHURL(remoteURL) {
-		auth = sshKey.method()
-	} else {
-		auth = httpAuth.method()
+	if ssh != nil {
+		auth = ssh.AuthMethod()
 	}
 	opts := &gogit.CloneOptions{URL: remoteURL, Auth: auth}
 	if branch != "" {
@@ -89,22 +199,15 @@ func Clone(dest, remoteURL, branch string, httpAuth *HTTPAuth, sshKey *SSHKey) e
 	return nil
 }
 
-func isSSHURL(u string) bool {
-	u = strings.ToLower(strings.TrimSpace(u))
-	return strings.HasPrefix(u, "ssh://") || strings.Contains(u, "@") && !strings.Contains(u, "://")
-}
-
-// Push pushes HEAD to origin with HTTP or SSH credentials.
-func Push(repoPath, branch string, httpAuth *HTTPAuth, sshKey *SSHKey) error {
+// Push pushes HEAD to origin over SSH.
+func Push(repoPath, branch string, ssh SessionSSH) error {
 	r, err := openRepo(repoPath)
 	if err != nil {
 		return err
 	}
 	auth := transport.AuthMethod(nil)
-	if rem, rerr := r.Remote("origin"); rerr == nil && len(rem.Config().URLs) > 0 && isSSHURL(rem.Config().URLs[0]) {
-		auth = sshKey.method()
-	} else {
-		auth = httpAuth.method()
+	if ssh != nil {
+		auth = ssh.AuthMethod()
 	}
 	ref := branch
 	if ref == "" {

@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -30,12 +31,13 @@ func testServer(t *testing.T) *Server {
 	}
 	t.Cleanup(func() { _ = repo.Close() })
 	srv := NewServer(repo, dir, project.NewService(dir), auth.NewService(repo))
-	srv.hubs.SetCloner(func(dest, _, _ string, _ *igit.HTTPAuth, _ *igit.SSHKey) error {
+	srv.hubs.SetCloner(func(dest, _, _ string, _ igit.SessionSSH) error {
 		if err := igit.InitRepo(dest); err != nil {
 			return err
 		}
 		return os.WriteFile(filepath.Join(dest, "main.tex"), []byte("hi\n"), 0o644)
 	})
+	srv.hubs.SetProber(func(string, string, igit.SessionSSH) error { return nil })
 	return srv
 }
 
@@ -161,7 +163,11 @@ func TestSSHCreateStaysOnSessionsWithKey(t *testing.T) {
 	t.Setenv("GO_ENV", "development")
 	srv := testServer(t)
 	alice := signIn(t, "alice")
-	form := strings.NewReader("remote=git@github.com:t/paper&branch=main")
+	k, err := igit.NewSessionSSHKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	form := strings.NewReader("remote=git@github.com:t/paper&branch=main&ssh_public=" + url.QueryEscape(k.Authorized))
 	req := httptest.NewRequest(http.MethodPost, paths.Projects(), form)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.AddCookie(&http.Cookie{Name: auth.AuthCookieName, Value: alice})
@@ -183,12 +189,16 @@ func TestSSHCreateStaysOnSessionsWithKey(t *testing.T) {
 	}
 }
 
-func TestCloneCreatesSessionAndSecondUserFails(t *testing.T) {
+func TestCreateUsesPostedPublic(t *testing.T) {
 	t.Setenv("JWT_SECRET", "rod-play-secret")
 	t.Setenv("GO_ENV", "development")
 	srv := testServer(t)
 	alice := signIn(t, "alice")
-	form := strings.NewReader("remote=https://github.com/t/paper&branch=main")
+	k, err := igit.NewSessionSSHKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	form := strings.NewReader("remote=git@github.com:t/paper&branch=main&ssh_public=" + url.QueryEscape(k.Authorized))
 	req := httptest.NewRequest(http.MethodPost, paths.Projects(), form)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.AddCookie(&http.Cookie{Name: auth.AuthCookieName, Value: alice})
@@ -197,12 +207,58 @@ func TestCloneCreatesSessionAndSecondUserFails(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("create = %d", rec.Code)
 	}
-	loc := rec.Header().Get("Location")
-	if !strings.HasPrefix(loc, "/editor/") {
-		t.Fatalf("Location = %q", loc)
+	list := httptest.NewRequest(http.MethodGet, paths.Projects(), nil)
+	list.AddCookie(&http.Cookie{Name: auth.AuthCookieName, Value: alice})
+	out := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(out, list)
+	body, _ := io.ReadAll(out.Body)
+	if !strings.Contains(string(body), "ssh-ed25519") {
+		t.Fatalf("sessions page missing posted key: %s", truncateForTest(body, 400))
+	}
+}
+
+func TestCreateRejectsBadPublic(t *testing.T) {
+	t.Setenv("JWT_SECRET", "rod-play-secret")
+	t.Setenv("GO_ENV", "development")
+	srv := testServer(t)
+	alice := signIn(t, "alice")
+	form := strings.NewReader("remote=git@github.com:t/paper&branch=main&ssh_public=not-a-key")
+	req := httptest.NewRequest(http.MethodPost, paths.Projects(), form)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{Name: auth.AuthCookieName, Value: alice})
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("create = %d", rec.Code)
+	}
+	if !strings.Contains(rec.Header().Get("Location"), "sessions.ssh_seed_invalid") {
+		t.Fatalf("Location = %q", rec.Header().Get("Location"))
+	}
+}
+
+func TestCloneCreatesSessionAndSecondUserFails(t *testing.T) {
+	t.Setenv("JWT_SECRET", "rod-play-secret")
+	t.Setenv("GO_ENV", "development")
+	srv := testServer(t)
+	alice := signIn(t, "alice")
+	k, err := igit.NewSessionSSHKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	form := strings.NewReader("remote=git@github.com:t/paper&branch=main&ssh_public=" + url.QueryEscape(k.Authorized))
+	req := httptest.NewRequest(http.MethodPost, paths.Projects(), form)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{Name: auth.AuthCookieName, Value: alice})
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("create = %d", rec.Code)
+	}
+	if strings.HasPrefix(rec.Header().Get("Location"), "/editor/") {
+		t.Fatalf("create must stay on sessions: %q", rec.Header().Get("Location"))
 	}
 	bob := signIn(t, "bob")
-	form2 := strings.NewReader("remote=https://github.com/t/paper&branch=main")
+	form2 := strings.NewReader("remote=git@github.com:t/paper&branch=main&ssh_public=" + url.QueryEscape(k.Authorized))
 	req2 := httptest.NewRequest(http.MethodPost, paths.Projects(), form2)
 	req2.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req2.AddCookie(&http.Cookie{Name: auth.AuthCookieName, Value: bob})

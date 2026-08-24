@@ -57,7 +57,10 @@ func TestValidate(t *testing.T) {
 	if err := Validate(""); !errors.Is(err, ErrEmptyRemote) {
 		t.Fatalf("empty: %v", err)
 	}
-	if err := Validate("https://github.com/a/b"); err != nil {
-		t.Fatalf("valid: %v", err)
+	if err := Validate("https://github.com/a/b"); !errors.Is(err, ErrNotSSH) {
+		t.Fatalf("https: %v", err)
+	}
+	if err := Validate("git@github.com:a/b"); err != nil {
+		t.Fatalf("ssh: %v", err)
 	}
 }
