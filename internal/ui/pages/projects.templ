@@ -29,23 +29,29 @@ templ Sessions(c layout.Chrome, items []session.Info) {
 					</form>
 				</div>
 			</div>
-			for _, item := range pendingSessions(items) {
-				<div class="alert alert-warning mb-6 shadow-lg" role="status">
-					<div class="w-full space-y-3">
-						<p class="font-semibold">{ c.T("sessions.add_ssh_key") }</p>
-						<p class="text-sm font-mono break-all">{ sessionTitle(item) } · { item.Branch }</p>
+			if first, ok := firstPending(items); ok {
+				<dialog id="ssh-deploy-modal" class="modal" open>
+					<div class="modal-box">
+						<h3 class="text-lg font-bold">{ c.T("sessions.add_ssh_key") }</h3>
+						<p class="py-2 text-sm font-mono break-all">{ sessionTitle(first) } · { first.Branch }</p>
 						<label class="form-control w-full">
 							<span class="label-text">{ c.T("sessions.ssh_key") }</span>
-							<textarea class="textarea textarea-bordered font-mono text-xs w-full" readonly rows="3" id={ "ssh-" + item.ID }>{ item.SSHPublic }</textarea>
+							<textarea class="textarea textarea-bordered font-mono text-xs w-full" readonly rows="4" id={ "ssh-" + first.ID }>{ first.SSHPublic }</textarea>
 						</label>
-						<div class="flex flex-wrap gap-2">
-							<button type="button" class="btn btn-sm" data-copy-ssh={ "ssh-" + item.ID }>{ c.T("sessions.copy_key") }</button>
-							<form method="post" action={ paths.SessionRetry(item.ID) }>
-								<button class="btn btn-primary btn-sm" type="submit">{ c.T("sessions.retry_clone") }</button>
+						<div class="modal-action">
+							<button type="button" class="btn" data-copy-ssh={ "ssh-" + first.ID }>{ c.T("sessions.copy_key") }</button>
+							<form method="post" action={ paths.SessionRetry(first.ID) }>
+								<button class="btn btn-primary" type="submit">{ c.T("sessions.retry_clone") }</button>
+							</form>
+							<form method="dialog">
+								<button class="btn btn-ghost">{ c.T("common.cancel") }</button>
 							</form>
 						</div>
 					</div>
-				</div>
+					<form method="dialog" class="modal-backdrop">
+						<button>{ c.T("common.cancel") }</button>
+					</form>
+				</dialog>
 			}
 			if len(items) == 0 {
 				<p class="text-center text-base-content/70">{ c.T("sessions.empty") }</p>
@@ -57,11 +63,8 @@ templ Sessions(c layout.Chrome, items []session.Info) {
 								<h2 class="card-title break-all">{ sessionTitle(item) }</h2>
 								<p class="text-sm text-base-content/70">{ item.Branch }</p>
 								<p class="text-xs font-mono text-base-content/50 break-all">{ item.ID }</p>
-								if item.SSHPublic != "" {
-									<label class="form-control w-full">
-										<span class="label-text">{ c.T("sessions.ssh_key") }</span>
-										<textarea class="textarea textarea-bordered font-mono text-xs" readonly rows="3">{ item.SSHPublic }</textarea>
-									</label>
+								if !item.Ready && item.SSHPublic != "" {
+									<button type="button" class="btn btn-sm" onclick="document.getElementById('ssh-deploy-modal')?.showModal()">{ c.T("sessions.ssh_key") }</button>
 								}
 								<div class="card-actions justify-end mt-4">
 									if item.Ready {
@@ -105,12 +108,11 @@ func sessionTitle(item session.Info) string {
 	return item.Remote
 }
 
-func pendingSessions(items []session.Info) []session.Info {
-	out := make([]session.Info, 0)
+func firstPending(items []session.Info) (session.Info, bool) {
 	for _, item := range items {
 		if !item.Ready && item.SSHPublic != "" {
-			out = append(out, item)
+			return item, true
 		}
 	}
-	return out
+	return session.Info{}, false
 }

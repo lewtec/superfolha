@@ -42,8 +42,23 @@ templ Editor(c layout.Chrome, projectID, projectName, email, sshPublic, i18nJSON
 					</form>
 				</div>
 			</header>
-			<div id="editor-deploy-key" class="hidden shrink-0 px-3 py-2 bg-warning/20 border-b border-warning text-sm"></div>
 			<div id="editor-workspace" class="editor-workspace relative flex min-h-0 flex-1 overflow-hidden"></div>
+			<dialog id="editor-ssh-modal" class="modal">
+				<div class="modal-box">
+					<h3 class="text-lg font-bold">{ c.T("sessions.add_ssh_key") }</h3>
+					<p id="editor-ssh-msg" class="py-2 text-sm"></p>
+					<textarea id="editor-ssh-key" class="textarea textarea-bordered font-mono text-xs w-full" readonly rows="4"></textarea>
+					<div class="modal-action">
+						<button type="button" class="btn" id="editor-ssh-copy">{ c.T("sessions.copy_key") }</button>
+						<form method="dialog">
+							<button class="btn btn-ghost">{ c.T("common.cancel") }</button>
+						</form>
+					</div>
+				</div>
+				<form method="dialog" class="modal-backdrop">
+					<button>{ c.T("common.cancel") }</button>
+				</form>
+			</dialog>
 		</div>
 		<script src={ paths.EditorJS() } type="module"></script>
 	}

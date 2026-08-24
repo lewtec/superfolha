@@ -156,8 +156,12 @@ function boot() {
   const compileBtn = document.getElementById("editor-compile") as HTMLButtonElement;
   const commitBtn = document.getElementById("editor-commit") as HTMLButtonElement;
   const chatToggle = document.getElementById("editor-chat-toggle") as HTMLButtonElement;
-  const deployEl = document.getElementById("editor-deploy-key");
+  const sshModal = document.getElementById("editor-ssh-modal") as HTMLDialogElement | null;
+  const sshKeyEl = document.getElementById("editor-ssh-key") as HTMLTextAreaElement | null;
+  const sshMsgEl = document.getElementById("editor-ssh-msg");
+  const sshCopy = document.getElementById("editor-ssh-copy");
   const initialSSH = root.dataset.sshPublic ?? "";
+  let sshModalShown = false;
 
   toggleBtn.innerHTML = icon(ICO.menu);
   chatToggle.innerHTML = icon(ICO.chat);
@@ -212,11 +216,17 @@ function boot() {
     statusEl.className = `badge badge-soft ${statusClass(collab.status)} whitespace-nowrap`;
     statusEl.textContent = t(msgs, statusKey(collab.status));
     const key = collab.sshPublic || initialSSH;
-    if (deployEl && key && (collab.status === "commit_error" || collab.status === "error")) {
-      deployEl.classList.remove("hidden");
-      deployEl.innerHTML = `<p class="font-semibold mb-1">${escapeAttr(t(msgs, "sessions.add_ssh_key"))}</p>
-        <textarea class="textarea textarea-bordered font-mono text-xs w-full" readonly rows="3">${escapeAttr(key)}</textarea>
-        <p class="text-xs mt-1">${escapeAttr(collab.errorMessage || "")}</p>`;
+    if (
+      sshModal &&
+      sshKeyEl &&
+      key &&
+      !sshModalShown &&
+      (collab.status === "commit_error" || collab.status === "error")
+    ) {
+      sshKeyEl.value = key;
+      if (sshMsgEl) sshMsgEl.textContent = collab.errorMessage || t(msgs, "sessions.add_ssh_key");
+      sshModalShown = true;
+      sshModal.showModal();
     }
   }
 
@@ -363,6 +373,9 @@ function boot() {
   }
 
   collab.subscribe(() => paintAll());
+  sshCopy?.addEventListener("click", () => {
+    if (sshKeyEl?.value) void navigator.clipboard.writeText(sshKeyEl.value);
+  });
 
   toggleBtn.addEventListener("click", () => {
     sidebarOpen = !sidebarOpen;
