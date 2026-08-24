@@ -45,6 +45,7 @@ type Info struct {
 	KnockOn   bool
 	Ready     bool
 	SSHPublic string
+	CloneURL  string
 	Knocking  []string
 }
 
@@ -61,6 +62,7 @@ func (l *Live) snapshot() Info {
 		KnockOn:   l.KnockOn,
 		Ready:     l.Ready,
 		SSHPublic: l.SSHPublic,
+		CloneURL:  l.CloneURL,
 		Knocking:  knocks,
 	}
 }
