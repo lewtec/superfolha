@@ -1,4 +1,12 @@
 import * as ed from "@noble/ed25519";
+import { sha512 } from "@noble/hashes/sha2.js";
+
+try {
+  ed.hashes.sha512 = sha512;
+  ed.hashes.sha512Async = (m: Uint8Array) => Promise.resolve(sha512(m));
+} catch (err) {
+  console.error("superfolha login hashes", err);
+}
 
 const DB = "superfolha-login";
 const STORE = "keys";
@@ -64,7 +72,7 @@ async function getSecretKey(): Promise<Uint8Array> {
   if (existing && existing.length === 32) {
     return existing;
   }
-  const { secretKey } = await ed.keygenAsync();
+  const { secretKey } = ed.keygen();
   await idbPut(db, secretKey);
   return secretKey;
 }
@@ -84,8 +92,8 @@ async function signIn(): Promise<void> {
     const challenge = chJSON.challenge;
     if (!challenge) throw new Error("empty challenge");
     const msg = new TextEncoder().encode(challenge);
-    const sig = await ed.signAsync(msg, secretKey);
-    const pub = await ed.getPublicKeyAsync(secretKey);
+    const sig = ed.sign(msg, secretKey);
+    const pub = ed.getPublicKey(secretKey);
     const res = await fetch(verifyURL, {
       method: "POST",
       credentials: "same-origin",
@@ -106,11 +114,22 @@ async function signIn(): Promise<void> {
   }
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+(globalThis as unknown as { __sfLogin?: () => void }).__sfLogin = () => {
+  void signIn();
+};
+
+function bind(): void {
   const btn = $("sf-login-btn");
-  if (!btn) return;
+  if (!btn || btn.dataset.bound === "1") return;
+  btn.dataset.bound = "1";
   btn.addEventListener("click", (ev) => {
     ev.preventDefault();
     void signIn();
   });
-});
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", bind);
+} else {
+  bind();
+}

@@ -17,6 +17,7 @@
     "@fontsource/ibm-plex-mono": "^5.2.7",
     "@fontsource/ibm-plex-sans": "^5.2.8",
     "@noble/ed25519": "^3.1.0",
+    "@noble/hashes": "^2.3.0",
     "@tailwindcss/cli": "^4.1.17",
     "codemirror": "^6.0.2",
     "daisyui": "^5.5.5",
