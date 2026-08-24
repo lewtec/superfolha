@@ -1,6 +1,11 @@
 package server
 
 import (
+	"bytes"
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -25,7 +30,7 @@ func testServer(t *testing.T) *Server {
 	}
 	t.Cleanup(func() { _ = repo.Close() })
 	srv := NewServer(repo, dir, project.NewService(dir), auth.NewService(repo))
-	srv.hubs.SetCloner(func(dest, _, _ string, _ *igit.HTTPAuth) error {
+	srv.hubs.SetCloner(func(dest, _, _ string, _ *igit.HTTPAuth, _ *igit.SSHKey) error {
 		if err := igit.InitRepo(dest); err != nil {
 			return err
 		}
@@ -106,6 +111,48 @@ func TestProjectsRedirectsAnonymous(t *testing.T) {
 	loc := res.Header.Get("Location")
 	if !strings.HasPrefix(loc, paths.Login()) {
 		t.Fatalf("Location = %q", loc)
+	}
+}
+
+func TestChallengeSignLoginSetsCookie(t *testing.T) {
+	t.Setenv("JWT_SECRET", "rod-play-secret")
+	t.Setenv("GO_ENV", "development")
+	auth.ResetChallengeStateForTest()
+	srv := testServer(t)
+	chRec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(chRec, httptest.NewRequest(http.MethodGet, paths.LoginChallenge(), nil))
+	if chRec.Code != http.StatusOK {
+		t.Fatalf("challenge = %d", chRec.Code)
+	}
+	var chBody struct {
+		Challenge string `json:"challenge"`
+	}
+	if err := json.NewDecoder(chRec.Body).Decode(&chBody); err != nil {
+		t.Fatal(err)
+	}
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sig := ed25519.Sign(priv, []byte(chBody.Challenge))
+	payload, err := json.Marshal(map[string]string{
+		"challenge":  chBody.Challenge,
+		"public_key": base64.RawURLEncoding.EncodeToString(pub),
+		"signature":  base64.RawURLEncoding.EncodeToString(sig),
+		"next":       paths.Projects(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, paths.LoginVerify(), bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("verify = %d body %s", rec.Code, rec.Body.String())
+	}
+	if rec.Header().Get("Set-Cookie") == "" {
+		t.Fatal("expected auth cookie")
 	}
 }
 

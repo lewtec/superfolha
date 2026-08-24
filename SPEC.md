@@ -67,9 +67,9 @@ If the process dies, RAM dies. The next writer clones again from the remote. Unp
 |---|----------|
 | F1 | **Forge-native.** The git remote is the paper. Superfolha does not own a second copy of truth. |
 | F2 | **HTTP clone is the primitive.** GitHub login is identity plus sugar that fills the clone URL and credential. |
-| F3 | **GitHub required as identity.** No anonymous host or guest. |
-| F4 | **GitHub App, grant on use.** Fine-grained by the repos the user actually opens. Classic `repo` OAuth is out. |
-| F5 | **Installation token in hub RAM** for GitHub HTTP clone and push. Paste-URL + pasted token for non-GitHub remotes. |
+| F3 | **Ed25519 challenge-sign identity.** The browser holds the private key. Login is nonce + signature. No GitHub App required to sign in. Fingerprint is the display name. |
+| F4 | **Do not delegate the identity private key.** Git uses a different per-session SSH key in hub RAM. The host adds that pubkey on the remote. |
+| F5 | **SSH remotes** clone/push with the session key. HTTP remotes still accept a pasted token. GitHub App install tokens stay optional sugar. |
 | F6 | **Clone creates a session** with a UUIDv7. Disk path `{state-dir}/repos/{sessionID}`. |
 | F7 | **Uniqueness:** at most one live session per `remote + branch`. Second clone **fails**. Do not put the UUIDv7 in that error. Host retry (same GitHub login) returns the existing session. |
 | F8 | **No join via clone.** Join is preauth or knock. |
@@ -88,10 +88,10 @@ CRDT decisions that still hold: one Y.Doc per session; CRDT is RAM-only; Git wor
 
 ## Identity
 
-1. User opens `/login` and continues with GitHub (GitHub App user OAuth).
-2. Callback issues a Superfolha JWT cookie: `{github_user_id, login}`. No user row.
-3. JWT secret is deploy config. Sessions die if the secret rotates.
-4. Display name is the GitHub login.
+1. User opens `/login`. The browser creates or reuses an Ed25519 key in IndexedDB.
+2. `GET /login/challenge` returns a short-lived signed nonce. The browser signs it. `POST /login/verify` checks the signature.
+3. Superfolha sets a JWT cookie: `{key_fingerprint_id, login}`. No user row. The identity private key never leaves the browser.
+4. Each session mints a **different** SSH key in hub RAM. The host adds that public key on the remote, then clones.
 
 Public GitHub remotes still require this login. They do not require an App grant.
 

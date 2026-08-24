@@ -82,6 +82,40 @@ func ParseGitHub(raw string) (owner, repo string, ok bool) {
 	return parts[0], parts[1], true
 }
 
+// IsSSH reports whether raw is an SSH git URL (scp or ssh://).
+func IsSSH(raw string) bool {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return false
+	}
+	if strings.HasPrefix(strings.ToLower(raw), "ssh://") {
+		return true
+	}
+	_, ok := scpURL(raw)
+	return ok
+}
+
+// TransportURL is the URL used to clone: SSH form kept, otherwise Canonical HTTP.
+func TransportURL(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if IsSSH(raw) {
+		if strings.HasPrefix(strings.ToLower(raw), "ssh://") {
+			return strings.TrimSuffix(strings.TrimRight(raw, "/"), ".git")
+		}
+		// normalize scp: git@host:path
+		at := strings.IndexByte(raw, '@')
+		colon := strings.LastIndexByte(raw, ':')
+		if at > 0 && colon > at {
+			host := raw[at+1 : colon]
+			path := strings.TrimSuffix(strings.TrimRight(raw[colon+1:], "/"), ".git")
+			user := raw[:at]
+			return user + "@" + host + ":" + path
+		}
+		return raw
+	}
+	return Canonical(raw)
+}
+
 // Validate reports whether raw can be used as a clone URL.
 func Validate(raw string) error {
 	if strings.TrimSpace(raw) == "" {

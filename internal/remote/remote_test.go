@@ -38,6 +38,20 @@ func TestParseGitHub(t *testing.T) {
 	}
 }
 
+func TestIsSSHAndTransport(t *testing.T) {
+	t.Parallel()
+	if !IsSSH("git@github.com:a/b.git") {
+		t.Fatal("scp should be SSH")
+	}
+	if IsSSH("https://github.com/a/b") {
+		t.Fatal("https is not SSH")
+	}
+	got := TransportURL("git@github.com:Foo/Bar.git")
+	if got != "git@github.com:Foo/Bar" {
+		t.Fatalf("TransportURL = %q", got)
+	}
+}
+
 func TestValidate(t *testing.T) {
 	t.Parallel()
 	if err := Validate(""); !errors.Is(err, ErrEmptyRemote) {

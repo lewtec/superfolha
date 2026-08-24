@@ -27,7 +27,11 @@ type Live struct {
 	Branch    string
 	HostLogin string
 	KnockOn   bool
+	Ready     bool
+	SSHPublic string
+	CloneURL  string
 	Auth      *igit.HTTPAuth
+	SSH       *igit.SSHKey
 	admitted  map[string]struct{}
 	knocking  map[string]struct{}
 }
@@ -39,6 +43,8 @@ type Info struct {
 	Branch    string
 	HostLogin string
 	KnockOn   bool
+	Ready     bool
+	SSHPublic string
 	Knocking  []string
 }
 
@@ -53,6 +59,8 @@ func (l *Live) snapshot() Info {
 		Branch:    l.Branch,
 		HostLogin: l.HostLogin,
 		KnockOn:   l.KnockOn,
+		Ready:     l.Ready,
+		SSHPublic: l.SSHPublic,
 		Knocking:  knocks,
 	}
 }
@@ -69,7 +77,7 @@ func (l *Live) canOpen(login string) bool {
 }
 
 // CreateCloner clones a remote into dest. Tests replace this.
-type CreateCloner func(dest, remoteURL, branch string, auth *igit.HTTPAuth) error
+type CreateCloner func(dest, remoteURL, branch string, auth *igit.HTTPAuth, sshKey *igit.SSHKey) error
 
 // Registry holds live sessions and their hubs.
 type Registry struct {
@@ -88,7 +96,7 @@ func NewRegistry(svc *project.Service) *Registry {
 		live:   make(map[string]*Live),
 		byKey:  make(map[string]string),
 		svc:    svc,
-		cloner: igit.CloneHTTP,
+		cloner: igit.Clone,
 	}
 }
 
@@ -100,11 +108,13 @@ func (r *Registry) SetCloner(fn CreateCloner) {
 }
 
 // Create clones remote@branch and opens a session. Host retry returns the existing session.
+// A failed clone still creates a pending session so the host can add the SSH key and retry.
 func (r *Registry) Create(hostLogin, rawRemote, branch string, auth *igit.HTTPAuth) (*Live, error) {
 	if err := remote.Validate(rawRemote); err != nil {
 		return nil, err
 	}
 	canon := remote.Canonical(rawRemote)
+	cloneURL := remote.TransportURL(rawRemote)
 	if branch == "" {
 		branch = "main"
 	}
@@ -121,49 +131,75 @@ func (r *Registry) Create(hostLogin, rawRemote, branch string, auth *igit.HTTPAu
 	}
 	r.mu.Unlock()
 
+	sshKey, err := igit.NewSessionSSHKey()
+	if err != nil {
+		return nil, err
+	}
+
 	id, err := uuid.NewV7()
 	if err != nil {
 		return nil, err
 	}
 	sessionID := id.String()
 	dest := r.svc.GetProjectPath(sessionID)
-	if err := r.cloner(dest, canon, branch, auth); err != nil {
+	cloneErr := r.cloner(dest, cloneURL, branch, auth, sshKey)
+	if cloneErr != nil {
 		if rmErr := os.RemoveAll(dest); rmErr != nil {
 			slog.Error("remove failed clone dest", "path", dest, "err", rmErr)
 		}
-		return nil, errors.Join(ErrClone, err)
 	}
-
-	h, err := Open(r.svc, sessionID, hostLogin)
-	if err != nil {
-		if rmErr := os.RemoveAll(dest); rmErr != nil {
-			slog.Error("remove failed open dest", "path", dest, "err", rmErr)
-		}
-		return nil, err
-	}
-	h.Auth = auth
-	h.Branch = branch
 
 	live := &Live{
 		ID:        sessionID,
 		Remote:    canon,
+		CloneURL:  cloneURL,
 		Branch:    branch,
 		HostLogin: hostLogin,
 		Auth:      auth,
+		SSH:       sshKey,
+		SSHPublic: sshKey.Authorized,
 		admitted:  map[string]struct{}{hostLogin: {}},
 		knocking:  map[string]struct{}{},
 	}
 
-	r.mu.Lock()
-	if id, ok := r.byKey[key]; ok {
+	if cloneErr == nil {
+		h, err := Open(r.svc, sessionID, hostLogin)
+		if err != nil {
+			if rmErr := os.RemoveAll(dest); rmErr != nil {
+				slog.Error("remove failed open dest", "path", dest, "err", rmErr)
+			}
+			return nil, err
+		}
+		h.Auth = auth
+		h.SSH = sshKey
+		h.Branch = branch
+		live.Ready = true
+		r.mu.Lock()
+		if existingID, ok := r.byKey[key]; ok {
+			r.mu.Unlock()
+			if closeErr := h.Close(); closeErr != nil {
+				slog.Error("close raced hub", "err", closeErr)
+			}
+			if rmErr := os.RemoveAll(dest); rmErr != nil {
+				slog.Error("remove raced dest", "path", dest, "err", rmErr)
+			}
+			existing := r.live[existingID]
+			if existing != nil && existing.HostLogin == hostLogin {
+				return existing, nil
+			}
+			return nil, ErrAlreadyLive
+		}
+		r.byKey[key] = sessionID
+		r.live[sessionID] = live
+		r.hubs[sessionID] = h
 		r.mu.Unlock()
-		if closeErr := h.Close(); closeErr != nil {
-			slog.Error("close raced hub", "err", closeErr)
-		}
-		if rmErr := os.RemoveAll(dest); rmErr != nil {
-			slog.Error("remove raced dest", "path", dest, "err", rmErr)
-		}
-		existing := r.live[id]
+		return live, nil
+	}
+
+	r.mu.Lock()
+	if existingID, ok := r.byKey[key]; ok {
+		r.mu.Unlock()
+		existing := r.live[existingID]
 		if existing != nil && existing.HostLogin == hostLogin {
 			return existing, nil
 		}
@@ -171,9 +207,49 @@ func (r *Registry) Create(hostLogin, rawRemote, branch string, auth *igit.HTTPAu
 	}
 	r.byKey[key] = sessionID
 	r.live[sessionID] = live
-	r.hubs[sessionID] = h
 	r.mu.Unlock()
 	return live, nil
+}
+
+// RetryClone tries to clone a pending session after the host added the SSH key.
+func (r *Registry) RetryClone(sessionID, hostLogin string, auth *igit.HTTPAuth) error {
+	r.mu.Lock()
+	l, ok := r.live[sessionID]
+	r.mu.Unlock()
+	if !ok {
+		return ErrNotFound
+	}
+	if l.HostLogin != hostLogin {
+		return ErrNotHost
+	}
+	if l.Ready {
+		return nil
+	}
+	if auth != nil {
+		l.Auth = auth
+	}
+	dest := r.svc.GetProjectPath(sessionID)
+	if err := r.cloner(dest, l.CloneURL, l.Branch, l.Auth, l.SSH); err != nil {
+		if rmErr := os.RemoveAll(dest); rmErr != nil {
+			slog.Error("remove failed retry dest", "path", dest, "err", rmErr)
+		}
+		return errors.Join(ErrClone, err)
+	}
+	h, err := Open(r.svc, sessionID, hostLogin)
+	if err != nil {
+		if rmErr := os.RemoveAll(dest); rmErr != nil {
+			slog.Error("remove failed retry open", "path", dest, "err", rmErr)
+		}
+		return err
+	}
+	h.Auth = l.Auth
+	h.SSH = l.SSH
+	h.Branch = l.Branch
+	r.mu.Lock()
+	l.Ready = true
+	r.hubs[sessionID] = h
+	r.mu.Unlock()
+	return nil
 }
 
 // GetIfLive returns a hub only if it is already open.

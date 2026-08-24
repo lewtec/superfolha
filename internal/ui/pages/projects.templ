@@ -42,8 +42,20 @@ templ Sessions(c layout.Chrome, items []session.Info) {
 								<h2 class="card-title break-all">{ item.Remote }</h2>
 								<p class="text-sm text-base-content/70">{ item.Branch }</p>
 								<p class="text-xs font-mono text-base-content/50 break-all">{ item.ID }</p>
+								if item.SSHPublic != "" {
+									<label class="form-control w-full">
+										<span class="label-text">{ c.T("sessions.ssh_key") }</span>
+										<textarea class="textarea textarea-bordered font-mono text-xs" readonly rows="3">{ item.SSHPublic }</textarea>
+									</label>
+								}
 								<div class="card-actions justify-end mt-4">
-									<a class="btn btn-primary btn-sm" href={ paths.Editor(item.ID) }>{ c.T("common.open") }</a>
+									if item.Ready {
+										<a class="btn btn-primary btn-sm" href={ paths.Editor(item.ID) }>{ c.T("common.open") }</a>
+									} else if item.HostLogin == c.Email {
+										<form method="post" action={ paths.SessionRetry(item.ID) }>
+											<button class="btn btn-primary btn-sm" type="submit">{ c.T("sessions.retry_clone") }</button>
+										</form>
+									}
 									if item.HostLogin == c.Email {
 										<form method="post" action={ paths.ProjectDelete(item.ID) } onsubmit="return confirm(this.dataset.confirm)" data-confirm={ c.T("sessions.end_confirm") }>
 											<button class="btn btn-error btn-sm" type="submit">{ c.T("sessions.end") }</button>

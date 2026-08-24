@@ -14,12 +14,23 @@ templ Login(c layout.Chrome, next string) {
 						<img src={ paths.BrandLogo() } alt="" width="64" height="64" class="h-16 w-16"/>
 					</a>
 				</figure>
-				<div class="card-body">
+				<div
+					id="sf-login"
+					class="card-body"
+					data-challenge={ paths.LoginChallenge() }
+					data-verify={ paths.LoginVerify() }
+					data-next={ next }
+					data-working={ c.T("auth.signing_in") }
+					data-failed={ c.T("auth.login_failed") }
+					data-unsupported={ c.T("auth.ed25519_unsupported") }
+				>
 					<h1 class="card-title text-2xl font-bold justify-center">Superfolha</h1>
 					<p class="text-center text-base-content/70 mb-4">{ c.T("auth.login_title") }</p>
-					<a class="btn btn-primary w-full" href={ paths.GitHubLoginNext(next) }>{ c.T("auth.github_button") }</a>
+					<button id="sf-login-btn" class="btn btn-primary w-full" type="button">{ c.T("auth.key_button") }</button>
+					<p id="sf-login-status" class="text-center text-sm text-base-content/70 mt-4"></p>
 				</div>
 			</div>
 		</div>
+		<script src={ paths.LoginJS() } defer></script>
 	}
 }
