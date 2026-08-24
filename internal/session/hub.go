@@ -63,16 +63,17 @@ type Hub struct {
 
 	svc *project.Service
 
-	mu          sync.Mutex
-	clients     map[string]*Client
-	flushTimer  *time.Timer
-	commitTimer *time.Timer
-	unsub       func()
-	syncLocked  bool
-	closing     bool
-	dirty       bool
-	chat        []ChatMessage
-	onCommitted func() // optional hook (e.g. touch project timestamp)
+	mu            sync.Mutex
+	clients       map[string]*Client
+	flushTimer    *time.Timer
+	commitTimer   *time.Timer
+	unsub         func()
+	syncLocked    bool
+	closing       bool
+	dirty         bool
+	pushFailUntil time.Time
+	chat          []ChatMessage
+	onCommitted   func() // optional hook (e.g. touch project timestamp)
 }
 
 // Open loads project files into a new hub.
@@ -151,7 +152,11 @@ func (h *Hub) markDirtyAndScheduleCommit() {
 	if h.commitTimer != nil {
 		h.commitTimer.Stop()
 	}
-	h.commitTimer = time.AfterFunc(commitDebounce, func() {
+	wait := commitDebounce
+	if left := time.Until(h.pushFailUntil); left > wait {
+		wait = left
+	}
+	h.commitTimer = time.AfterFunc(wait, func() {
 		if _, err := h.Commit(autoCommitMsg, ""); err != nil {
 			slog.Error("hub auto-commit", "project", h.ProjectID, "err", err)
 			h.emitSyncStatus("commit_error")
@@ -215,6 +220,9 @@ func (h *Hub) Commit(message, author string) (string, error) {
 			if h.SSH != nil {
 				pub = h.SSH.Authorized
 			}
+			h.mu.Lock()
+			h.pushFailUntil = time.Now().Add(commitDebounce)
+			h.mu.Unlock()
 			h.broadcastJSONMap(map[string]any{
 				"type":       "push.error",
 				"message":    err.Error(),
