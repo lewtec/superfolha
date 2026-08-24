@@ -543,7 +543,7 @@ func Sessions(c layout.Chrome, items []session.Info) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "</div><script>\n\t\t\tdocument.addEventListener(\"click\", function (e) {\n\t\t\t\tvar b = e.target.closest(\"[data-copy-ssh]\");\n\t\t\t\tif (!b) return;\n\t\t\t\tvar el = document.getElementById(b.getAttribute(\"data-copy-ssh\"));\n\t\t\t\tif (el) navigator.clipboard.writeText(el.value);\n\t\t\t});\n\t\t</script>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "</div><script>\n\t\t\tdocument.addEventListener(\"click\", function (e) {\n\t\t\t\tvar t = e.target;\n\t\t\t\tif (t && t.nodeType !== 1) t = t.parentElement;\n\t\t\t\tif (!t || !t.closest) return;\n\t\t\t\tvar b = t.closest(\"[data-copy-ssh]\");\n\t\t\t\tif (!b) return;\n\t\t\t\tvar el = document.getElementById(b.getAttribute(\"data-copy-ssh\"));\n\t\t\t\tif (!el) return;\n\t\t\t\tif (window.isSecureContext && navigator.clipboard && navigator.clipboard.writeText) {\n\t\t\t\t\tnavigator.clipboard.writeText(el.value);\n\t\t\t\t\treturn;\n\t\t\t\t}\n\t\t\t\tel.focus();\n\t\t\t\tel.select();\n\t\t\t\tel.setSelectionRange(0, el.value.length);\n\t\t\t\tdocument.execCommand(\"copy\");\n\t\t\t});\n\t\t</script>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
