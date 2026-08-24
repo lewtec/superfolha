@@ -103,14 +103,19 @@ func Static(elem ...string) string {
 	return path.Join(parts...)
 }
 
-func StyleCSS() string  { return Static("style.css") }
-func EditorJS() string  { return Static("editor.js") }
-func LoginJS() string   { return Static("login.js") }
+func StyleCSS() string       { return Static("style.css") }
+func EditorJS() string       { return Static("editor.js") }
+func LoginJS() string        { return Static("login.js") }
+func SessionsJS() string     { return Static("sessions.js") }
 func LoginChallenge() string { return "/login/challenge" }
 func LoginVerify() string    { return "/login/verify" }
 
 func SessionRetry(id string) string {
 	return path.Join("/sessions", id, "retry")
+}
+
+func SessionWS(id string) string {
+	return path.Join("/ws/sessions", id)
 }
 func BrandLogo() string { return Static("brand", "logo.png") }
 func Favicon() string   { return Static("brand", "favicon.png") }
@@ -169,6 +174,7 @@ const (
 	PatternSessionKick      = "POST /sessions/{" + ParamID + "}/kick"
 	PatternSessionKnockMode = "POST /sessions/{" + ParamID + "}/knock-mode"
 	PatternSessionRetry     = "POST /sessions/{" + ParamID + "}/retry"
+	PatternSessionWS        = "GET /ws/sessions/{" + ParamID + "}"
 	PatternEditorGet        = "GET /editor/{" + ParamID + "}"
 	PatternStatic           = "GET /static/"
 

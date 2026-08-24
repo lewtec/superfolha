@@ -1,16 +1,20 @@
 package server
 
 import (
+	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/lewtec/superfolha/internal/appenv"
+	"github.com/lewtec/superfolha/internal/auth"
 	"github.com/lewtec/superfolha/internal/paths"
 	"github.com/lewtec/superfolha/internal/project"
 	"github.com/lewtec/superfolha/internal/session"
@@ -55,6 +59,11 @@ type wsControl struct {
 	Content   string `json:"content,omitempty"`
 	Message   string `json:"message,omitempty"`
 	Update    string `json:"update,omitempty"` // awareness base64
+	Public    string `json:"public,omitempty"`
+	SSHPublic string `json:"ssh_public,omitempty"`
+	ID        string `json:"id,omitempty"`
+	Data      string `json:"data,omitempty"`
+	Signature string `json:"signature,omitempty"`
 }
 
 func (s *Server) handleProjectWS(w http.ResponseWriter, r *http.Request) {
@@ -151,7 +160,14 @@ func (s *Server) handleProjectWS(w http.ResponseWriter, r *http.Request) {
 			if err := json.Unmarshal(data, &ctrl); err != nil {
 				continue
 			}
+			if ctrl.Type == "ssh.sign.ok" || ctrl.Type == "ssh.sign.err" {
+				completeSign(client, ctrl)
+				continue
+			}
 			if ctrl.Type == "hello.ack" {
+				if pub := ctrl.SSHPublic; pub != "" {
+					hub.OfferKey(clientID, pub)
+				}
 				if ctrl.SessionID != "" && ctrl.SessionID != hub.SessionID {
 					if errFrame := marshalWSJSON(map[string]string{
 						"type":    "error",
@@ -188,7 +204,6 @@ func (s *Server) handleProjectWS(w http.ResponseWriter, r *http.Request) {
 				case client.Out <- session.Outbound{Binary: true, Data: hub.EncodeSyncStep1()}:
 				default:
 				}
-				go hub.EnsureAuthPush()
 				continue
 			}
 			if !hub.ClientReady(clientID) {
@@ -227,12 +242,136 @@ func (s *Server) handleProjectWS(w http.ResponseWriter, r *http.Request) {
 				if msg == "" {
 					msg = "Manual commit"
 				}
-				if _, err := hub.Commit(msg, user.Email); err != nil {
-					sendWSError(client, err.Error())
-				}
+				go func() {
+					if _, err := hub.PersistFrom(client, msg, user.Email); err != nil {
+						if errors.Is(err, session.ErrNoSigner) {
+							sendWSError(client, "persist.no_key")
+							return
+						}
+						sendWSError(client, err.Error())
+					}
+				}()
 			}
 		}
 	}
+	<-done
+}
+
+func completeSign(c *session.Client, ctrl wsControl) {
+	if c == nil || c.Signs == nil {
+		return
+	}
+	if ctrl.Type == "ssh.sign.err" {
+		msg := ctrl.Message
+		if msg == "" {
+			msg = "sign failed"
+		}
+		c.Signs.Complete(ctrl.ID, nil, errors.New(msg))
+		return
+	}
+	sig, err := base64.StdEncoding.DecodeString(ctrl.Signature)
+	if err != nil {
+		c.Signs.Complete(ctrl.ID, nil, err)
+		return
+	}
+	c.Signs.Complete(ctrl.ID, sig, nil)
+}
+
+func (s *Server) handleSessionWS(w http.ResponseWriter, r *http.Request) {
+	if s.hubs == nil {
+		http.Error(w, "collaboration unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	id := r.PathValue(paths.ParamID)
+	user, ok := auth.GetUserFromContext(r.Context())
+	if !ok || user.Email == "" {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	info, liveOK := s.hubs.Live(id)
+	if !liveOK || info.HostLogin != user.Email {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	conn, err := wsUpgrader.Upgrade(w, r, nil)
+	if err != nil {
+		slog.Error("session ws upgrade", "err", err)
+		return
+	}
+	defer conn.Close()
+	conn.SetReadLimit(wsMaxMessageBytes)
+
+	out := make(chan session.Outbound, 16)
+	done := make(chan struct{})
+	var work sync.WaitGroup
+	go func() {
+		defer close(done)
+		for frame := range out {
+			if err := conn.SetWriteDeadline(time.Now().Add(10 * time.Second)); err != nil {
+				return
+			}
+			if err := conn.WriteMessage(websocket.TextMessage, frame.Data); err != nil {
+				return
+			}
+		}
+	}()
+
+	bridge := session.NewSignBridge(func(signID string, data []byte) {
+		b := session.SignOKFrame(signID, data)
+		if b == nil {
+			return
+		}
+		out <- session.Outbound{Data: b}
+	})
+
+	for {
+		if err := conn.SetReadDeadline(time.Now().Add(120 * time.Second)); err != nil {
+			break
+		}
+		_, data, err := conn.ReadMessage()
+		if err != nil {
+			break
+		}
+		var ctrl wsControl
+		if err := json.Unmarshal(data, &ctrl); err != nil {
+			continue
+		}
+		switch ctrl.Type {
+		case "ssh.sign.ok", "ssh.sign.err":
+			dummy := &session.Client{Signs: bridge}
+			completeSign(dummy, ctrl)
+		case "clone":
+			pub := ctrl.Public
+			work.Add(1)
+			go func() {
+				defer work.Done()
+				sendClone := func(typ, message string) {
+					b := marshalWSJSON(map[string]string{
+						"type":       typ,
+						"message":    message,
+						"ssh_public": info.SSHPublic,
+					})
+					if b != nil {
+						out <- session.Outbound{Data: b}
+					}
+				}
+				sendClone("clone.status", "sessions.cloning")
+				ssh, err := session.TabSSH(pub, bridge)
+				if err != nil {
+					sendClone("clone.err", err.Error())
+					return
+				}
+				if err := s.hubs.CloneAndProbe(id, user.Email, ssh); err != nil {
+					sendClone("clone.err", err.Error())
+					return
+				}
+				sendClone("clone.ok", "")
+			}()
+		}
+	}
+	work.Wait()
+	close(out)
 	<-done
 }
 

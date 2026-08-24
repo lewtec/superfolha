@@ -5,7 +5,8 @@
     "copy:fonts": "mkdir -p internal/web/static/fonts && cp node_modules/@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-400-normal.woff2 node_modules/@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-500-normal.woff2 node_modules/@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-600-normal.woff2 node_modules/@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-700-normal.woff2 node_modules/@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff2 node_modules/@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-500-normal.woff2 internal/web/static/fonts/",
     "build:css": "bun run copy:fonts && tailwindcss -i ./internal/web/input.css -o ./internal/web/static/style.css --minify",
     "build:editor": "bun build ./web/editor/main.ts --outfile=./internal/web/static/editor.js --minify --target=browser",
-    "build:login": "bun build ./web/login/main.ts --outfile=./internal/web/static/login.js --minify --target=browser"
+    "build:login": "bun build ./web/login/main.ts --outfile=./internal/web/static/login.js --minify --target=browser",
+    "build:sessions": "bun build ./web/sessions/main.ts --outfile=./internal/web/static/sessions.js --minify --target=browser"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.19.1",

@@ -17,10 +17,9 @@ import (
 )
 
 const (
-	flushDebounce  = 1500 * time.Millisecond
-	commitDebounce = 30 * time.Second
-	chatCap        = 200
-	autoCommitMsg  = "Auto-commit: live session"
+	flushDebounce = 1500 * time.Millisecond
+	chatCap       = 200
+	autoCommitMsg = "Auto-commit: live session"
 )
 
 var (
@@ -32,9 +31,11 @@ var (
 
 // Client is a connected browser peer.
 type Client struct {
-	ID    string
-	Out   chan Outbound
-	Ready bool
+	ID         string
+	Out        chan Outbound
+	Ready      bool
+	OfferedPub string
+	Signs      *SignBridge
 }
 
 // Outbound is a message to one client.
@@ -57,24 +58,20 @@ type Hub struct {
 	Doc        *crdt.ProjectDoc
 	Root       string
 	OwnerEmail string
-	Auth       *igit.HTTPAuth
-	SSH        *igit.SSHKey
+	SSHPublic  string
 	Branch     string
 
 	svc *project.Service
 
-	mu            sync.Mutex
-	clients       map[string]*Client
-	flushTimer    *time.Timer
-	commitTimer   *time.Timer
-	unsub         func()
-	syncLocked    bool
-	closing       bool
-	dirty         bool
-	authChecked   bool
-	pushFailUntil time.Time
-	chat          []ChatMessage
-	onCommitted   func() // optional hook (e.g. touch project timestamp)
+	mu          sync.Mutex
+	clients     map[string]*Client
+	flushTimer  *time.Timer
+	unsub       func()
+	syncLocked  bool
+	closing     bool
+	dirty       bool
+	chat        []ChatMessage
+	onCommitted func() // optional hook (e.g. touch project timestamp)
 }
 
 // Open loads project files into a new hub.
@@ -111,7 +108,7 @@ func Open(svc *project.Service, projectID, ownerEmail string) (*Hub, error) {
 		}
 		h.broadcast(frame, true, skip)
 		h.scheduleFlush()
-		h.markDirtyAndScheduleCommit()
+		h.markDirty()
 		h.emitSyncStatus("dirty")
 	})
 	return h, nil
@@ -143,28 +140,13 @@ func (h *Hub) scheduleFlush() {
 	})
 }
 
-func (h *Hub) markDirtyAndScheduleCommit() {
+func (h *Hub) markDirty() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if h.closing {
 		return
 	}
 	h.dirty = true
-	if h.commitTimer != nil {
-		h.commitTimer.Stop()
-	}
-	wait := commitDebounce
-	if left := time.Until(h.pushFailUntil); left > wait {
-		wait = left
-	}
-	h.commitTimer = time.AfterFunc(wait, func() {
-		if _, err := h.Commit(autoCommitMsg, ""); err != nil {
-			slog.Error("hub auto-commit", "project", h.ProjectID, "err", err)
-			h.emitSyncStatus("commit_error")
-			return
-		}
-		h.emitSyncStatus("committed")
-	})
 }
 
 // Flush writes collaborative text to the project working tree.
@@ -180,8 +162,8 @@ func (h *Hub) Flush() error {
 }
 
 // Commit flushes text, locks CRDT sync, commits git, unlocks.
-// author empty → OwnerEmail.
-func (h *Hub) Commit(message, author string) (string, error) {
+// author empty → OwnerEmail. ssh is the asking tab; required for push.
+func (h *Hub) Commit(message, author string, ssh igit.SessionSSH) (string, error) {
 	if message == "" {
 		message = autoCommitMsg
 	}
@@ -215,29 +197,18 @@ func (h *Hub) Commit(message, author string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if h.Auth != nil || h.SSH != nil {
-		if err := igit.Push(h.Root, h.Branch, h.Auth, h.SSH); err != nil {
-			pub := ""
-			if h.SSH != nil {
-				pub = h.SSH.Authorized
-			}
-			h.mu.Lock()
-			h.pushFailUntil = time.Now().Add(commitDebounce)
-			h.mu.Unlock()
+	if ssh != nil {
+		if err := igit.Push(h.Root, h.Branch, ssh); err != nil {
 			h.broadcastJSONMap(map[string]any{
 				"type":       "push.error",
 				"message":    err.Error(),
-				"ssh_public": pub,
+				"ssh_public": h.SSHPublic,
 			}, "")
 			return "", err
 		}
 	}
 	h.mu.Lock()
 	h.dirty = false
-	if h.commitTimer != nil {
-		h.commitTimer.Stop()
-		h.commitTimer = nil
-	}
 	cb := h.onCommitted
 	h.mu.Unlock()
 	if cb != nil {
@@ -252,17 +223,16 @@ func (h *Hub) Commit(message, author string) (string, error) {
 	return c.Hash, nil
 }
 
-// EnsureAuthPush runs one idempotent commit+push after the first client joins
-// so a missing or read-only deploy key fails immediately.
-func (h *Hub) EnsureAuthPush() {
-	h.mu.Lock()
-	if h.authChecked || h.closing {
-		h.mu.Unlock()
-		return
+// PersistFrom runs Commit using this client's offered session key.
+func (h *Hub) PersistFrom(c *Client, message, author string) (string, error) {
+	if c == nil || c.Signs == nil || !SamePublic(c.OfferedPub, h.SSHPublic) {
+		return "", ErrNoSigner
 	}
-	h.authChecked = true
-	h.mu.Unlock()
-	_, _ = h.Commit(autoCommitMsg, "")
+	ssh, err := TabSSH(c.OfferedPub, c.Signs)
+	if err != nil {
+		return "", ErrNoSigner
+	}
+	return h.Commit(message, author, ssh)
 }
 
 // SaveTextFile writes text to CRDT + disk (common path for GraphQL/WS).
@@ -299,7 +269,7 @@ func (h *Hub) DeleteFile(path string) error {
 		"op":   "delete",
 		"path": path,
 	}, "")
-	h.markDirtyAndScheduleCommit()
+	h.markDirty()
 	return nil
 }
 
@@ -338,6 +308,16 @@ func (h *Hub) DisconnectAll() {
 // AddClient registers a peer (not Ready until hello.ack).
 func (h *Hub) AddClient(id string) *Client {
 	c := &Client{ID: id, Out: make(chan Outbound, 64)}
+	c.Signs = NewSignBridge(func(signID string, data []byte) {
+		frame := SignOKFrame(signID, data)
+		if frame == nil {
+			return
+		}
+		select {
+		case c.Out <- Outbound{Data: frame}:
+		default:
+		}
+	})
 	h.mu.Lock()
 	h.clients[id] = c
 	h.mu.Unlock()
@@ -360,6 +340,24 @@ func (h *Hub) ClientCount() int {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	return len(h.clients)
+}
+
+// OfferKey records the session pubkey this tab can sign with.
+func (h *Hub) OfferKey(id, pub string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	c, ok := h.clients[id]
+	if !ok {
+		return
+	}
+	c.OfferedPub = pub
+}
+
+// Client returns a connected peer.
+func (h *Hub) Client(id string) *Client {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.clients[id]
 }
 
 // MarkClientReady marks the peer as having accepted this hub session_id.
@@ -528,10 +526,6 @@ func (h *Hub) Close() error {
 		h.flushTimer.Stop()
 		h.flushTimer = nil
 	}
-	if h.commitTimer != nil {
-		h.commitTimer.Stop()
-		h.commitTimer = nil
-	}
 	if h.unsub != nil {
 		h.unsub()
 		h.unsub = nil
@@ -540,7 +534,6 @@ func (h *Hub) Close() error {
 		close(c.Out)
 		delete(h.clients, id)
 	}
-	dirty := h.dirty
 	doc := h.Doc
 	root := h.Root
 	h.mu.Unlock()
@@ -557,12 +550,6 @@ func (h *Hub) Close() error {
 	if doc != nil {
 		if err := doc.FlushToDir(root); err != nil {
 			return err
-		}
-	}
-	if dirty {
-		if _, err := h.Commit(autoCommitMsg, ""); err != nil {
-			// Best-effort final commit; still close.
-			slog.Warn("final hub commit on close", "project", h.ProjectID, "err", err)
 		}
 	}
 	return nil

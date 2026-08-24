@@ -5,13 +5,14 @@ import (
 	"github.com/lewtec/superfolha/internal/ui/layout"
 )
 
-templ Editor(c layout.Chrome, projectID, projectName, email, sshPublic, i18nJSON string) {
+templ Editor(c layout.Chrome, projectID, projectName, branch, email, sshPublic, i18nJSON string) {
 	@layout.EditorShell(c) {
 		<div
 			id="editor-root"
 			class="flex h-dvh min-h-0 flex-col"
 			data-project-id={ projectID }
 			data-project-name={ projectName }
+			data-branch={ branch }
 			data-email={ email }
 			data-ssh-public={ sshPublic }
 			data-projects-url={ paths.Projects() }

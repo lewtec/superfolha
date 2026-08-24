@@ -13,12 +13,11 @@ import (
 )
 
 var (
-	ErrAlreadyLive      = errors.New("session already live for remote and branch")
-	ErrNotFound         = errors.New("session not found")
-	ErrNotHost          = errors.New("not session host")
-	ErrKnockClosed      = errors.New("knock is disabled")
-	ErrClone            = errors.New("clone failed")
-	errWaitingDeployKey = errors.New("waiting for deploy key")
+	ErrAlreadyLive = errors.New("session already live for remote and branch")
+	ErrNotFound    = errors.New("session not found")
+	ErrNotHost     = errors.New("not session host")
+	ErrKnockClosed = errors.New("knock is disabled")
+	ErrClone       = errors.New("clone failed")
 )
 
 // Live is RAM metadata for one session incarnation.
@@ -31,8 +30,6 @@ type Live struct {
 	Ready     bool
 	SSHPublic string
 	CloneURL  string
-	Auth      *igit.HTTPAuth
-	SSH       *igit.SSHKey
 	admitted  map[string]struct{}
 	knocking  map[string]struct{}
 }
@@ -80,7 +77,10 @@ func (l *Live) canOpen(login string) bool {
 }
 
 // CreateCloner clones a remote into dest. Tests replace this.
-type CreateCloner func(dest, remoteURL, branch string, auth *igit.HTTPAuth, sshKey *igit.SSHKey) error
+type CreateCloner func(dest, remoteURL, branch string, ssh igit.SessionSSH) error
+
+// ProbePusher pushes HEAD after clone. Tests replace this.
+type ProbePusher func(dest, branch string, ssh igit.SessionSSH) error
 
 // Registry holds live sessions and their hubs.
 type Registry struct {
@@ -90,6 +90,7 @@ type Registry struct {
 	byKey  map[string]string
 	svc    *project.Service
 	cloner CreateCloner
+	prober ProbePusher
 }
 
 // NewRegistry creates an empty hub registry.
@@ -100,6 +101,7 @@ func NewRegistry(svc *project.Service) *Registry {
 		byKey:  make(map[string]string),
 		svc:    svc,
 		cloner: igit.Clone,
+		prober: igit.Push,
 	}
 }
 
@@ -110,10 +112,20 @@ func (r *Registry) SetCloner(fn CreateCloner) {
 	r.mu.Unlock()
 }
 
-// Create clones remote@branch and opens a session. Host retry returns the existing session.
-// A failed clone still creates a pending session so the host can add the SSH key and retry.
-func (r *Registry) Create(hostLogin, rawRemote, branch string, auth *igit.HTTPAuth) (*Live, error) {
+// SetProber replaces the probe push (tests).
+func (r *Registry) SetProber(fn ProbePusher) {
+	r.mu.Lock()
+	r.prober = fn
+	r.mu.Unlock()
+}
+
+// Create records a pending session. Clone happens on the signer socket.
+func (r *Registry) Create(hostLogin, rawRemote, branch, sshPublic string) (*Live, error) {
 	if err := remote.Validate(rawRemote); err != nil {
+		return nil, err
+	}
+	_, pubLine, err := igit.ParseAuthorized(sshPublic)
+	if err != nil {
 		return nil, err
 	}
 	canon := remote.Canonical(rawRemote)
@@ -134,75 +146,20 @@ func (r *Registry) Create(hostLogin, rawRemote, branch string, auth *igit.HTTPAu
 	}
 	r.mu.Unlock()
 
-	sshKey, err := igit.NewSessionSSHKey()
-	if err != nil {
-		return nil, err
-	}
-
 	id, err := uuid.NewV7()
 	if err != nil {
 		return nil, err
 	}
 	sessionID := id.String()
-	dest := r.svc.GetProjectPath(sessionID)
-	// SSH remotes need the session pubkey on the forge first. Do not clone yet.
-	var cloneErr error
-	if remote.IsSSH(rawRemote) {
-		cloneErr = errWaitingDeployKey
-	} else {
-		cloneErr = r.cloner(dest, cloneURL, branch, auth, sshKey)
-		if cloneErr != nil {
-			if rmErr := os.RemoveAll(dest); rmErr != nil {
-				slog.Error("remove failed clone dest", "path", dest, "err", rmErr)
-			}
-		}
-	}
-
 	live := &Live{
 		ID:        sessionID,
 		Remote:    canon,
 		CloneURL:  cloneURL,
 		Branch:    branch,
 		HostLogin: hostLogin,
-		Auth:      auth,
-		SSH:       sshKey,
-		SSHPublic: sshKey.Authorized,
+		SSHPublic: pubLine,
 		admitted:  map[string]struct{}{hostLogin: {}},
 		knocking:  map[string]struct{}{},
-	}
-
-	if cloneErr == nil {
-		h, err := Open(r.svc, sessionID, hostLogin)
-		if err != nil {
-			if rmErr := os.RemoveAll(dest); rmErr != nil {
-				slog.Error("remove failed open dest", "path", dest, "err", rmErr)
-			}
-			return nil, err
-		}
-		h.Auth = auth
-		h.SSH = sshKey
-		h.Branch = branch
-		live.Ready = true
-		r.mu.Lock()
-		if existingID, ok := r.byKey[key]; ok {
-			r.mu.Unlock()
-			if closeErr := h.Close(); closeErr != nil {
-				slog.Error("close raced hub", "err", closeErr)
-			}
-			if rmErr := os.RemoveAll(dest); rmErr != nil {
-				slog.Error("remove raced dest", "path", dest, "err", rmErr)
-			}
-			existing := r.live[existingID]
-			if existing != nil && existing.HostLogin == hostLogin {
-				return existing, nil
-			}
-			return nil, ErrAlreadyLive
-		}
-		r.byKey[key] = sessionID
-		r.live[sessionID] = live
-		r.hubs[sessionID] = h
-		r.mu.Unlock()
-		return live, nil
 	}
 
 	r.mu.Lock()
@@ -220,8 +177,8 @@ func (r *Registry) Create(hostLogin, rawRemote, branch string, auth *igit.HTTPAu
 	return live, nil
 }
 
-// RetryClone tries to clone a pending session after the host added the SSH key.
-func (r *Registry) RetryClone(sessionID, hostLogin string, auth *igit.HTTPAuth) error {
+// CloneAndProbe clones, seeds main.tex, probe-pushes, then opens the hub.
+func (r *Registry) CloneAndProbe(sessionID, hostLogin string, ssh igit.SessionSSH) error {
 	r.mu.Lock()
 	l, ok := r.live[sessionID]
 	r.mu.Unlock()
@@ -234,26 +191,43 @@ func (r *Registry) RetryClone(sessionID, hostLogin string, auth *igit.HTTPAuth) 
 	if l.Ready {
 		return nil
 	}
-	if auth != nil {
-		l.Auth = auth
+	if ssh == nil {
+		return ErrNoSigner
+	}
+	if !SamePublic(ssh.AuthorizedKey(), l.SSHPublic) {
+		return ErrNoSigner
 	}
 	dest := r.svc.GetProjectPath(sessionID)
-	if err := r.cloner(dest, l.CloneURL, l.Branch, l.Auth, l.SSH); err != nil {
+	if err := os.RemoveAll(dest); err != nil {
+		return err
+	}
+	if err := r.cloner(dest, l.CloneURL, l.Branch, ssh); err != nil {
 		if rmErr := os.RemoveAll(dest); rmErr != nil {
-			slog.Error("remove failed retry dest", "path", dest, "err", rmErr)
+			slog.Error("remove failed clone dest", "path", dest, "err", rmErr)
+		}
+		return errors.Join(ErrClone, err)
+	}
+	if err := r.svc.EnsureMainTeX(sessionID); err != nil {
+		if rmErr := os.RemoveAll(dest); rmErr != nil {
+			slog.Error("remove failed seed dest", "path", dest, "err", rmErr)
+		}
+		return err
+	}
+	if err := r.prober(dest, l.Branch, ssh); err != nil {
+		if rmErr := os.RemoveAll(dest); rmErr != nil {
+			slog.Error("remove failed probe dest", "path", dest, "err", rmErr)
 		}
 		return errors.Join(ErrClone, err)
 	}
 	h, err := Open(r.svc, sessionID, hostLogin)
 	if err != nil {
 		if rmErr := os.RemoveAll(dest); rmErr != nil {
-			slog.Error("remove failed retry open", "path", dest, "err", rmErr)
+			slog.Error("remove failed open dest", "path", dest, "err", rmErr)
 		}
 		return err
 	}
-	h.Auth = l.Auth
-	h.SSH = l.SSH
 	h.Branch = l.Branch
+	h.SSHPublic = l.SSHPublic
 	r.mu.Lock()
 	l.Ready = true
 	r.hubs[sessionID] = h

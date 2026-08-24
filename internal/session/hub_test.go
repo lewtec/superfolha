@@ -1,6 +1,7 @@
 package session
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -140,14 +141,22 @@ func TestRegistryCloseProject(t *testing.T) {
 	state := t.TempDir()
 	svc := project.NewService(state)
 	reg := NewRegistry(svc)
-	reg.SetCloner(func(dest, _, _ string, _ *igit.HTTPAuth, _ *igit.SSHKey) error {
+	reg.SetCloner(func(dest, _, _ string, _ igit.SessionSSH) error {
 		if err := igit.InitRepo(dest); err != nil {
 			return err
 		}
 		return os.WriteFile(filepath.Join(dest, "main.tex"), []byte("body\n"), 0o644)
 	})
-	live, err := reg.Create("owner@example.com", "https://github.com/t/paper", "main", nil)
+	reg.SetProber(func(string, string, igit.SessionSSH) error { return nil })
+	k, err := igit.NewSessionSSHKey()
 	if err != nil {
+		t.Fatal(err)
+	}
+	live, err := reg.Create("owner@example.com", "git@github.com:t/paper", "main", k.Authorized)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := reg.CloneAndProbe(live.ID, "owner@example.com", k); err != nil {
 		t.Fatal(err)
 	}
 	projectID := live.ID
@@ -176,7 +185,7 @@ func TestRegistryCloseProject(t *testing.T) {
 	reg.CloseProject(projectID)
 }
 
-func TestEnsureAuthPushOnce(t *testing.T) {
+func TestPersistFromRequiresSigner(t *testing.T) {
 	state := t.TempDir()
 	svc := project.NewService(state)
 	id := "55555555-5555-5555-5555-555555555555"
@@ -191,12 +200,9 @@ func TestEnsureAuthPushOnce(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer h.Close()
-	h.EnsureAuthPush()
-	if !h.authChecked {
-		t.Fatal("first join should mark auth checked")
-	}
-	h.EnsureAuthPush()
-	if !h.authChecked {
-		t.Fatal("second call must stay checked")
+	h.SSHPublic = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIqI4910CfGV/VLbLTy6XXLKZwm/HZQSG/N0iAG0D29c x"
+	c := h.AddClient("c1")
+	if _, err := h.PersistFrom(c, "m", "owner@example.com"); !errors.Is(err, ErrNoSigner) {
+		t.Fatalf("guest persist: %v", err)
 	}
 }

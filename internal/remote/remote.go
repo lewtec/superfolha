@@ -10,6 +10,7 @@ import (
 var (
 	ErrEmptyRemote   = errors.New("empty remote")
 	ErrInvalidRemote = errors.New("invalid remote")
+	ErrNotSSH        = errors.New("ssh remote required")
 )
 
 // Key is the uniqueness key for a live session: canonical remote + branch.
@@ -116,10 +117,13 @@ func TransportURL(raw string) string {
 	return Canonical(raw)
 }
 
-// Validate reports whether raw can be used as a clone URL.
+// Validate reports whether raw is an SSH git remote.
 func Validate(raw string) error {
 	if strings.TrimSpace(raw) == "" {
 		return ErrEmptyRemote
+	}
+	if !IsSSH(raw) {
+		return ErrNotSSH
 	}
 	c := Canonical(raw)
 	if c == "" {

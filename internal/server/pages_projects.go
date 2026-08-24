@@ -6,8 +6,6 @@ import (
 	"strings"
 
 	"github.com/lewtec/superfolha/internal/auth"
-	"github.com/lewtec/superfolha/internal/git"
-	"github.com/lewtec/superfolha/internal/githubapp"
 	appi18n "github.com/lewtec/superfolha/internal/i18n"
 	"github.com/lewtec/superfolha/internal/paths"
 	"github.com/lewtec/superfolha/internal/remote"
@@ -33,58 +31,24 @@ func (s *Server) handleProjectsPost(w http.ResponseWriter, r *http.Request) {
 	if branch == "" {
 		branch = "main"
 	}
-	token := strings.TrimSpace(r.FormValue("token"))
+	pub := strings.TrimSpace(r.FormValue("ssh_public"))
 	if err := remote.Validate(raw); err != nil {
 		http.Redirect(w, r, paths.ProjectsError("sessions.remote_required"), http.StatusSeeOther)
 		return
 	}
-	authz, err := s.cloneAuth(raw, token)
-	if err != nil {
-		if errors.Is(err, githubapp.ErrNeedInstall) {
-			http.Redirect(w, r, s.github.InstallURL(), http.StatusSeeOther)
-			return
-		}
-		http.Redirect(w, r, paths.ProjectsError("sessions.clone_failed"), http.StatusSeeOther)
-		return
-	}
-	live, err := s.hubs.Create(user.Email, raw, branch, authz)
-	if err != nil {
+	if _, err := s.hubs.Create(user.Email, raw, branch, pub); err != nil {
 		if errors.Is(err, session.ErrAlreadyLive) {
 			http.Redirect(w, r, paths.ProjectsError("sessions.already_live"), http.StatusSeeOther)
 			return
 		}
-		http.Redirect(w, r, paths.ProjectsError("sessions.clone_failed"), http.StatusSeeOther)
+		http.Redirect(w, r, paths.ProjectsError("sessions.ssh_seed_invalid"), http.StatusSeeOther)
 		return
 	}
-	if !live.Ready {
-		http.Redirect(w, r, paths.ProjectsFlash("sessions.add_ssh_key"), http.StatusSeeOther)
-		return
-	}
-	http.Redirect(w, r, paths.Editor(live.ID), http.StatusSeeOther)
+	http.Redirect(w, r, paths.ProjectsFlash("sessions.add_ssh_key"), http.StatusSeeOther)
 }
 
 func (s *Server) handleSessionRetry(w http.ResponseWriter, r *http.Request) {
-	user, _ := auth.GetUserFromContext(r.Context())
-	id := r.PathValue(paths.ParamID)
-	if err := s.hubs.RetryClone(id, user.Email, nil); err != nil {
-		http.Redirect(w, r, paths.ProjectsError("sessions.clone_failed"), http.StatusSeeOther)
-		return
-	}
-	http.Redirect(w, r, paths.Editor(id), http.StatusSeeOther)
-}
-
-func (s *Server) cloneAuth(raw, pastedToken string) (*git.HTTPAuth, error) {
-	if pastedToken != "" {
-		return &git.HTTPAuth{Username: "x-access-token", Password: pastedToken}, nil
-	}
-	owner, repo, ok := remote.ParseGitHub(raw)
-	if !ok {
-		return nil, nil
-	}
-	if s.github.PrivateKey == nil {
-		return nil, nil
-	}
-	return s.github.InstallationAuth(owner, repo)
+	http.Redirect(w, r, paths.ProjectsFlash("sessions.add_ssh_key"), http.StatusSeeOther)
 }
 
 func (s *Server) handleProjectDelete(w http.ResponseWriter, r *http.Request) {
@@ -185,5 +149,5 @@ func (s *Server) handleEditorGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c := s.chrome(r, info.Remote)
-	s.render(w, r, pages.Editor(c, info.ID, info.Remote, user.Email, info.SSHPublic, pages.MarshalI18n(appi18n.Map(s.bundle, s.lang(r)))))
+	s.render(w, r, pages.Editor(c, info.ID, info.CloneURL, info.Branch, user.Email, info.SSHPublic, pages.MarshalI18n(appi18n.Map(s.bundle, s.lang(r)))))
 }

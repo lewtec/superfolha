@@ -93,6 +93,7 @@ func (s *Server) Handler() http.Handler {
 
 	mux.Handle(paths.PatternCompile, http.HandlerFunc(s.handleCompile))
 	mux.Handle(paths.PatternProjectWS, http.HandlerFunc(s.handleProjectWS))
+	mux.Handle(paths.PatternSessionWS, http.HandlerFunc(s.handleSessionWS))
 	mux.Handle(paths.PatternUpload, http.HandlerFunc(s.handleUploadFile))
 	mux.Handle(paths.PatternDownload, http.HandlerFunc(s.handleDownloadFile))
 	mux.HandleFunc(paths.PatternAPILogout, s.handleLogout)
@@ -238,7 +239,7 @@ func (s *Server) handleUploadFile(w http.ResponseWriter, r *http.Request) {
 			}); mErr == nil {
 				hub.BroadcastJSON(ev, "")
 			}
-			if _, err := hub.Commit("Uploaded file: "+filePath, user.Email); err != nil {
+			if _, err := hub.Commit("Uploaded file: "+filePath, user.Email, nil); err != nil {
 				slog.Error("error committing upload via hub", "file", filePath, "project", projectIdStr, "err", err)
 				writeAPIError(w, apierrors.Internal(err))
 				return

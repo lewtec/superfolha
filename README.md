@@ -8,7 +8,7 @@ A complete web-based LaTeX editor with Git version control, real-time compilatio
 
 ## Features
 
-- **Authentication**: Ed25519 challenge-sign in the browser. Each session has its own SSH key for git.
+- **Authentication**: Ed25519 challenge-sign in the browser. Session SSH keys stay in the browser (IndexedDB, load/store). The server asks that tab to sign git. Missing `main.tex` is seeded from the default template.
 - **Projects**: Create and manage multiple LaTeX projects
 - **File Management**: Full file explorer with Git integration
 - **Editor**: CodeMirror 6 with LaTeX syntax highlighting and autocomplete
