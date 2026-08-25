@@ -11,16 +11,15 @@ templ Sessions(c layout.Chrome, items []session.Info) {
 		<div class="container mx-auto px-4 py-8">
 			<div class="flex justify-between items-center mb-6 gap-2 flex-wrap">
 				<h1 class="text-3xl font-bold">{ c.T("sessions.title") }</h1>
-				<p class="sf-clone-status text-sm w-full" data-working={ c.T("sessions.cloning") } data-failed={ c.T("sessions.clone_failed") } data-timeout={ c.T("sessions.clone_timeout") }></p>
 			</div>
 			<section id="sf-recents-wrap" class="hidden mb-8">
 				<h2 class="text-xl font-bold mb-3">{ c.T("sessions.recents") }</h2>
 				<ul
 					id="sf-recents"
 					class="list bg-base-100 rounded-box shadow-xl"
-					data-resume={ c.T("sessions.resume") }
-					data-open={ c.T("common.open") }
-					data-forget={ c.T("sessions.forget") }
+					data-label-resume={ c.T("sessions.resume") }
+					data-label-open={ c.T("common.open") }
+					data-label-forget={ c.T("sessions.forget") }
 				></ul>
 			</section>
 			<div class="card bg-base-100 shadow-xl mb-8">
@@ -54,7 +53,7 @@ templ Sessions(c layout.Chrome, items []session.Info) {
 				</div>
 			</div>
 			if first, ok := firstPending(items); ok {
-				<dialog id="ssh-deploy-modal" class="modal" open>
+				<dialog id="ssh-deploy-modal" class="modal">
 					<div class="modal-box">
 						<h3 class="text-lg font-bold">{ c.T("sessions.add_ssh_key") }</h3>
 						<p class="py-2 text-sm font-mono break-all">{ sessionTitle(first) } · { first.Branch }</p>
@@ -62,7 +61,6 @@ templ Sessions(c layout.Chrome, items []session.Info) {
 							<span class="label-text">{ c.T("sessions.ssh_key") }</span>
 							<textarea class="textarea font-mono text-xs w-full" readonly rows="4" id={ "ssh-" + first.ID }>{ first.SSHPublic }</textarea>
 						</label>
-						<p class="sf-clone-status text-sm py-2" data-working={ c.T("sessions.cloning") } data-failed={ c.T("sessions.clone_failed") } data-timeout={ c.T("sessions.clone_timeout") }></p>
 						<div class="modal-action">
 							<button type="button" class="btn" data-copy-ssh={ "ssh-" + first.ID }>{ c.T("sessions.copy_key") }</button>
 							<button type="button" class="btn btn-primary" id="sf-ssh-retry" data-ws={ paths.SessionWS(first.ID) } data-editor={ paths.Editor(first.ID) } data-remote={ first.CloneURL } data-branch={ first.Branch }>{ c.T("sessions.retry_clone") }</button>
@@ -117,6 +115,20 @@ templ Sessions(c layout.Chrome, items []session.Info) {
 					}
 				</div>
 			}
+		</div>
+		<div
+			id="sf-clone-toast"
+			class="toast toast-end toast-bottom z-50 hidden"
+			data-working={ c.T("sessions.cloning") }
+			data-failed={ c.T("sessions.clone_failed") }
+			data-timeout={ c.T("sessions.clone_timeout") }
+			data-unauthorized={ c.T("sessions.key_unauthorized") }
+			data-readonly={ c.T("sessions.key_read_only") }
+		>
+			<div id="sf-clone-alert" class="alert" role="status">
+				<span id="sf-clone-spin" class="loading loading-spinner hidden"></span>
+				<span id="sf-clone-msg"></span>
+			</div>
 		</div>
 		<script>
 			document.addEventListener("click", function (e) {

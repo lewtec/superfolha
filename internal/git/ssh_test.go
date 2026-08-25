@@ -28,6 +28,21 @@ func TestParseSessionSSHKeyStable(t *testing.T) {
 	}
 }
 
+func TestAuthFailed(t *testing.T) {
+	if AuthFailed(nil) {
+		t.Fatal("nil")
+	}
+	if !AuthFailed(errors.New("Permission denied (publickey)")) {
+		t.Fatal("publickey")
+	}
+	if !AuthFailed(errors.New("ssh: handshake failed: ssh: unable to authenticate")) {
+		t.Fatal("handshake")
+	}
+	if AuthFailed(errors.New("remote repository is empty")) {
+		t.Fatal("empty repo is not auth")
+	}
+}
+
 func TestParseAuthorized(t *testing.T) {
 	k, err := NewSessionSSHKey()
 	if err != nil {

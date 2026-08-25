@@ -17,7 +17,9 @@ var (
 	ErrNotFound    = errors.New("session not found")
 	ErrNotHost     = errors.New("not session host")
 	ErrKnockClosed = errors.New("knock is disabled")
-	ErrClone       = errors.New("clone failed")
+	ErrClone         = errors.New("clone failed")
+	ErrUnauthorized  = errors.New("sessions.key_unauthorized")
+	ErrNoWrite       = errors.New("sessions.key_read_only")
 )
 
 // Live is RAM metadata for one session incarnation.
@@ -82,6 +84,12 @@ type CreateCloner func(dest, remoteURL, branch string, ssh igit.SessionSSH) erro
 // ProbePusher pushes HEAD after clone. Tests replace this.
 type ProbePusher func(dest, branch string, ssh igit.SessionSSH) error
 
+// PullTester fetches origin. Tests replace this.
+type PullTester func(dest, branch string, ssh igit.SessionSSH) error
+
+// RemoteLister lists refs on a remote. Tests replace this.
+type RemoteLister func(remoteURL string, ssh igit.SessionSSH) error
+
 // Registry holds live sessions and their hubs.
 type Registry struct {
 	mu     sync.Mutex
@@ -91,6 +99,8 @@ type Registry struct {
 	svc    *project.Service
 	cloner CreateCloner
 	prober ProbePusher
+	puller PullTester
+	lister RemoteLister
 }
 
 // NewRegistry creates an empty hub registry.
@@ -102,6 +112,8 @@ func NewRegistry(svc *project.Service) *Registry {
 		svc:    svc,
 		cloner: igit.Clone,
 		prober: igit.Push,
+		puller: igit.Fetch,
+		lister: igit.LsRemote,
 	}
 }
 
@@ -116,6 +128,20 @@ func (r *Registry) SetCloner(fn CreateCloner) {
 func (r *Registry) SetProber(fn ProbePusher) {
 	r.mu.Lock()
 	r.prober = fn
+	r.mu.Unlock()
+}
+
+// SetPuller replaces the post-probe fetch (tests).
+func (r *Registry) SetPuller(fn PullTester) {
+	r.mu.Lock()
+	r.puller = fn
+	r.mu.Unlock()
+}
+
+// SetLister replaces the pre-unauthorized ls-remote (tests).
+func (r *Registry) SetLister(fn RemoteLister) {
+	r.mu.Lock()
+	r.lister = fn
 	r.mu.Unlock()
 }
 
@@ -205,6 +231,10 @@ func (r *Registry) CloneAndProbe(sessionID, hostLogin string, ssh igit.SessionSS
 		if rmErr := os.RemoveAll(dest); rmErr != nil {
 			slog.Error("remove failed clone dest", "path", dest, "err", rmErr)
 		}
+		lsErr := r.lister(l.CloneURL, ssh)
+		if lsErr != nil && (igit.AuthFailed(err) || igit.AuthFailed(lsErr)) {
+			return ErrUnauthorized
+		}
 		return errors.Join(ErrClone, err)
 	}
 	if err := r.svc.EnsureMainTeX(sessionID); err != nil {
@@ -214,8 +244,15 @@ func (r *Registry) CloneAndProbe(sessionID, hostLogin string, ssh igit.SessionSS
 		return err
 	}
 	if err := r.prober(dest, l.Branch, ssh); err != nil {
+		pullErr := r.puller(dest, l.Branch, ssh)
 		if rmErr := os.RemoveAll(dest); rmErr != nil {
 			slog.Error("remove failed probe dest", "path", dest, "err", rmErr)
+		}
+		if pullErr == nil {
+			return ErrNoWrite
+		}
+		if igit.AuthFailed(err) || igit.AuthFailed(pullErr) {
+			return ErrUnauthorized
 		}
 		return errors.Join(ErrClone, err)
 	}

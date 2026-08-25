@@ -185,6 +185,97 @@ func TestCreateRejectsHTTP(t *testing.T) {
 	}
 }
 
+func TestCloneAuthFailsAfterLsRemote(t *testing.T) {
+	t.Setenv("JWT_SECRET", "test-secret-for-session")
+	t.Setenv("GO_ENV", "development")
+	reg := NewRegistry(project.NewService(t.TempDir()))
+	listed := 0
+	reg.SetCloner(func(string, string, string, igit.SessionSSH) error {
+		return errors.New("Permission denied (publickey)")
+	})
+	reg.SetLister(func(string, igit.SessionSSH) error {
+		listed++
+		return errors.New("Permission denied (publickey)")
+	})
+	k := testKey(t)
+	live, err := reg.Create("alice", "git@github.com:t/paper", "main", k.Authorized)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := reg.CloneAndProbe(live.ID, "alice", k); !errors.Is(err, ErrUnauthorized) {
+		t.Fatalf("clone auth: %v; want ErrUnauthorized", err)
+	}
+	if listed != 1 {
+		t.Fatalf("ls-remote calls = %d; want 1", listed)
+	}
+}
+
+func TestCloneFailAfterPullWorksIsNotUnauthorized(t *testing.T) {
+	t.Setenv("JWT_SECRET", "test-secret-for-session")
+	t.Setenv("GO_ENV", "development")
+	reg := NewRegistry(project.NewService(t.TempDir()))
+	reg.SetCloner(func(string, string, string, igit.SessionSSH) error {
+		return errors.New("remote repository is empty")
+	})
+	reg.SetLister(func(string, igit.SessionSSH) error { return nil })
+	k := testKey(t)
+	live, err := reg.Create("alice", "git@github.com:t/paper", "main", k.Authorized)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = reg.CloneAndProbe(live.ID, "alice", k)
+	if err == nil || errors.Is(err, ErrUnauthorized) {
+		t.Fatalf("empty repo: %v; want clone error, not unauthorized", err)
+	}
+}
+
+func TestProbeFailAfterPullWorksIsReadOnly(t *testing.T) {
+	t.Setenv("JWT_SECRET", "test-secret-for-session")
+	t.Setenv("GO_ENV", "development")
+	reg := NewRegistry(project.NewService(t.TempDir()))
+	reg.SetCloner(stubClone)
+	reg.SetProber(func(string, string, igit.SessionSSH) error {
+		return errors.New("Permission denied (publickey)")
+	})
+	pulled := 0
+	reg.SetPuller(func(string, string, igit.SessionSSH) error {
+		pulled++
+		return nil
+	})
+	k := testKey(t)
+	live, err := reg.Create("alice", "git@github.com:t/paper", "main", k.Authorized)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := reg.CloneAndProbe(live.ID, "alice", k); !errors.Is(err, ErrNoWrite) {
+		t.Fatalf("probe: %v; want ErrNoWrite", err)
+	}
+	if pulled != 1 {
+		t.Fatalf("fetch calls = %d; want 1", pulled)
+	}
+}
+
+func TestProbeFailAfterPullFailsIsUnauthorized(t *testing.T) {
+	t.Setenv("JWT_SECRET", "test-secret-for-session")
+	t.Setenv("GO_ENV", "development")
+	reg := NewRegistry(project.NewService(t.TempDir()))
+	reg.SetCloner(stubClone)
+	reg.SetProber(func(string, string, igit.SessionSSH) error {
+		return errors.New("Permission denied (publickey)")
+	})
+	reg.SetPuller(func(string, string, igit.SessionSSH) error {
+		return errors.New("Permission denied (publickey)")
+	})
+	k := testKey(t)
+	live, err := reg.Create("alice", "git@github.com:t/paper", "main", k.Authorized)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := reg.CloneAndProbe(live.ID, "alice", k); !errors.Is(err, ErrUnauthorized) {
+		t.Fatalf("probe: %v; want ErrUnauthorized", err)
+	}
+}
+
 func TestCloneAndProbeRejectsWrongKey(t *testing.T) {
 	t.Setenv("JWT_SECRET", "test-secret-for-session")
 	t.Setenv("GO_ENV", "development")

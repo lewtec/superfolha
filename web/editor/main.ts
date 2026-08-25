@@ -260,7 +260,7 @@ async function boot() {
       (collab.status === "commit_error" || collab.status === "error")
     ) {
       sshKeyEl.value = key;
-      if (sshMsgEl) sshMsgEl.textContent = collab.errorMessage || t(msgs, "sessions.add_ssh_key");
+      if (sshMsgEl) sshMsgEl.textContent = t(msgs, collab.errorMessage || "sessions.add_ssh_key");
       sshModalShown = true;
       sshModal.showModal();
     }
