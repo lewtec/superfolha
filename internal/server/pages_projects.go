@@ -49,7 +49,7 @@ func (s *Server) handleProjectsPost(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, paths.Editor(live.ID), http.StatusSeeOther)
 		return
 	}
-	http.Redirect(w, r, paths.ProjectsFlash("sessions.add_ssh_key"), http.StatusSeeOther)
+	http.Redirect(w, r, paths.Projects(), http.StatusSeeOther)
 }
 
 func (s *Server) handleSessionRetry(w http.ResponseWriter, r *http.Request) {

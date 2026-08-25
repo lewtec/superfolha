@@ -69,7 +69,7 @@ If the process dies, RAM dies. The next writer clones again from the remote. Unp
 |---|----------|
 | F1 | **Forge-native.** The git remote is the paper. Superfolha does not own a second copy of truth. |
 | F2 | **SSH clone is the primitive.** The form is SSH only. No token. No `https://` clone. |
-| F3 | **Ed25519 challenge-sign identity.** The browser holds a roster of keys in IndexedDB. `sessionStorage` picks the active one (ghweb-shaped). Avatar menu: switch, add (`id_ed25519`), mint, leave. Login is nonce + signature. Fingerprint is the display name. |
+| F3 | **Ed25519 challenge-sign identity.** The browser holds a roster of keys in IndexedDB. `sessionStorage` picks the active one (ghweb-shaped). Avatar menu: switch, add (`id_ed25519` in a modal), mint, leave. Login is nonce + signature. Fingerprint is the display name. |
 | F4 | **One Ed25519 key.** Login and git SSH use the same seed in IndexedDB (`superfolha-login`). Create posts only the public line. The server never receives the private key. Superfolha opens SSH and asks the signer tab to `sign()`. |
 | F5 | **Signer tab.** Only the tab that started clone or Persist may sign. A second open tab does not sign for it. Close that tab and that action stops. |
 | F6 | **Clone creates a session** with a UUIDv7. Disk path `{state-dir}/repos/{sessionID}`. |
@@ -83,7 +83,7 @@ If the process dies, RAM dies. The next writer clones again from the remote. Unp
 | F14 | **Persist:** a seed-holding tab owns a 30s dirty cooldown and the Persist button. That tab asks and signs. Guest Persist is an error: no commit, no push. Guest keystrokes dirty the host tab’s doc; the host tab’s cooldown may persist. Server singleflight only. No server auto-push. |
 | F15 | **GitHub App leftover is unused.** No OAuth identity. No installation token for clone. |
 | F16 | Put that public key on the GitHub **account** (user SSH key) so it works on every repo. A deploy key is only needed if the key is not already on the account. |
-| F17 | **Create stays pending.** Sessions page opens a signer socket. Retry clone uses that socket. After clone, the same tab signs a probe push of current HEAD. Fail → key modal, stay on sessions. Success → editor. |
+| F17 | **Create stays pending.** Sessions page opens a signer socket on load and clones. After clone, the same tab signs a probe push of current HEAD. A failed clone or push must ls-remote/fetch once before the UI says the key is unauthorized. Pull ok + push fail → read-only. Fail → key modal, stay on sessions. Success → editor. |
 | F18 | If `main.tex` is missing after clone, write the default template locally. It is committed on the first Persist. |
 | F19 | **Recents.** The browser stores recent remotes in localStorage, keyed by the active identity. The sessions page lists them. Resume posts create: the host of a live ready session goes to the editor; otherwise a pending clone starts. |
 
@@ -109,8 +109,8 @@ Public remotes still require this login.
 3. Server canonicalizes the remote. If a live session exists for that pair:
    - same host login → return that session
    - anyone else → fail, no id
-4. Server stores a **pending** session. It does not clone. Redirect stays on `/sessions`. The host adds the public key on the remote.
-5. The sessions page opens `GET /ws/sessions/{id}`. That tab is the signer. The server clones over SSH, asking the tab to `sign()`.
+4. Server stores a **pending** session. It does not clone. Redirect stays on `/sessions`.
+5. The sessions page opens `GET /ws/sessions/{id}` on load. That tab is the signer. The server clones over SSH, asking the tab to `sign()`.
 6. After clone, if `main.tex` is missing, write the default template. Then the same tab signs a probe push of current HEAD.
 7. Probe fail → error + key modal. Stay pending. Probe success → open the hub. Redirect to `/editor/{sessionID}`.
 

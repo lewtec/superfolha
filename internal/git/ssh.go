@@ -17,6 +17,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	gitssh "github.com/go-git/go-git/v5/plumbing/transport/ssh"
+	"github.com/go-git/go-git/v5/storage/memory"
 	cryptossh "golang.org/x/crypto/ssh"
 )
 
@@ -226,4 +227,61 @@ func Push(repoPath, branch string, ssh SessionSSH) error {
 		return fmt.Errorf("push origin: %w", err)
 	}
 	return nil
+}
+
+// Fetch pulls from origin over SSH. Used to tell "no write" from "no key".
+func Fetch(repoPath, branch string, ssh SessionSSH) error {
+	r, err := openRepo(repoPath)
+	if err != nil {
+		return err
+	}
+	auth := transport.AuthMethod(nil)
+	if ssh != nil {
+		auth = ssh.AuthMethod()
+	}
+	opts := &gogit.FetchOptions{RemoteName: "origin", Auth: auth}
+	if branch != "" {
+		opts.RefSpecs = []config.RefSpec{config.RefSpec("refs/heads/" + branch + ":refs/remotes/origin/" + branch)}
+	}
+	err = r.Fetch(opts)
+	if err != nil && !errors.Is(err, gogit.NoErrAlreadyUpToDate) {
+		return fmt.Errorf("fetch origin: %w", err)
+	}
+	return nil
+}
+
+// LsRemote lists refs on the remote over SSH. No local repo required.
+func LsRemote(remoteURL string, ssh SessionSSH) error {
+	auth := transport.AuthMethod(nil)
+	if ssh != nil {
+		auth = ssh.AuthMethod()
+	}
+	rem := gogit.NewRemote(memory.NewStorage(), &config.RemoteConfig{
+		Name: "origin",
+		URLs: []string{remoteURL},
+	})
+	_, err := rem.List(&gogit.ListOptions{Auth: auth})
+	if err != nil {
+		return fmt.Errorf("ls-remote %s: %w", remoteURL, err)
+	}
+	return nil
+}
+
+// AuthFailed reports SSH public-key / permission denied.
+// go-git wraps transport.ErrAuthenticationRequired on HTTP only. SSH
+// returns a bare x/crypto/ssh handshake fmt.Errorf, so we also match
+// the usual strings.
+func AuthFailed(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, transport.ErrAuthenticationRequired) || errors.Is(err, transport.ErrAuthorizationFailed) {
+		return true
+	}
+	s := strings.ToLower(err.Error())
+	return strings.Contains(s, "permission denied") ||
+		strings.Contains(s, "publickey") ||
+		strings.Contains(s, "unable to authenticate") ||
+		strings.Contains(s, "authentication required") ||
+		strings.Contains(s, "authorization failed")
 }

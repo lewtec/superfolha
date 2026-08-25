@@ -45,7 +45,8 @@ templ IdentityMenu(c Chrome) {
 		data-add={ c.T("auth.add_identity") }
 		data-new={ c.T("auth.new_identity") }
 		data-leave={ c.T("common.leave") }
-		data-pass={ c.T("auth.key_pass") }
+		data-bad-key={ c.T("auth.key_bad") }
+		data-working={ c.T("auth.signing_in") }
 	>
 		<button
 			id="sf-ident-btn"
@@ -71,6 +72,26 @@ templ IdentityMenu(c Chrome) {
 			style="position-anchor:--sf-ident;position-area:bottom span-left"
 		></ul>
 	</div>
+	<dialog id="sf-ident-load" class="modal">
+		<div class="modal-box">
+			<h3 class="text-lg font-bold">{ c.T("auth.add_identity") }</h3>
+			<fieldset class="fieldset mt-2">
+				<legend class="fieldset-legend">{ c.T("auth.key_file") }</legend>
+				<input id="sf-ident-pass" class="input w-full" type="password" autocomplete="off" placeholder={ c.T("auth.key_pass") }/>
+				<p class="label">{ c.T("auth.key_file_hint") }</p>
+			</fieldset>
+			<p id="sf-ident-load-status" class="text-sm text-base-content/70 mt-2"></p>
+			<div class="modal-action">
+				<button type="button" class="btn btn-primary" id="sf-ident-load-pick">{ c.T("auth.load_key") }</button>
+				<form method="dialog">
+					<button class="btn btn-ghost">{ c.T("common.cancel") }</button>
+				</form>
+			</div>
+		</div>
+		<form method="dialog" class="modal-backdrop">
+			<button>{ c.T("common.cancel") }</button>
+		</form>
+	</dialog>
 	<input id="sf-ident-file" class="hidden" type="file"/>
 	<script src={ paths.ChromeJS() }></script>
 }

@@ -52,15 +52,28 @@ async function loadFile(file: File): Promise<void> {
   await refresh();
 }
 
-function cloneStatusEls(): HTMLElement[] {
-  return Array.from(document.querySelectorAll<HTMLElement>(".sf-clone-status"));
+function cloneToast(): HTMLElement | null {
+  return $("sf-clone-toast");
 }
 
 function setCloneStatus(text: string, isError: boolean): void {
-  for (const el of cloneStatusEls()) {
-    el.textContent = text;
-    el.classList.toggle("text-error", isError);
-  }
+  const toast = cloneToast();
+  const alertEl = $("sf-clone-alert");
+  const spin = $("sf-clone-spin");
+  const msg = $("sf-clone-msg");
+  if (!toast || !msg) return;
+  const shown = localizeClone(toast, text);
+  msg.textContent = shown;
+  toast.classList.toggle("hidden", !shown);
+  alertEl?.classList.toggle("alert-error", isError);
+  spin?.classList.toggle("hidden", isError || !shown);
+}
+
+function localizeClone(el: HTMLElement, text: string): string {
+  if (text === "sessions.key_unauthorized") return el.getAttribute("data-unauthorized") || text;
+  if (text === "sessions.key_read_only") return el.getAttribute("data-readonly") || text;
+  if (text === "sessions.cloning") return el.getAttribute("data-working") || text;
+  return text;
 }
 
 function startClone(btn: HTMLElement): void {
@@ -68,7 +81,7 @@ function startClone(btn: HTMLElement): void {
   const editor = btn.getAttribute("data-editor") ?? "";
   const remote = btn.getAttribute("data-remote") || input("sf-remote")?.value.trim() || "";
   const branch = btn.getAttribute("data-branch") || input("sf-branch")?.value.trim() || "main";
-  const statusEl = cloneStatusEls()[0];
+  const statusEl = cloneToast();
   const working = statusEl?.getAttribute("data-working") || "Cloning…";
   const failed = statusEl?.getAttribute("data-failed") || "Clone failed.";
   const timedOut = statusEl?.getAttribute("data-timeout") || "Clone timed out.";
@@ -134,6 +147,8 @@ function startClone(btn: HTMLElement): void {
           const pubEl = textarea("sf-ssh-pub");
           if (pubEl && msg.ssh_public) pubEl.value = msg.ssh_public;
           finish(false, msg.message || failed);
+          const modal = document.getElementById("ssh-deploy-modal");
+          if (modal instanceof HTMLDialogElement) modal.showModal();
         }
       };
       ws.onopen = () => {
@@ -166,9 +181,9 @@ function paintRecents(): void {
   const wrap = $("sf-recents-wrap");
   const list = $("sf-recents");
   if (!wrap || !list) return;
-  const resumeL = list.getAttribute("data-resume") || "Resume";
-  const openL = list.getAttribute("data-open") || "Open";
-  const forgetL = list.getAttribute("data-forget") || "Remove";
+  const resumeL = list.getAttribute("data-label-resume") || "Resume";
+  const openL = list.getAttribute("data-label-open") || "Open";
+  const forgetL = list.getAttribute("data-label-forget") || "Remove";
   const rows = loadRecents();
   wrap.classList.toggle("hidden", rows.length === 0);
   list.innerHTML = rows
@@ -216,10 +231,20 @@ function resume(remote: string, branch: string): void {
   const remoteEl = input("sf-remote");
   const branchEl = input("sf-branch");
   const form = $("sf-session-form");
-  if (!remoteEl || !form || !(form instanceof HTMLFormElement)) return;
+  if (!remoteEl || !form || !(form instanceof HTMLFormElement)) {
+    setCloneStatus("Cannot resume.", true);
+    return;
+  }
   remoteEl.value = remote;
   if (branchEl) branchEl.value = branch;
-  void refresh().then(() => form.submit());
+  const working = cloneToast()?.getAttribute("data-working") || "Cloning…";
+  setCloneStatus(working, false);
+  void refresh()
+    .then(() => form.submit())
+    .catch((err) => {
+      console.error("superfolha resume", err);
+      setCloneStatus(err instanceof Error ? err.message : "Cannot resume.", true);
+    });
 }
 
 function bind(): void {
@@ -265,14 +290,14 @@ function bind(): void {
     recents.addEventListener("click", (ev) => {
       const t = ev.target;
       if (!(t instanceof HTMLElement)) return;
-      const forget = t.closest("[data-forget]") as HTMLElement | null;
+      const forget = t.closest("button[data-forget]") as HTMLElement | null;
       if (forget?.dataset.forget) {
         ev.preventDefault();
         forgetRecent(forget.dataset.forget, forget.dataset.branch || "main");
         paintRecents();
         return;
       }
-      const go = t.closest("[data-resume]") as HTMLElement | null;
+      const go = t.closest("button[data-resume]") as HTMLElement | null;
       if (go?.dataset.resume) {
         ev.preventDefault();
         resume(go.dataset.resume, go.dataset.branch || "main");
@@ -295,6 +320,8 @@ function bind(): void {
       startClone(btn);
     });
   });
+  const auto = $("sf-ssh-retry");
+  if (auto) startClone(auto);
 }
 
 if (document.readyState === "loading") {

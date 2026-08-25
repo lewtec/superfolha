@@ -106,6 +106,8 @@
   "sessions.knock_closed": "Esta sesión no acepta peticiones.",
   "sessions.already_live": "Ya hay una sesión viva para ese remoto y rama.",
   "sessions.clone_failed": "La clonación falló.",
+  "sessions.key_unauthorized": "El remoto rechazó esta clave. Añade la línea pública a tu cuenta de GitHub y reintenta.",
+  "sessions.key_read_only": "Esta clave puede traer el remoto pero no puede enviar. Dale acceso de escritura y reintenta.",
   "sessions.cloning": "Clonando y comprobando el push…",
   "sessions.clone_timeout": "La clonación agotó el tiempo.",
   "sessions.preauth_ready": "Comparte el enlace de la barra de dirección para invitar.",

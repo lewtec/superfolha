@@ -72,7 +72,6 @@ function bind(): void {
     const addL = root!.getAttribute("data-add") || "Add identity";
     const newL = root!.getAttribute("data-new") || "New identity";
     const leaveL = root!.getAttribute("data-leave") || "Leave";
-    const passPH = root!.getAttribute("data-pass") || "Passphrase";
     const logout = root!.getAttribute("data-logout") || "/logout";
     const items = all
       .map((r: IdentityRec) => {
@@ -85,7 +84,6 @@ function bind(): void {
       items +
       `<li><button type="button" data-add="1">${addL}</button></li>` +
       `<li><button type="button" data-mint="1">${newL}</button></li>` +
-      `<li><input id="sf-ident-pass" class="input input-sm w-full" type="password" autocomplete="off" placeholder="${passPH}"/></li>` +
       `<li><form method="post" action="${logout}"><button type="submit">${leaveL}</button></form></li>`;
     const leave = menu.querySelector("form");
     leave?.addEventListener("submit", () => {
@@ -118,7 +116,9 @@ function bind(): void {
     }
     if (t.closest("[data-add]")) {
       ev.preventDefault();
-      fileEl?.click();
+      closeMenu();
+      const dlg = $("sf-ident-load") as HTMLDialogElement | null;
+      dlg?.showModal();
       return;
     }
     if (t.closest("[data-mint]")) {
@@ -127,6 +127,10 @@ function bind(): void {
     }
   });
 
+  $("sf-ident-load-pick")?.addEventListener("click", (ev) => {
+    ev.preventDefault();
+    fileEl?.click();
+  });
   fileEl?.addEventListener("change", () => {
     const file = fileEl.files?.[0];
     fileEl.value = "";
@@ -143,12 +147,25 @@ function bind(): void {
     location.assign(next);
   }
 
+  function loadStatus(text: string, isError: boolean): void {
+    const el = $("sf-ident-load-status");
+    if (!el) return;
+    el.textContent = text;
+    el.classList.toggle("text-error", isError);
+  }
+
   async function addFromFile(file: File): Promise<void> {
     const pass = (document.getElementById("sf-ident-pass") as HTMLInputElement | null)?.value ?? "";
-    const seed = parseIdentitySeed(await file.text(), pass);
-    await addIdentity(seed);
-    const next = await verifyLogin(seed, challengeURL, verifyURL, location.pathname);
-    location.assign(next);
+    loadStatus(root.getAttribute("data-working") || "Signing in…", false);
+    try {
+      const seed = parseIdentitySeed(await file.text(), pass);
+      await addIdentity(seed);
+      const next = await verifyLogin(seed, challengeURL, verifyURL, location.pathname);
+      location.assign(next);
+    } catch (err) {
+      console.error("superfolha identity load", err);
+      loadStatus(root.getAttribute("data-bad-key") || "That file is not an Ed25519 OpenSSH key.", true);
+    }
   }
 
   async function mintNew(): Promise<void> {

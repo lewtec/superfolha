@@ -106,6 +106,8 @@
   "sessions.knock_closed": "This session is not accepting knocks.",
   "sessions.already_live": "A session is already live for that remote and branch.",
   "sessions.clone_failed": "Clone failed.",
+  "sessions.key_unauthorized": "This key is not accepted on the remote. Add the public line to your GitHub account, then retry.",
+  "sessions.key_read_only": "This key can pull but cannot push. Give it write access on the remote, then retry.",
   "sessions.cloning": "Cloning and checking push…",
   "sessions.clone_timeout": "Clone timed out.",
   "sessions.preauth_ready": "Share the address bar link to invite.",

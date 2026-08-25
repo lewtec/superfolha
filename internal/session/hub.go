@@ -199,9 +199,15 @@ func (h *Hub) Commit(message, author string, ssh igit.SessionSSH) (string, error
 	}
 	if ssh != nil {
 		if err := igit.Push(h.Root, h.Branch, ssh); err != nil {
+			msg := err.Error()
+			if ferr := igit.Fetch(h.Root, h.Branch, ssh); ferr == nil {
+				msg = ErrNoWrite.Error()
+			} else if igit.AuthFailed(err) || igit.AuthFailed(ferr) {
+				msg = ErrUnauthorized.Error()
+			}
 			h.broadcastJSONMap(map[string]any{
 				"type":       "push.error",
-				"message":    err.Error(),
+				"message":    msg,
 				"ssh_public": h.SSHPublic,
 			}, "")
 			return "", err
