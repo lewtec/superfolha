@@ -85,6 +85,7 @@ If the process dies, RAM dies. The next writer clones again from the remote. Unp
 | F16 | Put that public key on the GitHub **account** (user SSH key) so it works on every repo. A deploy key is only needed if the key is not already on the account. |
 | F17 | **Create stays pending.** Sessions page opens a signer socket. Retry clone uses that socket. After clone, the same tab signs a probe push of current HEAD. Fail → key modal, stay on sessions. Success → editor. |
 | F18 | If `main.tex` is missing after clone, write the default template locally. It is committed on the first Persist. |
+| F19 | **Recents.** The browser stores recent remotes in localStorage, keyed by the active identity. The sessions page lists them. Resume posts create: the host of a live ready session goes to the editor; otherwise a pending clone starts. |
 
 CRDT decisions that still hold: one Y.Doc per session; CRDT is RAM-only; Git working tree is the disk projection; stream access = session access; flush before compile; lock CRDT sync while commit+push runs; Synced = server ack, not push; artifacts stay outside git; single instance.
 
@@ -251,4 +252,4 @@ internal/git/         # clone, commit, push; SessionSSH (tab signer or test key)
 
 ## Grill log (2026-08-24)
 
-Forge-native → Ed25519 login, session SSH key in the browser → SSH only → create pending, sessions signer socket clones then probe-pushes → one live session per remote+branch → host is first writer of this incarnation → knock opt-in → persist = signer tab (click or 30s dirty cooldown), guest Persist errors → seed never POSTed, load/store JSON → main.tex seeded locally if missing.
+Forge-native → Ed25519 login, session SSH key in the browser → SSH only → create pending, sessions signer socket clones then probe-pushes → one live session per remote+branch → host is first writer of this incarnation → knock opt-in → persist = signer tab (click or 30s dirty cooldown), guest Persist errors → seed never POSTed, load/store JSON → main.tex seeded locally if missing → recents in the browser, resume posts create.

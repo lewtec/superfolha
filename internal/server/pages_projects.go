@@ -36,12 +36,17 @@ func (s *Server) handleProjectsPost(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, paths.ProjectsError("sessions.remote_required"), http.StatusSeeOther)
 		return
 	}
-	if _, err := s.hubs.Create(user.Email, raw, branch, pub); err != nil {
+	live, err := s.hubs.Create(user.Email, raw, branch, pub)
+	if err != nil {
 		if errors.Is(err, session.ErrAlreadyLive) {
 			http.Redirect(w, r, paths.ProjectsError("sessions.already_live"), http.StatusSeeOther)
 			return
 		}
 		http.Redirect(w, r, paths.ProjectsError("sessions.ssh_seed_invalid"), http.StatusSeeOther)
+		return
+	}
+	if live.Ready {
+		http.Redirect(w, r, paths.Editor(live.ID), http.StatusSeeOther)
 		return
 	}
 	http.Redirect(w, r, paths.ProjectsFlash("sessions.add_ssh_key"), http.StatusSeeOther)

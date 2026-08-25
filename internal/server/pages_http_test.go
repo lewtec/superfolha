@@ -272,6 +272,35 @@ func TestCloneCreatesSessionAndSecondUserFails(t *testing.T) {
 	}
 }
 
+func TestHostRetryOfReadySessionOpensEditor(t *testing.T) {
+	t.Setenv("JWT_SECRET", "rod-play-secret")
+	t.Setenv("GO_ENV", "development")
+	srv := testServer(t)
+	alice := signIn(t, "alice")
+	k, err := igit.NewSessionSSHKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	live, err := srv.hubs.Create("alice", "git@github.com:t/paper", "main", k.Authorized)
+	if err != nil {
+		t.Fatal(err)
+	}
+	live.Ready = true
+	form := strings.NewReader("remote=git@github.com:t/paper&branch=main&ssh_public=" + url.QueryEscape(k.Authorized))
+	req := httptest.NewRequest(http.MethodPost, paths.Projects(), form)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{Name: auth.AuthCookieName, Value: alice})
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("retry = %d", rec.Code)
+	}
+	want := paths.Editor(live.ID)
+	if rec.Header().Get("Location") != want {
+		t.Fatalf("Location = %q; want %q", rec.Header().Get("Location"), want)
+	}
+}
+
 func truncateForTest(b []byte, n int) string {
 	if len(b) <= n {
 		return string(b)
