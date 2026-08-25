@@ -1,14 +1,11 @@
+import { encodeIdentityKey, parseIdentitySeed } from "../login/openssh";
+import { getOrCreateLoginSeed, putLoginSeed } from "../ssh/identity";
 import {
   authorized,
-  b64url,
-  b64urlDecode,
   decodeStdB64,
   encodeStdB64,
-  idbPut,
   publicLine,
-  seedFor,
   signSSH,
-  storageKey,
 } from "../ssh/sessionKey";
 import * as ed from "@noble/ed25519";
 
@@ -27,58 +24,30 @@ function textarea(id: string): HTMLTextAreaElement | null {
 }
 
 async function refresh(): Promise<void> {
-  const remoteEl = input("sf-remote");
-  const branchEl = input("sf-branch");
   const pubHidden = input("sf-ssh-public");
   const pubEl = textarea("sf-ssh-pub");
-  if (!remoteEl || !branchEl || !pubHidden || !pubEl) return;
-  const remote = remoteEl.value.trim();
-  const branch = branchEl.value.trim() || "main";
-  if (!remote) {
-    pubHidden.value = "";
-    pubEl.value = "";
-    return;
-  }
-  const seed = await seedFor(remote, branch);
+  if (!pubHidden || !pubEl) return;
+  const seed = await getOrCreateLoginSeed();
   const line = publicLine(seed);
   pubHidden.value = line;
   pubEl.value = line;
 }
 
 function store(): void {
-  const remote = input("sf-remote")?.value.trim() ?? "";
-  const branch = input("sf-branch")?.value.trim() || "main";
-  const pub = textarea("sf-ssh-pub")?.value ?? "";
-  void seedFor(remote, branch).then((seed) => {
-    const blob = new Blob(
-      [JSON.stringify({ v: 1, remote, branch, seed: b64url(seed), public: pub }, null, 2)],
-      { type: "application/json" },
-    );
+  void getOrCreateLoginSeed().then((seed) => {
+    const pem = encodeIdentityKey(seed);
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "superfolha-ssh.json";
+    a.href = URL.createObjectURL(new Blob([pem], { type: "application/x-pem-file" }));
+    a.download = "id_ed25519";
     a.click();
     URL.revokeObjectURL(a.href);
   });
 }
 
 async function loadFile(file: File): Promise<void> {
-  const obj = JSON.parse(await file.text()) as {
-    remote?: string;
-    branch?: string;
-    seed?: string;
-  };
-  if (!obj.seed) throw new Error("missing seed");
-  const seed = b64urlDecode(obj.seed);
-  if (seed.length !== 32) throw new Error("bad seed");
-  const remoteEl = input("sf-remote");
-  const branchEl = input("sf-branch");
-  if (remoteEl && obj.remote) remoteEl.value = obj.remote;
-  if (branchEl && obj.branch) branchEl.value = obj.branch;
-  const remote = remoteEl?.value.trim() ?? "";
-  const branch = branchEl?.value.trim() || "main";
-  if (!remote) throw new Error("missing remote");
-  await idbPut(storageKey(remote, branch), seed);
+  const pass = input("sf-ssh-pass")?.value ?? "";
+  const seed = parseIdentitySeed(await file.text(), pass);
+  await putLoginSeed(seed);
   await refresh();
 }
 
@@ -117,7 +86,7 @@ function startClone(btn: HTMLElement): void {
     btn.classList.remove("btn-disabled");
     setCloneStatus(text, !ok);
   };
-  void seedFor(remote, branch)
+  void getOrCreateLoginSeed()
     .then((seed) => {
       const pub = authorized(ed.getPublicKey(seed));
       const proto = location.protocol === "https:" ? "wss:" : "ws:";
@@ -193,9 +162,6 @@ function bind(): void {
   if (form && form.dataset.bound !== "1") {
     form.dataset.bound = "1";
     remoteEl?.addEventListener("input", () => {
-      void refresh();
-    });
-    branchEl?.addEventListener("input", () => {
       void refresh();
     });
     storeBtn?.addEventListener("click", (ev) => {

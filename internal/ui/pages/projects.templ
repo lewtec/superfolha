@@ -28,12 +28,13 @@ templ Sessions(c layout.Chrome, items []session.Info) {
 						</label>
 						<fieldset class="fieldset">
 							<legend class="fieldset-legend">{ c.T("sessions.ssh_key_local") }</legend>
-							<textarea id="sf-ssh-pub" class="textarea textarea-bordered font-mono text-xs w-full" readonly rows="3"></textarea>
+							<textarea id="sf-ssh-pub" class="textarea font-mono text-xs w-full" readonly rows="3"></textarea>
 							<input type="hidden" name="ssh_public" id="sf-ssh-public"/>
-							<input type="file" id="sf-ssh-file" class="hidden" accept="application/json,.json"/>
+							<input type="password" id="sf-ssh-pass" class="input w-full" autocomplete="off" placeholder={ c.T("auth.key_pass") }/>
+							<input type="file" id="sf-ssh-file" class="hidden"/>
 							<div class="flex flex-wrap gap-2 mt-2">
-								<button type="button" class="btn" id="sf-ssh-store">{ c.T("sessions.ssh_store") }</button>
-								<button type="button" class="btn" id="sf-ssh-load">{ c.T("sessions.ssh_load") }</button>
+								<button type="button" class="btn" id="sf-ssh-store">{ c.T("auth.store_key") }</button>
+								<button type="button" class="btn" id="sf-ssh-load">{ c.T("auth.load_key") }</button>
 								<button type="button" class="btn" data-copy-ssh="sf-ssh-pub">{ c.T("sessions.copy_key") }</button>
 							</div>
 							<p class="label">{ c.T("sessions.ssh_key_hint") }</p>
@@ -49,7 +50,7 @@ templ Sessions(c layout.Chrome, items []session.Info) {
 						<p class="py-2 text-sm font-mono break-all">{ sessionTitle(first) } · { first.Branch }</p>
 						<label class="form-control w-full">
 							<span class="label-text">{ c.T("sessions.ssh_key") }</span>
-							<textarea class="textarea textarea-bordered font-mono text-xs w-full" readonly rows="4" id={ "ssh-" + first.ID }>{ first.SSHPublic }</textarea>
+							<textarea class="textarea font-mono text-xs w-full" readonly rows="4" id={ "ssh-" + first.ID }>{ first.SSHPublic }</textarea>
 						</label>
 						<p class="sf-clone-status text-sm py-2" data-working={ c.T("sessions.cloning") } data-failed={ c.T("sessions.clone_failed") } data-timeout={ c.T("sessions.clone_timeout") }></p>
 						<div class="modal-action">

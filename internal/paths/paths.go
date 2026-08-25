@@ -107,6 +107,7 @@ func StyleCSS() string       { return Static("style.css") }
 func EditorJS() string       { return Static("editor.js") }
 func LoginJS() string        { return Static("login.js") }
 func SessionsJS() string     { return Static("sessions.js") }
+func ChromeJS() string       { return Static("chrome.js") }
 func LoginChallenge() string { return "/login/challenge" }
 func LoginVerify() string    { return "/login/verify" }
 

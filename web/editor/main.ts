@@ -8,7 +8,8 @@ import { ProjectCollab, type ChatMessage, type SyncStatus } from "./collab/Proje
 import { latexCompletions, latexLanguage } from "./latexCompletions";
 import { buildFileTree, type FileTreeNode } from "./utils/fileTree";
 import { isBinaryContent } from "./utils/fileUtils";
-import { idbGet, publicLine, storageKey } from "../ssh/sessionKey";
+import { getLoginSeed } from "../ssh/identity";
+import { publicLine } from "../ssh/sessionKey";
 
 type Tab = "code" | "pdf" | "logs";
 
@@ -203,17 +204,13 @@ async function boot() {
   const expanded = new Set<string>();
 
   const collab = new ProjectCollab(projectId, email, wsPath);
-  const remote = root.dataset.projectName ?? "";
-  const branch = root.dataset.branch || "main";
-  if (remote) {
-    try {
-      const seed = await idbGet(storageKey(remote, branch));
-      if (seed && seed.length === 32) {
-        collab.setSigner(seed, publicLine(seed));
-      }
-    } catch (err) {
-      console.error("superfolha ssh load", err);
+  try {
+    const seed = await getLoginSeed();
+    if (seed) {
+      collab.setSigner(seed, publicLine(seed));
     }
+  } catch (err) {
+    console.error("superfolha ssh load", err);
   }
   collab.connect();
 
