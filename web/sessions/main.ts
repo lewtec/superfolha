@@ -1,5 +1,6 @@
 import { encodeIdentityKey, parseIdentitySeed } from "../login/openssh";
 import { getOrCreateLoginSeed, putLoginSeed } from "../ssh/identity";
+import { forgetRecent, loadRecents, recentKey, rememberRecent } from "./recents";
 import {
   authorized,
   decodeStdB64,
@@ -152,6 +153,75 @@ function startClone(btn: HTMLElement): void {
     });
 }
 
+function liveFor(remote: string, branch: string): { editor: string; ready: boolean } | null {
+  const want = recentKey(remote, branch);
+  for (const el of document.querySelectorAll<HTMLElement>("[data-sf-live]")) {
+    if (recentKey(el.dataset.remote || "", el.dataset.branch || "") !== want) continue;
+    return { editor: el.dataset.editor || "", ready: el.dataset.ready === "1" };
+  }
+  return null;
+}
+
+function paintRecents(): void {
+  const wrap = $("sf-recents-wrap");
+  const list = $("sf-recents");
+  if (!wrap || !list) return;
+  const resumeL = list.getAttribute("data-resume") || "Resume";
+  const openL = list.getAttribute("data-open") || "Open";
+  const forgetL = list.getAttribute("data-forget") || "Remove";
+  const rows = loadRecents();
+  wrap.classList.toggle("hidden", rows.length === 0);
+  list.innerHTML = rows
+    .map((r) => {
+      const live = liveFor(r.remote, r.branch);
+      const action = live?.ready ? openL : resumeL;
+      const remote = esc(r.remote);
+      const branch = esc(r.branch);
+      return `<li class="list-row">
+        <div class="list-col-grow min-w-0">
+          <div class="font-mono text-sm break-all">${remote}</div>
+          <div class="text-xs text-base-content/60">${branch}</div>
+        </div>
+        <button type="button" class="btn btn-sm btn-primary" data-resume="${remote}" data-branch="${branch}">${esc(action)}</button>
+        <button type="button" class="btn btn-sm btn-ghost" data-forget="${remote}" data-branch="${branch}" aria-label="${esc(forgetL)}">×</button>
+      </li>`;
+    })
+    .join("");
+}
+
+function esc(s: string): string {
+  return s.replace(/[&<>"']/g, (ch) => {
+    switch (ch) {
+      case "&":
+        return "&amp;";
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      case '"':
+        return "&quot;";
+      default:
+        return "&#39;";
+    }
+  });
+}
+
+function resume(remote: string, branch: string): void {
+  rememberRecent(remote, branch);
+  const live = liveFor(remote, branch);
+  if (live?.ready && live.editor) {
+    location.assign(live.editor);
+    return;
+  }
+  const remoteEl = input("sf-remote");
+  const branchEl = input("sf-branch");
+  const form = $("sf-session-form");
+  if (!remoteEl || !form || !(form instanceof HTMLFormElement)) return;
+  remoteEl.value = remote;
+  if (branchEl) branchEl.value = branch;
+  void refresh().then(() => form.submit());
+}
+
 function bind(): void {
   const form = $("sf-session-form");
   const remoteEl = input("sf-remote");
@@ -182,12 +252,41 @@ function bind(): void {
     });
     form.addEventListener("submit", (ev) => {
       ev.preventDefault();
+      rememberRecent(remoteEl?.value ?? "", branchEl?.value ?? "");
       void refresh().then(() => {
         if (form instanceof HTMLFormElement) form.submit();
       });
     });
     void refresh();
   }
+  const recents = $("sf-recents");
+  if (recents && recents.dataset.bound !== "1") {
+    recents.dataset.bound = "1";
+    recents.addEventListener("click", (ev) => {
+      const t = ev.target;
+      if (!(t instanceof HTMLElement)) return;
+      const forget = t.closest("[data-forget]") as HTMLElement | null;
+      if (forget?.dataset.forget) {
+        ev.preventDefault();
+        forgetRecent(forget.dataset.forget, forget.dataset.branch || "main");
+        paintRecents();
+        return;
+      }
+      const go = t.closest("[data-resume]") as HTMLElement | null;
+      if (go?.dataset.resume) {
+        ev.preventDefault();
+        resume(go.dataset.resume, go.dataset.branch || "main");
+      }
+    });
+    paintRecents();
+  }
+  document.querySelectorAll<HTMLElement>("[data-sf-live]").forEach((card) => {
+    if (card.dataset.remembered === "1") return;
+    card.dataset.remembered = "1";
+    card.querySelector("a[href]")?.addEventListener("click", () => {
+      rememberRecent(card.dataset.remote || "", card.dataset.branch || "");
+    });
+  });
   document.querySelectorAll<HTMLElement>("[data-ws][data-editor]").forEach((btn) => {
     if (btn.dataset.bound === "1") return;
     btn.dataset.bound = "1";
