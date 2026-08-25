@@ -69,8 +69,8 @@ If the process dies, RAM dies. The next writer clones again from the remote. Unp
 |---|----------|
 | F1 | **Forge-native.** The git remote is the paper. Superfolha does not own a second copy of truth. |
 | F2 | **SSH clone is the primitive.** The form is SSH only. No token. No `https://` clone. |
-| F3 | **Ed25519 challenge-sign identity.** The browser holds the login private key. Login is nonce + signature. Fingerprint is the display name. |
-| F4 | **Session key stays in the browser.** IndexedDB, per remote+branch. Load/store is JSON. Create posts only the public line. The server never receives the seed. Superfolha opens SSH and asks the signer tab to `sign()`. |
+| F3 | **Ed25519 challenge-sign identity.** The browser holds a roster of keys in IndexedDB. `sessionStorage` picks the active one (ghweb-shaped). Avatar menu: switch, add (`id_ed25519`), mint, leave. Login is nonce + signature. Fingerprint is the display name. |
+| F4 | **One Ed25519 key.** Login and git SSH use the same seed in IndexedDB (`superfolha-login`). Create posts only the public line. The server never receives the private key. Superfolha opens SSH and asks the signer tab to `sign()`. |
 | F5 | **Signer tab.** Only the tab that started clone or Persist may sign. A second open tab does not sign for it. Close that tab and that action stops. |
 | F6 | **Clone creates a session** with a UUIDv7. Disk path `{state-dir}/repos/{sessionID}`. |
 | F7 | **Uniqueness:** at most one live session per `remote + branch`. Second clone **fails**. Do not put the UUIDv7 in that error. Host retry (same GitHub login) returns the existing session. |
@@ -82,7 +82,7 @@ If the process dies, RAM dies. The next writer clones again from the remote. Unp
 | F13 | **v1 revoke:** kick everyone (drop live clients). Preauth TTL/epoch later. |
 | F14 | **Persist:** a seed-holding tab owns a 30s dirty cooldown and the Persist button. That tab asks and signs. Guest Persist is an error: no commit, no push. Guest keystrokes dirty the host tab’s doc; the host tab’s cooldown may persist. Server singleflight only. No server auto-push. |
 | F15 | **GitHub App leftover is unused.** No OAuth identity. No installation token for clone. |
-| F16 | Login key and session key are different. One session pubkey per remote+branch (GitHub deploy keys cannot be reused across repos). |
+| F16 | Put that public key on the GitHub **account** (user SSH key) so it works on every repo. A deploy key is only needed if the key is not already on the account. |
 | F17 | **Create stays pending.** Sessions page opens a signer socket. Retry clone uses that socket. After clone, the same tab signs a probe push of current HEAD. Fail → key modal, stay on sessions. Success → editor. |
 | F18 | If `main.tex` is missing after clone, write the default template locally. It is committed on the first Persist. |
 
@@ -92,10 +92,10 @@ CRDT decisions that still hold: one Y.Doc per session; CRDT is RAM-only; Git wor
 
 ## Identity
 
-1. User opens `/login`. The browser creates or reuses an Ed25519 key in IndexedDB.
+1. User opens `/login`. The browser creates or reuses an Ed25519 key in IndexedDB. Load/store uses an OpenSSH `id_ed25519` file (passphrase if the file is locked).
 2. `GET /login/challenge` returns a short-lived signed nonce. The browser signs it. `POST /login/verify` checks the signature.
 3. Superfolha sets a JWT cookie: `{key_fingerprint_id, login}`. No user row. The identity private key never leaves the browser.
-4. The browser holds a **session** Ed25519 seed (IndexedDB, per remote+branch). Create posts only the public line. The host adds that public key on the remote. Clone and push ask that tab to `sign()`. The login key is never uploaded.
+4. The browser holds one Ed25519 seed (IndexedDB `superfolha-login`). Login and git SSH both use it. Create posts only the public line. Clone and push ask that tab to `sign()`. The private key is never uploaded.
 
 Public remotes still require this login.
 

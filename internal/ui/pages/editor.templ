@@ -38,9 +38,7 @@ templ Editor(c layout.Chrome, projectID, projectName, branch, email, sshPublic, 
 					<button type="button" id="editor-chat-toggle" class="btn btn-ghost btn-square min-h-[var(--touch-min)]" aria-label={ c.T("editor.chat") } title={ c.T("editor.chat") }></button>
 					@layout.LangSelect(c, paths.Editor(projectID))
 					@layout.ThemeToggle(c)
-					<form method="post" action={ paths.Logout() }>
-						<button class="btn btn-ghost btn-sm" type="submit">{ c.T("common.leave") }</button>
-					</form>
+					@layout.IdentityMenu(c)
 				</div>
 			</header>
 			<div id="editor-workspace" class="editor-workspace relative flex min-h-0 flex-1 overflow-hidden"></div>
@@ -48,7 +46,7 @@ templ Editor(c layout.Chrome, projectID, projectName, branch, email, sshPublic, 
 				<div class="modal-box">
 					<h3 class="text-lg font-bold">{ c.T("sessions.add_ssh_key") }</h3>
 					<p id="editor-ssh-msg" class="py-2 text-sm"></p>
-					<textarea id="editor-ssh-key" class="textarea textarea-bordered font-mono text-xs w-full" readonly rows="4"></textarea>
+					<textarea id="editor-ssh-key" class="textarea font-mono text-xs w-full" readonly rows="4"></textarea>
 					<div class="modal-action">
 						<button type="button" class="btn" id="editor-ssh-copy">{ c.T("sessions.copy_key") }</button>
 						<form method="dialog">

@@ -23,10 +23,23 @@ templ Login(c layout.Chrome, next string) {
 					data-working={ c.T("auth.signing_in") }
 					data-failed={ c.T("auth.login_failed") }
 					data-unsupported={ c.T("auth.ed25519_unsupported") }
+					data-loaded={ c.T("auth.key_loaded") }
+					data-stored={ c.T("auth.key_stored") }
+					data-bad-key={ c.T("auth.key_bad") }
 				>
 					<h1 class="card-title text-2xl font-bold justify-center">Superfolha</h1>
 					<p class="text-center text-base-content/70 mb-4">{ c.T("auth.login_title") }</p>
 					<button id="sf-login-btn" class="btn btn-primary w-full" type="button" onclick="window.__sfLogin && window.__sfLogin()">{ c.T("auth.key_button") }</button>
+					<fieldset class="fieldset mt-2">
+						<legend class="fieldset-legend">{ c.T("auth.key_file") }</legend>
+						<input id="sf-login-pass" class="input w-full" type="password" autocomplete="off" placeholder={ c.T("auth.key_pass") }/>
+						<input id="sf-login-file" class="hidden" type="file"/>
+						<div class="flex flex-wrap gap-2 mt-2">
+							<button id="sf-login-load" class="btn flex-1" type="button">{ c.T("auth.load_key") }</button>
+							<button id="sf-login-store" class="btn flex-1" type="button">{ c.T("auth.store_key") }</button>
+						</div>
+						<p class="label">{ c.T("auth.key_file_hint") }</p>
+					</fieldset>
 					<p id="sf-login-status" class="text-center text-sm text-base-content/70 mt-4"></p>
 				</div>
 			</div>

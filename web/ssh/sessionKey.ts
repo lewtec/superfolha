@@ -93,7 +93,7 @@ export function authorized(pub: Uint8Array): string {
   const payload = concat(sshString(algo), sshString(pub));
   let bin = "";
   for (let i = 0; i < payload.length; i++) bin += String.fromCharCode(payload[i]!);
-  return `ssh-ed25519 ${btoa(bin)} superfolha-session`;
+  return `ssh-ed25519 ${btoa(bin)} superfolha`;
 }
 
 export async function seedFor(remote: string, branch: string): Promise<Uint8Array> {
