@@ -417,7 +417,7 @@ async function boot() {
     sidebarOpen = !sidebarOpen;
     paintAll();
   });
-  commitBtn.addEventListener("click", () => collab.commitNow());
+  commitBtn?.addEventListener("click", () => collab.commitNow());
   chatToggle.addEventListener("click", () => {
     chatOpen = !chatOpen;
     localStorage.setItem(chatKey, chatOpen ? "1" : "0");

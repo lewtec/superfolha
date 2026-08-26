@@ -1,8 +1,10 @@
 package server
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/lewtec/superfolha/internal/auth"
@@ -79,7 +81,13 @@ func (s *Server) handleSessionPreauth(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, paths.ProjectsError("errors.INTERNAL"), http.StatusSeeOther)
 		return
 	}
-	http.Redirect(w, r, paths.Editor(id)+"?preauth="+tok+"&flash=sessions.preauth_ready", http.StatusSeeOther)
+	link := paths.Editor(id) + "?preauth=" + url.QueryEscape(tok)
+	if strings.Contains(r.Header.Get("Accept"), "application/json") {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]string{"url": link})
+		return
+	}
+	http.Redirect(w, r, link, http.StatusSeeOther)
 }
 
 func (s *Server) handleSessionKnock(w http.ResponseWriter, r *http.Request) {
@@ -134,11 +142,13 @@ func (s *Server) handleSessionKnockMode(w http.ResponseWriter, r *http.Request) 
 func (s *Server) handleEditorGet(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue(paths.ParamID)
 	user, _ := auth.GetUserFromContext(r.Context())
+	shareHint := false
 	if tok := r.URL.Query().Get("preauth"); tok != "" {
 		if err := s.hubs.RedeemPreauth(id, user.Email, tok); err != nil {
 			http.Redirect(w, r, paths.ProjectsError("sessions.preauth_invalid"), http.StatusSeeOther)
 			return
 		}
+		shareHint = true
 	}
 	info, ok := s.hubs.Live(id)
 	if !ok {
@@ -154,5 +164,9 @@ func (s *Server) handleEditorGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c := s.chrome(r, info.Remote)
-	s.render(w, r, pages.Editor(c, info.ID, info.CloneURL, info.Branch, user.Email, info.SSHPublic, pages.MarshalI18n(appi18n.Map(s.bundle, s.lang(r)))))
+	if info.HostLogin == user.Email {
+		c.InviteAction = paths.SessionPreauth(info.ID)
+	}
+	c.CommitLabel = c.T("editor.commit_now")
+	s.render(w, r, pages.Editor(c, info.ID, info.CloneURL, info.Branch, user.Email, info.SSHPublic, shareHint, pages.MarshalI18n(appi18n.Map(s.bundle, s.lang(r)))))
 }

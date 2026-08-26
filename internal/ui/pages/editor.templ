@@ -5,7 +5,7 @@ import (
 	"github.com/lewtec/superfolha/internal/ui/layout"
 )
 
-templ Editor(c layout.Chrome, projectID, projectName, branch, email, sshPublic, i18nJSON string) {
+templ Editor(c layout.Chrome, projectID string, projectName string, branch string, email string, sshPublic string, shareHint bool, i18nJSON string) {
 	@layout.EditorShell(c) {
 		<div
 			id="editor-root"
@@ -33,15 +33,20 @@ templ Editor(c layout.Chrome, projectID, projectName, branch, email, sshPublic, 
 				</div>
 				<div class="navbar-end gap-1 items-center shrink-0">
 					<span id="editor-status" class="badge badge-soft badge-warning whitespace-nowrap">{ c.T("editor.status_connecting") }</span>
-					<button type="button" id="editor-commit" class="btn btn-ghost btn-sm hidden sm:inline-flex">{ c.T("editor.commit_now") }</button>
+					<button type="button" id="editor-commit" class="hidden"></button>
 					<button type="button" id="editor-compile" class="btn btn-primary btn-sm min-h-[var(--touch-min)]">{ c.T("editor.compile") }</button>
 					<button type="button" id="editor-chat-toggle" class="btn btn-ghost btn-square min-h-[var(--touch-min)]" aria-label={ c.T("editor.chat") } title={ c.T("editor.chat") }></button>
-					@layout.LangSelect(c, paths.Editor(projectID))
-					@layout.ThemeToggle(c)
 					@layout.IdentityMenu(c)
 				</div>
 			</header>
 			<div id="editor-workspace" class="editor-workspace relative flex min-h-0 flex-1 overflow-hidden"></div>
+			if shareHint {
+				<div class="toast toast-end toast-bottom z-50">
+					<div class="alert" role="status">
+						<span>{ c.T("sessions.preauth_ready") }</span>
+					</div>
+				</div>
+			}
 			<dialog id="editor-ssh-modal" class="modal">
 				<div class="modal-box">
 					<h3 class="text-lg font-bold">{ c.T("sessions.add_ssh_key") }</h3>

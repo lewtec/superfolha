@@ -301,6 +301,66 @@ func TestHostRetryOfReadySessionOpensEditor(t *testing.T) {
 	}
 }
 
+func TestHostInviteRedirectsToPreauthLink(t *testing.T) {
+	t.Setenv("JWT_SECRET", "rod-play-secret")
+	t.Setenv("GO_ENV", "development")
+	srv := testServer(t)
+	alice := signIn(t, "alice")
+	k, err := igit.NewSessionSSHKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	live, err := srv.hubs.Create("alice", "git@github.com:t/paper", "main", k.Authorized)
+	if err != nil {
+		t.Fatal(err)
+	}
+	live.Ready = true
+	req := httptest.NewRequest(http.MethodPost, paths.SessionPreauth(live.ID), nil)
+	req.AddCookie(&http.Cookie{Name: auth.AuthCookieName, Value: alice})
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("invite = %d", rec.Code)
+	}
+	loc := rec.Header().Get("Location")
+	if !strings.HasPrefix(loc, paths.Editor(live.ID)+"?preauth=") {
+		t.Fatalf("Location = %q", loc)
+	}
+}
+
+func TestHostInviteJSONReturnsLink(t *testing.T) {
+	t.Setenv("JWT_SECRET", "rod-play-secret")
+	t.Setenv("GO_ENV", "development")
+	srv := testServer(t)
+	alice := signIn(t, "alice")
+	k, err := igit.NewSessionSSHKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	live, err := srv.hubs.Create("alice", "git@github.com:t/paper", "main", k.Authorized)
+	if err != nil {
+		t.Fatal(err)
+	}
+	live.Ready = true
+	req := httptest.NewRequest(http.MethodPost, paths.SessionPreauth(live.ID), nil)
+	req.Header.Set("Accept", "application/json")
+	req.AddCookie(&http.Cookie{Name: auth.AuthCookieName, Value: alice})
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("invite json = %d", rec.Code)
+	}
+	var out struct {
+		URL string `json:"url"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(out.URL, paths.Editor(live.ID)+"?preauth=") {
+		t.Fatalf("url = %q", out.URL)
+	}
+}
+
 func truncateForTest(b []byte, n int) string {
 	if len(b) <= n {
 		return string(b)

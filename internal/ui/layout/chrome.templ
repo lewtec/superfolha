@@ -42,11 +42,21 @@ templ IdentityMenu(c Chrome) {
 		data-verify={ paths.LoginVerify() }
 		data-logout={ paths.Logout() }
 		data-title={ c.T("auth.identities") }
-		data-add={ c.T("auth.add_identity") }
-		data-new={ c.T("auth.new_identity") }
-		data-leave={ c.T("common.leave") }
+		data-add-label={ c.T("auth.add_identity") }
+		data-new-label={ c.T("auth.new_identity") }
+		data-leave-label={ c.T("common.leave") }
+		data-invite-label={ c.T("sessions.invite") }
+		data-invite-action={ c.InviteAction }
+		data-invite-copied={ c.T("sessions.invite_copied") }
+		data-commit-label={ c.CommitLabel }
+		data-theme-label={ c.T("common.theme") }
+		data-lang-label={ c.T("common.language") }
+		data-lang={ c.Lang }
+		data-lang-next={ c.LangNext }
+		data-lang-action={ paths.Lang() }
 		data-bad-key={ c.T("auth.key_bad") }
 		data-working={ c.T("auth.signing_in") }
+		data-no-file={ c.T("auth.no_file") }
 	>
 		<button
 			id="sf-ident-btn"
@@ -63,11 +73,11 @@ templ IdentityMenu(c Chrome) {
 					<span id="sf-ident-initials">?</span>
 				</div>
 			</div>
-			<span id="sf-ident-label" class="hidden sm:inline font-mono text-xs truncate max-w-[10rem]">{ c.Email }</span>
+			<span id="sf-ident-label" class="hidden sm:inline font-mono text-xs">{ c.Email }</span>
 		</button>
 		<ul
 			id="sf-ident-menu"
-			class="dropdown menu dropdown-end w-64 rounded-box bg-base-100 p-2 shadow-sm"
+			class="dropdown menu dropdown-end w-80 rounded-box bg-base-100 p-2 shadow-sm"
 			popover="manual"
 			style="position-anchor:--sf-ident;position-area:bottom span-left"
 		></ul>
@@ -75,24 +85,32 @@ templ IdentityMenu(c Chrome) {
 	<dialog id="sf-ident-load" class="modal">
 		<div class="modal-box">
 			<h3 class="text-lg font-bold">{ c.T("auth.add_identity") }</h3>
-			<fieldset class="fieldset mt-2">
-				<legend class="fieldset-legend">{ c.T("auth.key_file") }</legend>
+			<fieldset class="fieldset mt-4">
+				<legend class="fieldset-legend">{ c.T("auth.choose_key") }</legend>
+				<input id="sf-ident-file" class="file-input w-full" type="file"/>
+			</fieldset>
+			<fieldset class="fieldset">
+				<legend class="fieldset-legend">{ c.T("auth.key_pass") }</legend>
 				<input id="sf-ident-pass" class="input w-full" type="password" autocomplete="off" placeholder={ c.T("auth.key_pass") }/>
 				<p class="label">{ c.T("auth.key_file_hint") }</p>
 			</fieldset>
 			<p id="sf-ident-load-status" class="text-sm text-base-content/70 mt-2"></p>
 			<div class="modal-action">
-				<button type="button" class="btn btn-primary" id="sf-ident-load-pick">{ c.T("auth.load_key") }</button>
 				<form method="dialog">
-					<button class="btn btn-ghost">{ c.T("common.cancel") }</button>
+					<button class="btn">{ c.T("common.cancel") }</button>
 				</form>
+				<button type="button" class="btn btn-primary" id="sf-ident-load-ok" disabled>{ c.T("auth.confirm_identity") }</button>
 			</div>
 		</div>
 		<form method="dialog" class="modal-backdrop">
 			<button>{ c.T("common.cancel") }</button>
 		</form>
 	</dialog>
-	<input id="sf-ident-file" class="hidden" type="file"/>
+	<div id="sf-ident-toast" class="toast toast-end toast-bottom z-50 hidden">
+		<div class="alert" role="status">
+			<span id="sf-ident-toast-msg"></span>
+		</div>
+	</div>
 	<script src={ paths.ChromeJS() }></script>
 }
 
@@ -154,8 +172,6 @@ templ AppShell(c Chrome) {
 					</a>
 				</div>
 				<div class="navbar-end gap-1 sm:gap-2 items-center">
-					@LangSelect(c, paths.Projects())
-					@ThemeToggle(c)
 					if c.Email != "" {
 						@IdentityMenu(c)
 					}
