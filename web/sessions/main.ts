@@ -215,9 +215,14 @@ function paintRecents(): void {
       const remote = esc(r.remote);
       const shown = esc(displayRemote(r.remote));
       const branch = esc(r.branch);
+      const warnTpl = document.getElementById("sf-local-warn-tpl") as HTMLTemplateElement | null;
+      const warn = isLocalRemote(r.remote) ? (warnTpl?.innerHTML ?? "") : "";
       return `<li class="list-row">
         <div class="list-col-grow min-w-0">
-          <div class="font-mono text-sm break-all">${shown}</div>
+          <div class="flex items-center gap-1 min-w-0">
+            <div class="font-mono text-sm break-all min-w-0">${shown}</div>
+            ${warn}
+          </div>
           <div class="text-xs text-base-content/60">${branch}</div>
         </div>
         <button type="button" class="btn btn-sm btn-primary" data-resume="${remote}" data-branch="${branch}">${esc(action)}</button>

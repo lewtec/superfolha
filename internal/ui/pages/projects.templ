@@ -24,7 +24,12 @@ templ Sessions(c layout.Chrome, items []session.Info) {
 								data-ready={ readyFlag(item.Ready) }
 							>
 								<div class="card-body">
-									<h2 class="card-title break-all text-base">{ sessionTitle(item) }</h2>
+									<h2 class="card-title break-all text-base items-center">
+										{ sessionTitle(item) }
+										if item.Ephemeral {
+											@layout.LocalWarn(c)
+										}
+									</h2>
 									<p class="text-sm text-base-content/70">
 										{ item.Branch }
 										if item.Ephemeral {
@@ -65,6 +70,9 @@ templ Sessions(c layout.Chrome, items []session.Info) {
 					data-label-open={ c.T("common.open") }
 					data-label-forget={ c.T("sessions.forget") }
 				></ul>
+				<template id="sf-local-warn-tpl">
+					@layout.LocalWarn(c)
+				</template>
 			</section>
 			<div class="card bg-base-100 border border-base-300">
 				<div class="card-body">

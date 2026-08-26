@@ -85,6 +85,7 @@ templ IdentityMenu(c Chrome) {
 			style="position-anchor:--sf-ident;position-area:bottom span-left"
 		></ul>
 		<form id="sf-ident-leave" method="post" action={ paths.Logout() } class="hidden"></form>
+		@LocalWarnPanel(c)
 	</div>
 	<dialog id="sf-ident-load" class="modal">
 		<div class="modal-box">
@@ -116,6 +117,41 @@ templ IdentityMenu(c Chrome) {
 		</div>
 	</div>
 	<script src={ paths.ChromeJS() }></script>
+}
+
+templ Icon(d string) {
+	<svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+		<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d={ d }></path>
+	</svg>
+}
+
+templ LocalWarn(c Chrome) {
+	<button
+		type="button"
+		class="btn btn-ghost btn-xs btn-square text-warning shrink-0"
+		data-sf-local-warn
+		onclick="document.getElementById('sf-local-warn')?.showModal()"
+		aria-label={ c.T("sessions.local_warn_title") }
+	>
+		@Icon("M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z")
+	</button>
+}
+
+templ LocalWarnPanel(c Chrome) {
+	<dialog id="sf-local-warn" class="modal">
+		<div class="modal-box w-80 max-w-[min(20rem,calc(100vw-2rem))]">
+			<h3 class="text-lg font-bold">{ c.T("sessions.local_warn_title") }</h3>
+			<p class="py-3">{ c.T("sessions.local_warn_body") }</p>
+			<div class="modal-action">
+				<form method="dialog">
+					<button class="btn">{ c.T("common.cancel") }</button>
+				</form>
+			</div>
+		</div>
+		<form method="dialog" class="modal-backdrop">
+			<button>{ c.T("common.cancel") }</button>
+		</form>
+	</dialog>
 }
 
 templ BrandMark() {

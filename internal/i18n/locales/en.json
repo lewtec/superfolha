@@ -97,6 +97,8 @@
   "sessions.start_hint": "Paste an SSH remote, or an absolute local path. Local paths are ephemeral: no SSH, no push, gone when this server dies.",
   "sessions.ephemeral": "Ephemeral",
   "sessions.ephemeral_hint": "Local path. No SSH and no push. This session dies with the server.",
+  "sessions.local_warn_title": "Local project",
+  "sessions.local_warn_body": "This folder is only on this machine. Superfolha does not save it to GitHub or any other host. The session dies when this server stops.",
   "sessions.remote_label": "Remote or local path",
   "sessions.branch_label": "Branch",
   "sessions.token_label": "Token (non-GitHub remotes)",
