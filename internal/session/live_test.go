@@ -20,6 +20,12 @@ func stubClone(dest, _, _ string, _ igit.SessionSSH) error {
 
 func stubProbe(_ string, _ string, _ igit.SessionSSH) error { return nil }
 
+// Clone/probe stubs return these so AuthFailed classifies like real git SSH.
+var (
+	errPermDeniedPublickey = errors.New("permission denied (publickey)")
+	errEmptyRepo           = errors.New("remote repository is empty")
+)
+
 func testKey(t *testing.T) *igit.SSHKey {
 	t.Helper()
 	k, err := igit.NewSessionSSHKey()
@@ -221,11 +227,11 @@ func TestCloneAuthFailsAfterLsRemote(t *testing.T) {
 	reg := NewRegistry(project.NewService(t.TempDir()))
 	listed := 0
 	reg.SetCloner(func(string, string, string, igit.SessionSSH) error {
-		return errors.New("Permission denied (publickey)")
+		return errPermDeniedPublickey
 	})
 	reg.SetLister(func(string, igit.SessionSSH) error {
 		listed++
-		return errors.New("Permission denied (publickey)")
+		return errPermDeniedPublickey
 	})
 	k := testKey(t)
 	live, err := reg.Create("alice", "git@github.com:t/paper", "main", k.Authorized)
@@ -245,7 +251,7 @@ func TestCloneFailAfterPullWorksIsNotUnauthorized(t *testing.T) {
 	t.Setenv("GO_ENV", "development")
 	reg := NewRegistry(project.NewService(t.TempDir()))
 	reg.SetCloner(func(string, string, string, igit.SessionSSH) error {
-		return errors.New("remote repository is empty")
+		return errEmptyRepo
 	})
 	reg.SetLister(func(string, igit.SessionSSH) error { return nil })
 	k := testKey(t)
@@ -265,7 +271,7 @@ func TestProbeFailAfterPullWorksIsReadOnly(t *testing.T) {
 	reg := NewRegistry(project.NewService(t.TempDir()))
 	reg.SetCloner(stubClone)
 	reg.SetProber(func(string, string, igit.SessionSSH) error {
-		return errors.New("Permission denied (publickey)")
+		return errPermDeniedPublickey
 	})
 	pulled := 0
 	reg.SetPuller(func(string, string, igit.SessionSSH) error {
@@ -291,10 +297,10 @@ func TestProbeFailAfterPullFailsIsUnauthorized(t *testing.T) {
 	reg := NewRegistry(project.NewService(t.TempDir()))
 	reg.SetCloner(stubClone)
 	reg.SetProber(func(string, string, igit.SessionSSH) error {
-		return errors.New("Permission denied (publickey)")
+		return errPermDeniedPublickey
 	})
 	reg.SetPuller(func(string, string, igit.SessionSSH) error {
-		return errors.New("Permission denied (publickey)")
+		return errPermDeniedPublickey
 	})
 	k := testKey(t)
 	live, err := reg.Create("alice", "git@github.com:t/paper", "main", k.Authorized)
