@@ -97,6 +97,8 @@
   "sessions.start_hint": "Pega un remoto SSH o una ruta local absoluta. Las rutas locales son efímeras: sin SSH, sin push, desaparecen cuando muere este servidor.",
   "sessions.ephemeral": "Efímero",
   "sessions.ephemeral_hint": "Ruta local. Sin SSH y sin push. Esta sesión muere con el servidor.",
+  "sessions.local_warn_title": "Proyecto local",
+  "sessions.local_warn_body": "Esta carpeta está solo en esta máquina. Superfolha no la guarda en GitHub ni en otro servicio. La sesión muere cuando para este servidor.",
   "sessions.remote_label": "Remoto o ruta local",
   "sessions.branch_label": "Rama",
   "sessions.token_label": "Token (remotos que no son GitHub)",

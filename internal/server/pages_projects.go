@@ -177,5 +177,5 @@ func (s *Server) handleEditorGet(w http.ResponseWriter, r *http.Request) {
 		c.InviteAction = paths.SessionPreauth(info.ID)
 	}
 	c.CommitLabel = c.T("editor.commit_now")
-	s.render(w, r, pages.Editor(c, info.ID, remote.Display(info.CloneURL), info.Branch, user.Email, info.SSHPublic, shareHint, pages.MarshalI18n(appi18n.Map(s.bundle, s.lang(r)))))
+	s.render(w, r, pages.Editor(c, info.ID, remote.Display(info.CloneURL), info.Branch, user.Email, info.SSHPublic, shareHint, info.Ephemeral, pages.MarshalI18n(appi18n.Map(s.bundle, s.lang(r)))))
 }

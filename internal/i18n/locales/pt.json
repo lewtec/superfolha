@@ -97,6 +97,8 @@
   "sessions.start_hint": "Cole um remoto SSH ou um caminho local absoluto. Caminhos locais são efêmeros: sem SSH, sem push, somem quando este servidor morre.",
   "sessions.ephemeral": "Efêmero",
   "sessions.ephemeral_hint": "Caminho local. Sem SSH e sem push. Esta sessão morre com o servidor.",
+  "sessions.local_warn_title": "Projeto local",
+  "sessions.local_warn_body": "Esta pasta existe só nesta máquina. O Superfolha não grava isso no GitHub nem em outro serviço. A sessão morre quando este servidor para.",
   "sessions.remote_label": "Remoto ou caminho local",
   "sessions.branch_label": "Branch",
   "sessions.token_label": "Token (remotos que não são GitHub)",

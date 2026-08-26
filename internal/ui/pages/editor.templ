@@ -5,7 +5,7 @@ import (
 	"github.com/lewtec/superfolha/internal/ui/layout"
 )
 
-templ Editor(c layout.Chrome, projectID string, projectName string, branch string, email string, sshPublic string, shareHint bool, i18nJSON string) {
+templ Editor(c layout.Chrome, projectID string, projectName string, branch string, email string, sshPublic string, shareHint bool, ephemeral bool, i18nJSON string) {
 	@layout.EditorShell(c) {
 		<div
 			id="editor-root"
@@ -30,6 +30,9 @@ templ Editor(c layout.Chrome, projectID string, projectName string, branch strin
 						<span class="hidden sm:inline font-semibold">{ c.T("common.app_name") }</span>
 					</a>
 					<span class="hidden md:inline truncate text-sm text-base-content/70">{ projectName }</span>
+					if ephemeral {
+						@layout.LocalWarn(c)
+					}
 				</div>
 				<div class="navbar-end gap-1 items-center shrink-0">
 					<span id="editor-status" class="badge badge-soft badge-warning whitespace-nowrap">{ c.T("editor.status_connecting") }</span>
