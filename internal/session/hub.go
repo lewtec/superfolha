@@ -60,6 +60,7 @@ type Hub struct {
 	OwnerEmail string
 	SSHPublic  string
 	Branch     string
+	Ephemeral  bool
 
 	svc *project.Service
 
@@ -231,6 +232,9 @@ func (h *Hub) Commit(message, author string, ssh igit.SessionSSH) (string, error
 
 // PersistFrom runs Commit using this client's offered session key.
 func (h *Hub) PersistFrom(c *Client, message, author string) (string, error) {
+	if h.Ephemeral {
+		return h.Commit(message, author, nil)
+	}
 	if c == nil || c.Signs == nil || !SamePublic(c.OfferedPub, h.SSHPublic) {
 		return "", ErrNoSigner
 	}

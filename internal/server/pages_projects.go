@@ -47,6 +47,15 @@ func (s *Server) handleProjectsPost(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, paths.ProjectsError("sessions.ssh_seed_invalid"), http.StatusSeeOther)
 		return
 	}
+	if live.Ephemeral && !live.Ready {
+		if err := s.hubs.CloneAndProbe(live.ID, user.Email, nil); err != nil {
+			_ = s.hubs.End(live.ID, user.Email)
+			http.Redirect(w, r, paths.ProjectsError("sessions.clone_failed"), http.StatusSeeOther)
+			return
+		}
+		http.Redirect(w, r, paths.Editor(live.ID), http.StatusSeeOther)
+		return
+	}
 	if live.Ready {
 		http.Redirect(w, r, paths.Editor(live.ID), http.StatusSeeOther)
 		return

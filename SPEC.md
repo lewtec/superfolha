@@ -86,6 +86,7 @@ If the process dies, RAM dies. The next writer clones again from the remote. Unp
 | F17 | **Create stays pending.** Sessions page opens a signer socket on load and clones. After clone, the same tab signs a probe push of current HEAD. A failed clone or push must ls-remote/fetch once before the UI says the key is unauthorized. Pull ok + push fail → read-only. Fail → key modal, stay on sessions. Success → editor. |
 | F18 | If `main.tex` is missing after clone, write the default template locally. It is committed on the first Persist. |
 | F19 | **Recents.** The browser stores recent remotes in localStorage, keyed by the active identity. The sessions page lists them. Resume posts create: the host of a live ready session goes to the editor; otherwise a pending clone starts. |
+| F20 | **Local path is ephemeral.** An absolute path or `file://` opens a session without SSH. Clone that repo if it is git; otherwise init a blank tree. No probe push. Persist commits locally and does not push. The session dies with the process. |
 
 CRDT decisions that still hold: one Y.Doc per session; CRDT is RAM-only; Git working tree is the disk projection; stream access = session access; flush before compile; lock CRDT sync while commit+push runs; Synced = server ack, not push; artifacts stay outside git; single instance.
 

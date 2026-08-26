@@ -137,21 +137,21 @@ function bind(): void {
       })
       .join("");
     const langs: [string, string][] = [
-      ["en", "English"],
-      ["pt", "Português"],
-      ["es", "Español"],
+      ["en", "EN"],
+      ["pt", "PT"],
+      ["es", "ES"],
     ];
-    const opts = langs
-      .map(
-        ([code, name]) =>
-          `<option value="${code}"${lang === code ? " selected" : ""}>${name}</option>`,
-      )
+    const langBtns = langs
+      .map(([code, name]) => {
+        const on = lang === code ? " btn-active" : "";
+        return `<button type="submit" name="lang" value="${code}" class="join-item btn btn-xs${on}">${name}</button>`;
+      })
       .join("");
     const extras =
       (commitL ? actionItem("commit", ICO.upload, commitL) : "") +
       (inviteAction ? actionItem("invite", ICO.link, inviteL) : "") +
       `<li><button type="button" data-sf="theme"><span class="swap swap-rotate${dark ? " swap-active" : ""}">${icon(ICO.sun, "swap-on")}${icon(ICO.moon, "swap-off")}</span><span class="grow">${dark ? themeLight : themeDarkL}</span></button></li>` +
-      `<li><form method="post" action="${langAction}"><input type="hidden" name="next" value="${langNext}"/>${icon(ICO.globe)}<span class="grow">${langL}</span><select name="lang" class="select select-sm w-28 shrink-0" aria-label="${langL}" onchange="this.form.submit()">${opts}</select></form></li>`;
+      `<li><form method="post" action="${langAction}"><input type="hidden" name="next" value="${langNext}"/>${icon(ICO.globe)}<span class="grow">${langL}</span><span class="join shrink-0" role="group" aria-label="${langL}">${langBtns}</span></form></li>`;
     menu.innerHTML =
       `<li class="menu-title">${root!.getAttribute("data-title") || "Identities"}</li>` +
       (active

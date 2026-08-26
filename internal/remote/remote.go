@@ -4,6 +4,7 @@ package remote
 import (
 	"errors"
 	"net/url"
+	"path/filepath"
 	"strings"
 )
 
@@ -24,6 +25,13 @@ func Canonical(raw string) string {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return ""
+	}
+	if IsLocal(raw) {
+		p, err := LocalPath(raw)
+		if err != nil {
+			return raw
+		}
+		return "file://" + p
 	}
 	if u, ok := scpURL(raw); ok {
 		return u
@@ -96,9 +104,40 @@ func IsSSH(raw string) bool {
 	return ok
 }
 
-// TransportURL is the URL used to clone: SSH form kept, otherwise Canonical HTTP.
+// IsLocal reports whether raw is an absolute filesystem path or file:// URL.
+func IsLocal(raw string) bool {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return false
+	}
+	if strings.HasPrefix(strings.ToLower(raw), "file://") {
+		return true
+	}
+	return strings.HasPrefix(raw, "/")
+}
+
+// LocalPath returns the cleaned absolute path for a local remote.
+func LocalPath(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if strings.HasPrefix(strings.ToLower(raw), "file://") {
+		u, err := url.Parse(raw)
+		if err != nil || u.Path == "" {
+			return "", ErrInvalidRemote
+		}
+		return filepath.Clean(u.Path), nil
+	}
+	if strings.HasPrefix(raw, "/") {
+		return filepath.Clean(raw), nil
+	}
+	return "", ErrInvalidRemote
+}
+
+// TransportURL is the URL used to clone: SSH form kept, file:// for local, otherwise Canonical HTTP.
 func TransportURL(raw string) string {
 	raw = strings.TrimSpace(raw)
+	if IsLocal(raw) {
+		return Canonical(raw)
+	}
 	if IsSSH(raw) {
 		if strings.HasPrefix(strings.ToLower(raw), "ssh://") {
 			return strings.TrimSuffix(strings.TrimRight(raw, "/"), ".git")
@@ -117,10 +156,17 @@ func TransportURL(raw string) string {
 	return Canonical(raw)
 }
 
-// Validate reports whether raw is an SSH git remote.
+// Validate reports whether raw is an SSH git remote or a local path.
 func Validate(raw string) error {
 	if strings.TrimSpace(raw) == "" {
 		return ErrEmptyRemote
+	}
+	if IsLocal(raw) {
+		p, err := LocalPath(raw)
+		if err != nil || p == "/" || p == "." {
+			return ErrInvalidRemote
+		}
+		return nil
 	}
 	if !IsSSH(raw) {
 		return ErrNotSSH
