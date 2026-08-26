@@ -21,11 +21,18 @@ import (
 	cryptossh "golang.org/x/crypto/ssh"
 )
 
-// ErrBadSSHSeed is returned when a session seed is not 32 bytes.
-var ErrBadSSHSeed = errors.New("invalid ssh seed")
-
-// ErrBadSSHPublic is returned when an authorized_keys line is not ssh-ed25519.
-var ErrBadSSHPublic = errors.New("invalid ssh public key")
+var (
+	// ErrBadSSHSeed is returned when a session seed is not 32 bytes.
+	ErrBadSSHSeed = errors.New("invalid ssh seed")
+	// ErrBadSSHPublic is returned when an authorized_keys line is not ssh-ed25519.
+	ErrBadSSHPublic = errors.New("invalid ssh public key")
+	// ErrNoSignerTab is returned when TabSigner has no Ask callback.
+	ErrNoSignerTab = errors.New("no signer tab")
+	// ErrBadSSHSignature is returned when the tab signature is the wrong length.
+	ErrBadSSHSignature = errors.New("bad ssh signature")
+	// ErrHostKeyChanged is returned when a known SSH host presents a new key.
+	ErrHostKeyChanged = errors.New("ssh host key changed")
+)
 
 // SessionSSH is git SSH auth. Product path is a tab signer; tests may use SSHKey.
 type SessionSSH interface {
@@ -142,14 +149,14 @@ func (t *TabSigner) PublicKey() cryptossh.PublicKey { return t.Pub }
 
 func (t *TabSigner) Sign(_ io.Reader, data []byte) (*cryptossh.Signature, error) {
 	if t == nil || t.Ask == nil {
-		return nil, errors.New("no signer tab")
+		return nil, ErrNoSignerTab
 	}
 	sig, err := t.Ask(data)
 	if err != nil {
 		return nil, err
 	}
 	if len(sig) != ed25519.SignatureSize {
-		return nil, errors.New("bad ssh signature")
+		return nil, ErrBadSSHSignature
 	}
 	return &cryptossh.Signature{Format: cryptossh.KeyAlgoED25519, Blob: sig}, nil
 }
@@ -176,10 +183,11 @@ func tofuCallback(hostname string, _ net.Addr, key cryptossh.PublicKey) error {
 		tofu.Store(host, raw)
 		return nil
 	}
-	if bytes.Equal(prev.([]byte), raw) {
+	prevBytes, ok := prev.([]byte)
+	if ok && bytes.Equal(prevBytes, raw) {
 		return nil
 	}
-	return fmt.Errorf("ssh host key changed for %s", host)
+	return fmt.Errorf("%w for %s", ErrHostKeyChanged, host)
 }
 
 // Clone copies remote@branch into dest over SSH.
