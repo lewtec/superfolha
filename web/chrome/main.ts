@@ -112,7 +112,7 @@ function bind(): void {
   async function paint(): Promise<void> {
     const all = await listIdentities();
     const active = getActiveId() || login;
-    if (label) label.textContent = active || "";
+    if (label) label.textContent = active ? hexPart(active) : "";
     if (ini) ini.textContent = initials(active || "?");
     if (!menu) return;
     const addL = root!.getAttribute("data-add-label") || "Add identity";
@@ -121,19 +121,16 @@ function bind(): void {
     const inviteL = root!.getAttribute("data-invite-label") || "Invite";
     const inviteAction = root!.getAttribute("data-invite-action") || "";
     const commitL = root!.getAttribute("data-commit-label") || "";
-    const themeLight = root!.getAttribute("data-theme-light") || "Light theme";
-    const themeDarkL = root!.getAttribute("data-theme-dark") || "Dark theme";
-    const signedIn = root!.getAttribute("data-signed-in") || "Signed in as";
+    const themeL = root!.getAttribute("data-theme-label") || "Theme";
     const langL = root!.getAttribute("data-lang-label") || "Language";
     const lang = root!.getAttribute("data-lang") || "en";
     const langNext = root!.getAttribute("data-lang-next") || "/";
     const langAction = root!.getAttribute("data-lang-action") || "/lang";
-    const logout = root!.getAttribute("data-logout") || "/logout";
     const dark = themeDark();
     const items = all
       .map((r: IdentityRec) => {
         const on = r.id === active;
-        return `<li><button type="button" class="${on ? "menu-active" : ""}" data-sf="switch" data-id="${r.id}" title="${r.id}">${avatarHTML(r.id, "w-8")}<span class="min-w-0 flex flex-col items-start gap-0"><span class="font-mono text-xs">${hexPart(r.id)}</span><span class="text-xs opacity-60">ed25519</span></span>${on ? icon(ICO.check) : ""}</button></li>`;
+        return `<li><button type="button" class="${on ? "menu-active" : ""}" data-sf="switch" data-id="${r.id}" title="${r.id}">${avatarHTML(r.id, "w-8")}<span class="min-w-0 font-mono text-xs break-all">${r.id}</span>${on ? icon(ICO.check) : ""}</button></li>`;
       })
       .join("");
     const langs: [string, string][] = [
@@ -150,23 +147,21 @@ function bind(): void {
     const extras =
       (commitL ? actionItem("commit", ICO.upload, commitL) : "") +
       (inviteAction ? actionItem("invite", ICO.link, inviteL) : "") +
-      `<li><button type="button" data-sf="theme"><span class="swap swap-rotate${dark ? " swap-active" : ""}">${icon(ICO.sun, "swap-on")}${icon(ICO.moon, "swap-off")}</span><span class="grow">${dark ? themeLight : themeDarkL}</span></button></li>` +
+      `<li><button type="button" data-sf="theme"><span class="swap swap-rotate${dark ? " swap-active" : ""}">${icon(ICO.sun, "swap-on")}${icon(ICO.moon, "swap-off")}</span><span class="grow">${themeL}</span></button></li>` +
       `<li><form method="post" action="${langAction}"><input type="hidden" name="next" value="${langNext}"/>${icon(ICO.globe)}<span class="grow">${langL}</span><span class="join shrink-0" role="group" aria-label="${langL}">${langBtns}</span></form></li>`;
     menu.innerHTML =
       `<li class="menu-title">${root!.getAttribute("data-title") || "Identities"}</li>` +
-      (active
-        ? `<li><div>${avatarHTML(active, "w-10")}<span class="min-w-0"><span class="block text-xs">${signedIn}</span><span class="block font-mono text-xs break-all">${active}</span></span></div></li>`
-        : "") +
       items +
       actionItem("add", ICO.plus, addL) +
       actionItem("mint", ICO.userPlus, newL) +
       `<li aria-hidden="true"><hr class="border-base-300 mx-2 my-1"/></li>` +
       extras +
-      `<li><form method="post" action="${logout}"><button type="submit" data-sf="leave">${icon(ICO.leave)}<span>${leaveL}</span></button></form></li>`;
-    menu.querySelector("[data-sf=leave]")?.closest("form")?.addEventListener("submit", () => {
-      clearActiveId();
-    });
+      `<li><button type="submit" form="sf-ident-leave" data-sf="leave">${icon(ICO.leave)}<span>${leaveL}</span></button></li>`;
   }
+
+  $("sf-ident-leave")?.addEventListener("submit", () => {
+    clearActiveId();
+  });
 
   btn?.addEventListener("click", (ev) => {
     ev.preventDefault();

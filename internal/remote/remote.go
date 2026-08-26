@@ -116,6 +116,18 @@ func IsLocal(raw string) bool {
 	return strings.HasPrefix(raw, "/")
 }
 
+// Display is the human label: local paths without the file:// prefix.
+func Display(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if IsLocal(raw) {
+		p, err := LocalPath(raw)
+		if err == nil {
+			return p
+		}
+	}
+	return raw
+}
+
 // LocalPath returns the cleaned absolute path for a local remote.
 func LocalPath(raw string) (string, error) {
 	raw = strings.TrimSpace(raw)

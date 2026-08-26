@@ -57,6 +57,10 @@ function isLocalRemote(raw: string): boolean {
   return v.startsWith("/") || v.toLowerCase().startsWith("file://");
 }
 
+function displayRemote(raw: string): string {
+  return raw.trim().replace(/^file:\/\//i, "");
+}
+
 function paintRemoteMode(): void {
   const form = $("sf-session-form");
   const remoteEl = input("sf-remote");
@@ -209,10 +213,11 @@ function paintRecents(): void {
       const live = liveFor(r.remote, r.branch);
       const action = live?.ready ? openL : resumeL;
       const remote = esc(r.remote);
+      const shown = esc(displayRemote(r.remote));
       const branch = esc(r.branch);
       return `<li class="list-row">
         <div class="list-col-grow min-w-0">
-          <div class="font-mono text-sm break-all">${remote}</div>
+          <div class="font-mono text-sm break-all">${shown}</div>
           <div class="text-xs text-base-content/60">${branch}</div>
         </div>
         <button type="button" class="btn btn-sm btn-primary" data-resume="${remote}" data-branch="${branch}">${esc(action)}</button>
@@ -284,6 +289,7 @@ function bind(): void {
     });
     loadBtn?.addEventListener("click", (ev) => {
       ev.preventDefault();
+      input("sf-ssh-pass")?.classList.remove("hidden");
       fileEl?.click();
     });
     fileEl?.addEventListener("change", () => {
