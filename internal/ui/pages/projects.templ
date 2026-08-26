@@ -25,17 +25,24 @@ templ Sessions(c layout.Chrome, items []session.Info) {
 			<div class="card bg-base-100 shadow-xl mb-8">
 				<div class="card-body">
 					<h2 class="card-title">{ c.T("sessions.start") }</h2>
-					<p class="text-sm text-base-content/70">{ c.T("sessions.start_hint") }</p>
-					<form id="sf-session-form" method="post" action={ paths.Projects() } class="space-y-4">
+					<p id="sf-start-hint" class="text-sm text-base-content/70">{ c.T("sessions.start_hint") }</p>
+					<form
+						id="sf-session-form"
+						method="post"
+						action={ paths.Projects() }
+						class="space-y-4"
+						data-hint-ssh={ c.T("sessions.start_hint") }
+						data-hint-local={ c.T("sessions.ephemeral_hint") }
+					>
 						<label class="form-control w-full">
 							<span class="label-text">{ c.T("sessions.remote_label") }</span>
-							<input id="sf-remote" class="input input-bordered w-full font-mono" type="text" name="remote" required placeholder="git@github.com:org/paper" spellcheck="false" autocomplete="off"/>
+							<input id="sf-remote" class="input input-bordered w-full font-mono" type="text" name="remote" required placeholder="git@github.com:org/paper or /tmp/paper" spellcheck="false" autocomplete="off"/>
 						</label>
 						<label class="form-control w-full">
 							<span class="label-text">{ c.T("sessions.branch_label") }</span>
 							<input id="sf-branch" class="input input-bordered w-full" type="text" name="branch" placeholder="main"/>
 						</label>
-						<fieldset class="fieldset">
+						<fieldset id="sf-ssh-box" class="fieldset">
 							<legend class="fieldset-legend">{ c.T("sessions.ssh_key_local") }</legend>
 							<textarea id="sf-ssh-pub" class="textarea font-mono text-xs w-full" readonly rows="3"></textarea>
 							<input type="hidden" name="ssh_public" id="sf-ssh-public"/>
@@ -89,7 +96,12 @@ templ Sessions(c layout.Chrome, items []session.Info) {
 						>
 							<div class="card-body">
 								<h2 class="card-title break-all">{ sessionTitle(item) }</h2>
-								<p class="text-sm text-base-content/70">{ item.Branch }</p>
+								<p class="text-sm text-base-content/70">
+									{ item.Branch }
+									if item.Ephemeral {
+										<span class="badge badge-ghost badge-sm ms-2">{ c.T("sessions.ephemeral") }</span>
+									}
+								</p>
 								<p class="text-xs font-mono text-base-content/50 break-all">{ item.ID }</p>
 								if !item.Ready && item.SSHPublic != "" {
 									<button type="button" class="btn btn-sm" onclick="document.getElementById('ssh-deploy-modal')?.showModal()">{ c.T("sessions.ssh_key") }</button>

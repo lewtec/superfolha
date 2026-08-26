@@ -52,6 +52,24 @@ async function loadFile(file: File): Promise<void> {
   await refresh();
 }
 
+function isLocalRemote(raw: string): boolean {
+  const v = raw.trim();
+  return v.startsWith("/") || v.toLowerCase().startsWith("file://");
+}
+
+function paintRemoteMode(): void {
+  const form = $("sf-session-form");
+  const remoteEl = input("sf-remote");
+  const hint = $("sf-start-hint");
+  const box = $("sf-ssh-box");
+  if (!form || !remoteEl) return;
+  const local = isLocalRemote(remoteEl.value);
+  hint?.replaceChildren(document.createTextNode(
+    (local ? form.getAttribute("data-hint-local") : form.getAttribute("data-hint-ssh")) || "",
+  ));
+  box?.classList.toggle("hidden", local);
+}
+
 function cloneToast(): HTMLElement | null {
   return $("sf-clone-toast");
 }
@@ -257,6 +275,7 @@ function bind(): void {
   if (form && form.dataset.bound !== "1") {
     form.dataset.bound = "1";
     remoteEl?.addEventListener("input", () => {
+      paintRemoteMode();
       void refresh();
     });
     storeBtn?.addEventListener("click", (ev) => {
@@ -282,6 +301,7 @@ function bind(): void {
         if (form instanceof HTMLFormElement) form.submit();
       });
     });
+    paintRemoteMode();
     void refresh();
   }
   const recents = $("sf-recents");

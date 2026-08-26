@@ -272,6 +272,26 @@ func TestCloneCreatesSessionAndSecondUserFails(t *testing.T) {
 	}
 }
 
+func TestLocalPathCreateOpensEditor(t *testing.T) {
+	t.Setenv("JWT_SECRET", "rod-play-secret")
+	t.Setenv("GO_ENV", "development")
+	srv := testServer(t)
+	alice := signIn(t, "alice")
+	form := strings.NewReader("remote=" + url.QueryEscape("/tmp/sf-local-paper") + "&branch=main")
+	req := httptest.NewRequest(http.MethodPost, paths.Projects(), form)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{Name: auth.AuthCookieName, Value: alice})
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("create = %d", rec.Code)
+	}
+	loc := rec.Header().Get("Location")
+	if !strings.HasPrefix(loc, "/editor/") {
+		t.Fatalf("local create must open editor: %q", loc)
+	}
+}
+
 func TestHostRetryOfReadySessionOpensEditor(t *testing.T) {
 	t.Setenv("JWT_SECRET", "rod-play-secret")
 	t.Setenv("GO_ENV", "development")

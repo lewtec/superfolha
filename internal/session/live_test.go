@@ -185,6 +185,36 @@ func TestCreateRejectsHTTP(t *testing.T) {
 	}
 }
 
+func TestCreateLocalEphemeral(t *testing.T) {
+	t.Setenv("JWT_SECRET", "test-secret-for-session")
+	t.Setenv("GO_ENV", "development")
+	reg := NewRegistry(project.NewService(t.TempDir()))
+	live, err := reg.Create("alice", "/tmp/sf-ephemeral-paper", "main", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !live.Ephemeral {
+		t.Fatal("local path must be ephemeral")
+	}
+	if live.SSHPublic != "" {
+		t.Fatalf("ephemeral SSHPublic = %q", live.SSHPublic)
+	}
+	if err := reg.CloneAndProbe(live.ID, "alice", nil); err != nil {
+		t.Fatal(err)
+	}
+	info, ok := reg.Live(live.ID)
+	if !ok || !info.Ready || !info.Ephemeral {
+		t.Fatalf("ready ephemeral: %+v ok=%v", info, ok)
+	}
+	h := reg.GetIfLive(live.ID)
+	if h == nil || !h.Ephemeral {
+		t.Fatal("hub must be ephemeral")
+	}
+	if _, err := h.PersistFrom(h.AddClient("c1"), "m", "alice"); err != nil {
+		t.Fatalf("ephemeral persist: %v", err)
+	}
+}
+
 func TestCloneAuthFailsAfterLsRemote(t *testing.T) {
 	t.Setenv("JWT_SECRET", "test-secret-for-session")
 	t.Setenv("GO_ENV", "development")

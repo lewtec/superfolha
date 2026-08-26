@@ -13,13 +13,13 @@ import (
 )
 
 var (
-	ErrAlreadyLive = errors.New("session already live for remote and branch")
-	ErrNotFound    = errors.New("session not found")
-	ErrNotHost     = errors.New("not session host")
-	ErrKnockClosed = errors.New("knock is disabled")
-	ErrClone         = errors.New("clone failed")
-	ErrUnauthorized  = errors.New("sessions.key_unauthorized")
-	ErrNoWrite       = errors.New("sessions.key_read_only")
+	ErrAlreadyLive  = errors.New("session already live for remote and branch")
+	ErrNotFound     = errors.New("session not found")
+	ErrNotHost      = errors.New("not session host")
+	ErrKnockClosed  = errors.New("knock is disabled")
+	ErrClone        = errors.New("clone failed")
+	ErrUnauthorized = errors.New("sessions.key_unauthorized")
+	ErrNoWrite      = errors.New("sessions.key_read_only")
 )
 
 // Live is RAM metadata for one session incarnation.
@@ -32,6 +32,7 @@ type Live struct {
 	Ready     bool
 	SSHPublic string
 	CloneURL  string
+	Ephemeral bool
 	admitted  map[string]struct{}
 	knocking  map[string]struct{}
 }
@@ -46,6 +47,7 @@ type Info struct {
 	Ready     bool
 	SSHPublic string
 	CloneURL  string
+	Ephemeral bool
 	Knocking  []string
 }
 
@@ -63,6 +65,7 @@ func (l *Live) snapshot() Info {
 		Ready:     l.Ready,
 		SSHPublic: l.SSHPublic,
 		CloneURL:  l.CloneURL,
+		Ephemeral: l.Ephemeral,
 		Knocking:  knocks,
 	}
 }
@@ -150,9 +153,14 @@ func (r *Registry) Create(hostLogin, rawRemote, branch, sshPublic string) (*Live
 	if err := remote.Validate(rawRemote); err != nil {
 		return nil, err
 	}
-	_, pubLine, err := igit.ParseAuthorized(sshPublic)
-	if err != nil {
-		return nil, err
+	local := remote.IsLocal(rawRemote)
+	pubLine := ""
+	if !local {
+		var err error
+		_, pubLine, err = igit.ParseAuthorized(sshPublic)
+		if err != nil {
+			return nil, err
+		}
 	}
 	canon := remote.Canonical(rawRemote)
 	cloneURL := remote.TransportURL(rawRemote)
@@ -184,6 +192,7 @@ func (r *Registry) Create(hostLogin, rawRemote, branch, sshPublic string) (*Live
 		Branch:    branch,
 		HostLogin: hostLogin,
 		SSHPublic: pubLine,
+		Ephemeral: local,
 		admitted:  map[string]struct{}{hostLogin: {}},
 		knocking:  map[string]struct{}{},
 	}
@@ -216,6 +225,9 @@ func (r *Registry) CloneAndProbe(sessionID, hostLogin string, ssh igit.SessionSS
 	}
 	if l.Ready {
 		return nil
+	}
+	if l.Ephemeral {
+		return r.cloneEphemeral(sessionID, l)
 	}
 	if ssh == nil {
 		return ErrNoSigner
@@ -263,13 +275,53 @@ func (r *Registry) CloneAndProbe(sessionID, hostLogin string, ssh igit.SessionSS
 		}
 		return err
 	}
+	r.markReady(l, h)
+	return nil
+}
+
+func (r *Registry) cloneEphemeral(sessionID string, l *Live) error {
+	dest := r.svc.GetProjectPath(sessionID)
+	if err := os.RemoveAll(dest); err != nil {
+		return err
+	}
+	src, err := remote.LocalPath(l.CloneURL)
+	if err != nil {
+		src, err = remote.LocalPath(l.Remote)
+	}
+	if err != nil {
+		return errors.Join(ErrClone, err)
+	}
+	if err := igit.CloneLocal(dest, src, l.Branch); err != nil {
+		if rmErr := os.RemoveAll(dest); rmErr != nil {
+			slog.Error("remove failed local dest", "path", dest, "err", rmErr)
+		}
+		return errors.Join(ErrClone, err)
+	}
+	if err := r.svc.EnsureMainTeX(sessionID); err != nil {
+		if rmErr := os.RemoveAll(dest); rmErr != nil {
+			slog.Error("remove failed seed dest", "path", dest, "err", rmErr)
+		}
+		return err
+	}
+	h, err := Open(r.svc, sessionID, l.HostLogin)
+	if err != nil {
+		if rmErr := os.RemoveAll(dest); rmErr != nil {
+			slog.Error("remove failed open dest", "path", dest, "err", rmErr)
+		}
+		return err
+	}
+	r.markReady(l, h)
+	return nil
+}
+
+func (r *Registry) markReady(l *Live, h *Hub) {
 	h.Branch = l.Branch
 	h.SSHPublic = l.SSHPublic
+	h.Ephemeral = l.Ephemeral
 	r.mu.Lock()
 	l.Ready = true
-	r.hubs[sessionID] = h
+	r.hubs[l.ID] = h
 	r.mu.Unlock()
-	return nil
 }
 
 // GetIfLive returns a hub only if it is already open.

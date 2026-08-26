@@ -200,6 +200,14 @@ func Clone(dest, remoteURL, branch string, ssh SessionSSH) error {
 	return nil
 }
 
+// CloneLocal copies a filesystem git repo into dest, or inits dest if src is not a repo.
+func CloneLocal(dest, srcPath, branch string) error {
+	if _, err := gogit.PlainOpen(srcPath); err == nil {
+		return Clone(dest, "file://"+srcPath, branch, nil)
+	}
+	return InitRepo(dest)
+}
+
 // Push pushes HEAD to origin over SSH.
 func Push(repoPath, branch string, ssh SessionSSH) error {
 	r, err := openRepo(repoPath)

@@ -63,4 +63,16 @@ func TestValidate(t *testing.T) {
 	if err := Validate("git@github.com:a/b"); err != nil {
 		t.Fatalf("ssh: %v", err)
 	}
+	if err := Validate("/tmp/paper"); err != nil {
+		t.Fatalf("local: %v", err)
+	}
+	if err := Validate("file:///tmp/paper"); err != nil {
+		t.Fatalf("file: %v", err)
+	}
+	if !IsLocal("/tmp/paper") || IsLocal("git@github.com:a/b") {
+		t.Fatal("IsLocal")
+	}
+	if got := Canonical("/tmp/foo/../paper"); got != "file:///tmp/paper" {
+		t.Fatalf("Canonical local = %q", got)
+	}
 }
