@@ -162,13 +162,6 @@ function bind(): void {
   $("sf-ident-leave")?.addEventListener("submit", () => {
     clearActiveId();
   });
-  document.addEventListener("click", (ev) => {
-    const t = ev.target;
-    if (!(t instanceof HTMLElement) || !t.closest("[data-sf-local-warn]")) return;
-    ev.preventDefault();
-    ev.stopPropagation();
-    ($("sf-local-warn") as HTMLDialogElement | null)?.showModal();
-  });
 
   btn?.addEventListener("click", (ev) => {
     ev.preventDefault();
