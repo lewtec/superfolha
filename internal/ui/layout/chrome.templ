@@ -50,6 +50,9 @@ templ IdentityMenu(c Chrome) {
 		data-invite-copied={ c.T("sessions.invite_copied") }
 		data-commit-label={ c.CommitLabel }
 		data-theme-label={ c.T("common.theme") }
+		data-theme-light={ c.T("common.theme_light") }
+		data-theme-dark={ c.T("common.theme_dark") }
+		data-signed-in={ c.T("common.signed_in_as") }
 		data-lang-label={ c.T("common.language") }
 		data-lang={ c.Lang }
 		data-lang-next={ c.LangNext }
@@ -77,7 +80,7 @@ templ IdentityMenu(c Chrome) {
 		</button>
 		<ul
 			id="sf-ident-menu"
-			class="dropdown menu dropdown-end w-80 rounded-box bg-base-100 p-2 shadow-sm"
+			class="dropdown menu menu-sm dropdown-end w-80 rounded-box bg-base-100 p-2 shadow-sm"
 			popover="manual"
 			style="position-anchor:--sf-ident;position-area:bottom span-left"
 		></ul>

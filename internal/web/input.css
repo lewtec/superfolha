@@ -7,6 +7,7 @@
 }
 @source "../ui/**/*.templ";
 @source "../../web/editor/**/*.ts";
+@source "../../web/chrome/**/*.ts";
 
 @plugin "daisyui/theme" {
   name: "superfolha";
