@@ -96,6 +96,11 @@ templ Sessions(c layout.Chrome, items []session.Info) {
 								}
 								<div class="card-actions justify-end mt-4">
 									if item.Ready {
+										if item.HostLogin == c.Email {
+											<form method="post" action={ paths.SessionPreauth(item.ID) }>
+												<button class="btn btn-ghost btn-sm" type="submit">{ c.T("sessions.invite") }</button>
+											</form>
+										}
 										<a class="btn btn-primary btn-sm" href={ paths.Editor(item.ID) }>{ c.T("common.open") }</a>
 									} else if item.HostLogin == c.Email {
 										<button type="button" class="btn btn-primary btn-sm" data-ws={ paths.SessionWS(item.ID) } data-editor={ paths.Editor(item.ID) } data-remote={ item.CloneURL } data-branch={ item.Branch } data-retry-clone>{ c.T("sessions.retry_clone") }</button>

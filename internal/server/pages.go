@@ -29,11 +29,12 @@ func (s *Server) loc(r *http.Request) *i18n.Localizer {
 func (s *Server) chrome(r *http.Request, title string) layout.Chrome {
 	loc := s.loc(r)
 	c := layout.Chrome{
-		Title: title,
-		Lang:  s.lang(r),
-		Flash: r.URL.Query().Get("flash"),
-		Error: r.URL.Query().Get("error"),
-		T:     func(id string) string { return appi18n.T(loc, id) },
+		Title:    title,
+		Lang:     s.lang(r),
+		Flash:    r.URL.Query().Get("flash"),
+		Error:    r.URL.Query().Get("error"),
+		LangNext: r.URL.Path,
+		T:        func(id string) string { return appi18n.T(loc, id) },
 	}
 	if u, ok := auth.GetUserFromContext(r.Context()); ok {
 		c.LoggedIn = true
