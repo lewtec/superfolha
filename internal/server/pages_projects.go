@@ -172,10 +172,10 @@ func (s *Server) handleEditorGet(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, paths.ProjectsFlash("sessions.add_ssh_key"), http.StatusSeeOther)
 		return
 	}
-	c := s.chrome(r, info.Remote)
+	c := s.chrome(r, remote.Display(info.CloneURL))
 	if info.HostLogin == user.Email {
 		c.InviteAction = paths.SessionPreauth(info.ID)
 	}
 	c.CommitLabel = c.T("editor.commit_now")
-	s.render(w, r, pages.Editor(c, info.ID, info.CloneURL, info.Branch, user.Email, info.SSHPublic, shareHint, pages.MarshalI18n(appi18n.Map(s.bundle, s.lang(r)))))
+	s.render(w, r, pages.Editor(c, info.ID, remote.Display(info.CloneURL), info.Branch, user.Email, info.SSHPublic, shareHint, pages.MarshalI18n(appi18n.Map(s.bundle, s.lang(r)))))
 }

@@ -232,6 +232,9 @@ async function boot() {
   const sidebar = document.getElementById("sf-sidebar")!;
   const codeHost = document.getElementById("sf-code")!;
   const pdfHost = document.getElementById("sf-pdf")!;
+  if (!pdfHost.innerHTML) {
+    pdfHost.innerHTML = `<div class="grid h-full place-items-center p-6 text-sm text-base-content/60">${escapeHtml(t(msgs, "editor.pdf_empty"))}</div>`;
+  }
   const logsPre = document.getElementById("sf-logs-pre")!;
   const pathEl = document.getElementById("sf-path")!;
   const chatEl = document.getElementById("sf-chat")!;
@@ -272,12 +275,11 @@ async function boot() {
     const peers = collab.peers();
     sidebar.innerHTML = `
       <nav class="p-2 border-b border-base-300 shrink-0" aria-label="${escapeAttr(t(msgs, "editor.view"))}">
-        <p class="px-2 pb-1 text-xs font-medium uppercase tracking-wide text-base-content/60">${escapeHtml(t(msgs, "editor.view"))}</p>
-        <ul class="menu menu-md bg-transparent rounded-box w-full p-0 gap-0.5">
-          <li><button type="button" data-tab="code" class="${tab === "code" ? "active" : ""}">${escapeHtml(t(msgs, "editor.code"))}</button></li>
-          <li><button type="button" data-tab="pdf" class="${tab === "pdf" ? "active" : ""}">${escapeHtml(t(msgs, "editor.pdf"))}</button></li>
-          <li><button type="button" data-tab="logs" class="${tab === "logs" ? "active" : ""}">${escapeHtml(t(msgs, "editor.logs"))}</button></li>
-        </ul>
+        <div role="tablist" class="tabs tabs-border w-full">
+          <button type="button" role="tab" data-tab="code" class="tab ${tab === "code" ? "tab-active" : ""}">${escapeHtml(t(msgs, "editor.code"))}</button>
+          <button type="button" role="tab" data-tab="pdf" class="tab ${tab === "pdf" ? "tab-active" : ""}">${escapeHtml(t(msgs, "editor.pdf"))}</button>
+          <button type="button" role="tab" data-tab="logs" class="tab ${tab === "logs" ? "tab-active" : ""}">${escapeHtml(t(msgs, "editor.logs"))}</button>
+        </div>
       </nav>
       ${
         peers.length
@@ -293,7 +295,7 @@ async function boot() {
         <div class="flex justify-between items-center mb-2">
           <h3 class="font-bold">${escapeHtml(t(msgs, "editor.files"))}</h3>
           <div class="flex gap-1">
-            <button type="button" id="sf-upload" class="btn btn-xs btn-primary">${escapeHtml(t(msgs, "editor.load"))}</button>
+            <button type="button" id="sf-upload" class="btn btn-xs">${escapeHtml(t(msgs, "editor.load"))}</button>
             <button type="button" id="sf-new" class="btn btn-xs btn-primary">+ ${escapeHtml(t(msgs, "editor.new_file"))}</button>
           </div>
         </div>

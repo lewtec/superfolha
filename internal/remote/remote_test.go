@@ -75,4 +75,7 @@ func TestValidate(t *testing.T) {
 	if got := Canonical("/tmp/foo/../paper"); got != "file:///tmp/paper" {
 		t.Fatalf("Canonical local = %q", got)
 	}
+	if got := Display("file:///tmp/paper"); got != "/tmp/paper" {
+		t.Fatalf("Display = %q", got)
+	}
 }

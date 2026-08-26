@@ -6,7 +6,7 @@ const PREFIX = "superfolha.recents.";
 const CAP = 12;
 
 export function canonRemote(remote: string): string {
-  return remote.trim().replace(/\.git$/, "");
+  return remote.trim().replace(/^file:\/\//i, "").replace(/\.git$/, "");
 }
 
 export function recentKey(remote: string, branch: string): string {

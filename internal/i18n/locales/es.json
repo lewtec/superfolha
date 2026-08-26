@@ -78,7 +78,7 @@
   "editor.download_failed": "No se pudo descargar el archivo",
   "editor.pdf_empty": "Aún no hay PDF compilado. Pulsa Compilar para generar el PDF.",
   "editor.status_syncing": "Sincronizando…",
-  "editor.status_synced": "En el servidor",
+  "editor.status_synced": "Sincronizado",
   "editor.status_committing": "Haciendo commit…",
   "editor.status_offline": "Sin conexión",
   "editor.status_connecting": "Conectando a la sesión…",

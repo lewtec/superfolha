@@ -2,27 +2,71 @@ package pages
 
 import (
 	"github.com/lewtec/superfolha/internal/paths"
+	"github.com/lewtec/superfolha/internal/remote"
 	"github.com/lewtec/superfolha/internal/session"
 	"github.com/lewtec/superfolha/internal/ui/layout"
 )
 
 templ Sessions(c layout.Chrome, items []session.Info) {
 	@layout.AppShell(c) {
-		<div class="container mx-auto px-4 py-8">
-			<div class="flex justify-between items-center mb-6 gap-2 flex-wrap">
-				<h1 class="text-3xl font-bold">{ c.T("sessions.title") }</h1>
-			</div>
-			<section id="sf-recents-wrap" class="hidden mb-8">
-				<h2 class="text-xl font-bold mb-3">{ c.T("sessions.recents") }</h2>
+		<div class="container mx-auto px-4 py-6 space-y-8">
+			if len(items) > 0 {
+				<section>
+					<h1 class="text-xl font-semibold mb-3">{ c.T("sessions.title") }</h1>
+					<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+						for _, item := range items {
+							<div
+								class="card bg-base-100 border border-base-300"
+								data-sf-live
+								data-remote={ item.CloneURL }
+								data-branch={ item.Branch }
+								data-editor={ paths.Editor(item.ID) }
+								data-ready={ readyFlag(item.Ready) }
+							>
+								<div class="card-body">
+									<h2 class="card-title break-all text-base">{ sessionTitle(item) }</h2>
+									<p class="text-sm text-base-content/70">
+										{ item.Branch }
+										if item.Ephemeral {
+											<span class="badge badge-ghost badge-sm ms-2">{ c.T("sessions.ephemeral") }</span>
+										}
+									</p>
+									if !item.Ready && item.SSHPublic != "" {
+										<button type="button" class="btn btn-sm" onclick="document.getElementById('ssh-deploy-modal')?.showModal()">{ c.T("sessions.ssh_key") }</button>
+									}
+									<div class="card-actions justify-end mt-2">
+										if item.Ready {
+											<a class="btn btn-primary btn-sm" href={ paths.Editor(item.ID) }>{ c.T("common.open") }</a>
+										} else if item.HostLogin == c.Email {
+											<button type="button" class="btn btn-primary btn-sm" data-ws={ paths.SessionWS(item.ID) } data-editor={ paths.Editor(item.ID) } data-remote={ item.CloneURL } data-branch={ item.Branch } data-retry-clone>{ c.T("sessions.retry_clone") }</button>
+										}
+										if item.HostLogin == c.Email {
+											<form method="post" action={ paths.ProjectDelete(item.ID) } onsubmit="return confirm(this.dataset.confirm)" data-confirm={ c.T("sessions.end_confirm") }>
+												<button class="btn btn-error btn-sm" type="submit">{ c.T("sessions.end") }</button>
+											</form>
+										} else {
+											<form method="post" action={ paths.SessionKnock(item.ID) }>
+												<button class="btn btn-ghost btn-sm" type="submit">{ c.T("sessions.knock") }</button>
+											</form>
+										}
+									</div>
+								</div>
+							</div>
+						}
+					</div>
+				</section>
+			}
+			<section id="sf-recents-wrap" class="hidden">
+				<h2 class="text-xl font-semibold mb-3">{ c.T("sessions.recents") }</h2>
 				<ul
 					id="sf-recents"
-					class="list bg-base-100 rounded-box shadow-xl"
+					class="list bg-base-100 rounded-box border border-base-300"
 					data-label-resume={ c.T("sessions.resume") }
 					data-label-open={ c.T("common.open") }
 					data-label-forget={ c.T("sessions.forget") }
 				></ul>
 			</section>
-			<div class="card bg-base-100 shadow-xl mb-8">
+			<div class="card bg-base-100 border border-base-300">
 				<div class="card-body">
 					<h2 class="card-title">{ c.T("sessions.start") }</h2>
 					<p id="sf-start-hint" class="text-sm text-base-content/70">{ c.T("sessions.start_hint") }</p>
@@ -34,19 +78,19 @@ templ Sessions(c layout.Chrome, items []session.Info) {
 						data-hint-ssh={ c.T("sessions.start_hint") }
 						data-hint-local={ c.T("sessions.ephemeral_hint") }
 					>
-						<label class="form-control w-full">
-							<span class="label-text">{ c.T("sessions.remote_label") }</span>
-							<input id="sf-remote" class="input input-bordered w-full font-mono" type="text" name="remote" required placeholder="git@github.com:org/paper or /tmp/paper" spellcheck="false" autocomplete="off"/>
-						</label>
-						<label class="form-control w-full">
-							<span class="label-text">{ c.T("sessions.branch_label") }</span>
-							<input id="sf-branch" class="input input-bordered w-full" type="text" name="branch" placeholder="main"/>
-						</label>
+						<fieldset class="fieldset">
+							<legend class="fieldset-legend">{ c.T("sessions.remote_label") }</legend>
+							<input id="sf-remote" class="input w-full font-mono" type="text" name="remote" required placeholder="git@github.com:org/paper or /tmp/paper" spellcheck="false" autocomplete="off"/>
+						</fieldset>
+						<fieldset class="fieldset">
+							<legend class="fieldset-legend">{ c.T("sessions.branch_label") }</legend>
+							<input id="sf-branch" class="input w-full" type="text" name="branch" placeholder="main"/>
+						</fieldset>
 						<fieldset id="sf-ssh-box" class="fieldset">
 							<legend class="fieldset-legend">{ c.T("sessions.ssh_key_local") }</legend>
-							<textarea id="sf-ssh-pub" class="textarea font-mono text-xs w-full" readonly rows="3"></textarea>
+							<textarea id="sf-ssh-pub" class="textarea font-mono text-xs w-full" readonly rows="2"></textarea>
 							<input type="hidden" name="ssh_public" id="sf-ssh-public"/>
-							<input type="password" id="sf-ssh-pass" class="input w-full" autocomplete="off" placeholder={ c.T("auth.key_pass") }/>
+							<input type="password" id="sf-ssh-pass" class="input w-full hidden" autocomplete="off" placeholder={ c.T("auth.key_pass") }/>
 							<input type="file" id="sf-ssh-file" class="hidden"/>
 							<div class="flex flex-wrap gap-2 mt-2">
 								<button type="button" class="btn" id="sf-ssh-store">{ c.T("auth.store_key") }</button>
@@ -80,57 +124,6 @@ templ Sessions(c layout.Chrome, items []session.Info) {
 						<button>{ c.T("common.cancel") }</button>
 					</form>
 				</dialog>
-			}
-			if len(items) == 0 {
-				<p class="text-center text-base-content/70">{ c.T("sessions.empty") }</p>
-			} else {
-				<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-					for _, item := range items {
-						<div
-							class="card bg-base-100 shadow-xl"
-							data-sf-live
-							data-remote={ item.CloneURL }
-							data-branch={ item.Branch }
-							data-editor={ paths.Editor(item.ID) }
-							data-ready={ readyFlag(item.Ready) }
-						>
-							<div class="card-body">
-								<h2 class="card-title break-all">{ sessionTitle(item) }</h2>
-								<p class="text-sm text-base-content/70">
-									{ item.Branch }
-									if item.Ephemeral {
-										<span class="badge badge-ghost badge-sm ms-2">{ c.T("sessions.ephemeral") }</span>
-									}
-								</p>
-								<p class="text-xs font-mono text-base-content/50 break-all">{ item.ID }</p>
-								if !item.Ready && item.SSHPublic != "" {
-									<button type="button" class="btn btn-sm" onclick="document.getElementById('ssh-deploy-modal')?.showModal()">{ c.T("sessions.ssh_key") }</button>
-								}
-								<div class="card-actions justify-end mt-4">
-									if item.Ready {
-										if item.HostLogin == c.Email {
-											<form method="post" action={ paths.SessionPreauth(item.ID) }>
-												<button class="btn btn-ghost btn-sm" type="submit">{ c.T("sessions.invite") }</button>
-											</form>
-										}
-										<a class="btn btn-primary btn-sm" href={ paths.Editor(item.ID) }>{ c.T("common.open") }</a>
-									} else if item.HostLogin == c.Email {
-										<button type="button" class="btn btn-primary btn-sm" data-ws={ paths.SessionWS(item.ID) } data-editor={ paths.Editor(item.ID) } data-remote={ item.CloneURL } data-branch={ item.Branch } data-retry-clone>{ c.T("sessions.retry_clone") }</button>
-									}
-									if item.HostLogin == c.Email {
-										<form method="post" action={ paths.ProjectDelete(item.ID) } onsubmit="return confirm(this.dataset.confirm)" data-confirm={ c.T("sessions.end_confirm") }>
-											<button class="btn btn-error btn-sm" type="submit">{ c.T("sessions.end") }</button>
-										</form>
-									} else {
-										<form method="post" action={ paths.SessionKnock(item.ID) }>
-											<button class="btn btn-ghost btn-sm" type="submit">{ c.T("sessions.knock") }</button>
-										</form>
-									}
-								</div>
-							</div>
-						</div>
-					}
-				</div>
 			}
 		</div>
 		<div
@@ -172,9 +165,9 @@ templ Sessions(c layout.Chrome, items []session.Info) {
 
 func sessionTitle(item session.Info) string {
 	if item.CloneURL != "" {
-		return item.CloneURL
+		return remote.Display(item.CloneURL)
 	}
-	return item.Remote
+	return remote.Display(item.Remote)
 }
 
 func readyFlag(ok bool) string {
