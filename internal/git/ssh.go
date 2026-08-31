@@ -190,49 +190,39 @@ func tofuCallback(hostname string, _ net.Addr, key cryptossh.PublicKey) error {
 	return fmt.Errorf("%w for %s", ErrHostKeyChanged, host)
 }
 
-// Clone copies remote@branch into dest over SSH.
-func Clone(dest, remoteURL, branch string, ssh SessionSSH) error {
-	auth := transport.AuthMethod(nil)
-	if ssh != nil {
-		auth = ssh.AuthMethod()
+func sessionAuth(ssh SessionSSH) transport.AuthMethod {
+	if ssh == nil {
+		return nil
 	}
-	opts := &gogit.CloneOptions{URL: remoteURL, Auth: auth}
-	if branch != "" {
-		opts.ReferenceName = plumbing.NewBranchReferenceName(branch)
+	return ssh.AuthMethod()
+}
+
+type authClone struct {
+	dest, remoteURL, branch string
+	auth                    transport.AuthMethod
+}
+
+func (c authClone) run() error {
+	opts := &gogit.CloneOptions{URL: c.remoteURL, Auth: c.auth}
+	if c.branch != "" {
+		opts.ReferenceName = plumbing.NewBranchReferenceName(c.branch)
 		opts.SingleBranch = true
 	}
-	_, err := gogit.PlainClone(dest, false, opts)
+	_, err := gogit.PlainClone(c.dest, false, opts)
 	if err != nil {
-		return fmt.Errorf("clone %s: %w", remoteURL, err)
+		return fmt.Errorf("clone %s: %w", c.remoteURL, err)
 	}
 	return nil
 }
 
-// CloneLocal copies a filesystem git repo into dest, or inits dest if src is not a repo.
-func CloneLocal(dest, srcPath, branch string) error {
-	if _, err := gogit.PlainOpen(srcPath); err == nil {
-		return Clone(dest, "file://"+srcPath, branch, nil)
-	}
-	return InitRepo(dest)
-}
-
-// Push pushes HEAD to origin over SSH.
-func Push(repoPath, branch string, ssh SessionSSH) error {
+func pushOriginWithAuth(repoPath, branch string, auth transport.AuthMethod) error {
 	r, err := openRepo(repoPath)
 	if err != nil {
 		return err
 	}
-	auth := transport.AuthMethod(nil)
-	if ssh != nil {
-		auth = ssh.AuthMethod()
-	}
-	ref := branch
-	if ref == "" {
-		head, herr := r.Head()
-		if herr != nil {
-			return fmt.Errorf("head: %w", herr)
-		}
-		ref = head.Name().Short()
+	ref, err := headBranch(r, branch)
+	if err != nil {
+		return err
 	}
 	err = r.Push(&gogit.PushOptions{
 		RemoteName: "origin",
@@ -245,17 +235,42 @@ func Push(repoPath, branch string, ssh SessionSSH) error {
 	return nil
 }
 
+func headBranch(r *gogit.Repository, branch string) (string, error) {
+	if branch != "" {
+		return branch, nil
+	}
+	head, err := r.Head()
+	if err != nil {
+		return "", fmt.Errorf("head: %w", err)
+	}
+	return head.Name().Short(), nil
+}
+
+// Clone copies remote@branch into dest over SSH.
+func Clone(dest, remoteURL, branch string, ssh SessionSSH) error {
+	return authClone{dest: dest, remoteURL: remoteURL, branch: branch, auth: sessionAuth(ssh)}.run()
+}
+
+// CloneLocal copies a filesystem git repo into dest, or inits dest if src is not a repo.
+func CloneLocal(dest, srcPath, branch string) error {
+	if _, err := gogit.PlainOpen(srcPath); err == nil {
+		return Clone(dest, "file://"+srcPath, branch, nil)
+	}
+	return InitRepo(dest)
+}
+
+// Push pushes HEAD to origin over SSH.
+func Push(repoPath, branch string, ssh SessionSSH) error {
+	return pushOriginWithAuth(repoPath, branch, sessionAuth(ssh))
+}
+
 // Fetch pulls from origin over SSH. Used to tell "no write" from "no key".
 func Fetch(repoPath, branch string, ssh SessionSSH) error {
 	r, err := openRepo(repoPath)
 	if err != nil {
 		return err
 	}
-	auth := transport.AuthMethod(nil)
-	if ssh != nil {
-		auth = ssh.AuthMethod()
-	}
-	opts := &gogit.FetchOptions{RemoteName: "origin", Auth: auth}
+	opts := &gogit.FetchOptions{RemoteName: "origin", Auth: sessionAuth(ssh)}
 	if branch != "" {
 		opts.RefSpecs = []config.RefSpec{config.RefSpec("refs/heads/" + branch + ":refs/remotes/origin/" + branch)}
 	}
@@ -268,15 +283,11 @@ func Fetch(repoPath, branch string, ssh SessionSSH) error {
 
 // LsRemote lists refs on the remote over SSH. No local repo required.
 func LsRemote(remoteURL string, ssh SessionSSH) error {
-	auth := transport.AuthMethod(nil)
-	if ssh != nil {
-		auth = ssh.AuthMethod()
-	}
 	rem := gogit.NewRemote(memory.NewStorage(), &config.RemoteConfig{
 		Name: "origin",
 		URLs: []string{remoteURL},
 	})
-	_, err := rem.List(&gogit.ListOptions{Auth: auth})
+	_, err := rem.List(&gogit.ListOptions{Auth: sessionAuth(ssh)})
 	if err != nil {
 		return fmt.Errorf("ls-remote %s: %w", remoteURL, err)
 	}
