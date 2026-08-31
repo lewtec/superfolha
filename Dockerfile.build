@@ -1,28 +1,23 @@
 # Full multi-stage build for local/CI `docker build` and platforms that build
 # from source (Railway/Render). Production releases use GoReleaser + root Dockerfile
 # (texlive base + prebuilt binary).
+#
+# Frontend + templ codegen is `go generate ./...` (see generate.go). Do not
+# re-list bun scripts here — that is how this image drifted from local builds.
 
-# Stage 1: CSS + editor island
-FROM oven/bun:1.3.8-debian AS assets
+FROM oven/bun:1.3.8-debian AS bun
 
-WORKDIR /src
-COPY package.json bun.lock* ./
-RUN bun install --frozen-lockfile || bun install
-COPY internal/web/input.css internal/web/input.css
-COPY internal/ui internal/ui
-COPY web/editor web/editor
-RUN bun run build:css && bun run build:editor
-
-# Stage 2: Go binary (embeds /static + templ)
 FROM golang:1.25-bookworm AS builder
 
 WORKDIR /build
+
+COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
 
 COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-COPY --from=assets /src/internal/web/static ./internal/web/static
+RUN go generate ./...
 
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /build/server ./cmd/superfolha
 
