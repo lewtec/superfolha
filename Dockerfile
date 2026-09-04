@@ -3,7 +3,7 @@
 #   $TARGETPLATFORM/superfolha
 # Do not rebuild Go/frontend here — see Dockerfile.build for a full multi-stage build.
 
-FROM texlive/texlive:latest@sha256:bd551dda2195c6830bb714f731d74c4f71cda812178abae15a206fd68b5dbb7c
+FROM texlive/texlive:latest@sha256:4984977ccf5afe883cb382d0163f267de0d029d140bb7a9e8f4c19f0b781d57b
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
