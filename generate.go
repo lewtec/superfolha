@@ -2,7 +2,7 @@
 package tools
 
 //go:generate bun install
-//go:generate bun run build:css
+//go:generate go tool tailwind -i ./internal/web/input.css -o ./internal/web/static/style.css --minify
 //go:generate bun run build:editor
 //go:generate bun run build:login
 //go:generate bun run build:sessions
