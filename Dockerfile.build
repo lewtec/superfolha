@@ -5,7 +5,7 @@
 # Frontend + templ codegen is `go generate ./...` (see generate.go). Do not
 # re-list bun scripts here — that is how this image drifted from local builds.
 
-FROM oven/bun:1.3.8-debian AS bun
+FROM oven/bun:1.4.1-debian@sha256:8a74444991f5b3acbdbfa1f8983e2ac9df58dc98652636a1a641fafb4f287a17 AS bun
 
 FROM golang:1.25-bookworm AS builder
 
