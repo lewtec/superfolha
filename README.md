@@ -29,7 +29,7 @@ A complete web-based LaTeX editor with Git version control, real-time compilatio
 
 ### Frontend (templ + JS island)
 - Server-rendered [templ](https://templ.guide) pages (Backstage-style forms + 303)
-- DaisyUI 5 + Tailwind 4 (bun → `/static/style.css`)
+- DaisyUI 5 + Tailwind 4 (tailgopher → `/static/style.css`)
 - CodeMirror 6 + Yjs editor island (`/static/editor.js`)
 - Browser PDF viewer (blob iframe)
 - go-i18n (en / es / pt)
