@@ -41,7 +41,7 @@ func Canonical(raw string) string {
 	}
 	u, err := url.Parse(raw)
 	if err != nil || u.Host == "" {
-		return strings.TrimSuffix(strings.TrimRight(raw, "/"), ".git")
+		return trimGitSuffix(raw)
 	}
 	u.User = nil
 	u.Fragment = ""
@@ -51,8 +51,12 @@ func Canonical(raw string) string {
 	if u.Scheme == "ssh" || u.Scheme == "git" {
 		u.Scheme = "https"
 	}
-	u.Path = strings.TrimSuffix(strings.TrimRight(u.Path, "/"), ".git")
+	u.Path = trimGitSuffix(u.Path)
 	return u.String()
+}
+
+func trimGitSuffix(s string) string {
+	return strings.TrimSuffix(strings.TrimRight(s, "/"), ".git")
 }
 
 func scpURL(raw string) (string, bool) {
@@ -66,7 +70,7 @@ func scpURL(raw string) (string, bool) {
 		return "", false
 	}
 	host := strings.ToLower(raw[at+1 : colon])
-	path := strings.TrimSuffix(strings.TrimRight(raw[colon+1:], "/"), ".git")
+	path := trimGitSuffix(raw[colon+1:])
 	if host == "" || path == "" {
 		return "", false
 	}
@@ -152,14 +156,14 @@ func TransportURL(raw string) string {
 	}
 	if IsSSH(raw) {
 		if strings.HasPrefix(strings.ToLower(raw), "ssh://") {
-			return strings.TrimSuffix(strings.TrimRight(raw, "/"), ".git")
+			return trimGitSuffix(raw)
 		}
 		// normalize scp: git@host:path
 		at := strings.IndexByte(raw, '@')
 		colon := strings.LastIndexByte(raw, ':')
 		if at > 0 && colon > at {
 			host := raw[at+1 : colon]
-			path := strings.TrimSuffix(strings.TrimRight(raw[colon+1:], "/"), ".git")
+			path := trimGitSuffix(raw[colon+1:])
 			user := raw[:at]
 			return user + "@" + host + ":" + path
 		}
