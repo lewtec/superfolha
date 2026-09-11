@@ -22,7 +22,7 @@ A complete web-based LaTeX editor with Git version control, real-time compilatio
 ### Backend (Go)
 - HTTP server with stdlib router
 - GraphQL API via gqlgen
-- SQLite (modernc.org/sqlite) via lewkit `x/db` + sqlc (`go generate ./internal/db`)
+- SQLite (modernc.org/sqlite) via lewkit `x/db` + sqlc (`go generate ./...`)
 - Git operations
 - JWT authentication
 - LaTeX compilation with latexmk / TeX Live
@@ -51,8 +51,8 @@ mise run install
 export JWT_SECRET="dev-secret-key-change-in-production"
 export GO_ENV="development"
 
-# CSS + editor island + templ
-mise run codegen
+# CSS + editor islands + templ + sqlc
+go generate ./...
 
 go run ./cmd/superfolha --state-dir=./data
 ```
@@ -65,7 +65,7 @@ SQLite lives at `{state-dir}/superfolha.db`. Git repos live at `{state-dir}/repo
 mise tasks
 mise run install
 mise run build
-mise run gen
+go generate ./...
 mise run docker
 mise run test
 mise run fmt
