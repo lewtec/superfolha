@@ -18,22 +18,13 @@ import (
 	"github.com/lewtec/lewkit/x/release"
 	"github.com/lewtec/superfolha/internal/auth"
 	"github.com/lewtec/superfolha/internal/db"
-	"github.com/lewtec/superfolha/internal/db/postgres"
 	"github.com/lewtec/superfolha/internal/db/sqlite"
 	"github.com/lewtec/superfolha/internal/project"
 	"github.com/lewtec/superfolha/internal/server"
 )
 
-var (
-	// Driver configuration errors (errors.Is).
-	ErrPostgresDSNRequired = errors.New("postgres driver requires a DSN (--db / DATABASE_URL)")
-	ErrUnknownDBDriver     = errors.New("unknown database driver")
-)
-
 type root struct {
-	stateDir cmd.StringArg `long:"state-dir" help:"Directory for Git repositories (and default SQLite path)"`
-	dbDriver cmd.StringArg `long:"db-driver" help:"Database driver: sqlite (default) or postgres"`
-	db       cmd.StringArg `long:"db" help:"Database DSN (sqlite path or postgres:// URL)"`
+	stateDir cmd.StringArg `long:"state-dir" help:"Directory for Git repositories and SQLite"`
 	addr     cmd.StringArg `long:"addr" help:"Listen address (default: :$PORT if set, else 127.0.0.1:8080)"`
 	version  *versionCmd
 }
@@ -45,16 +36,6 @@ func (root) Description() string {
 func (r *root) applyEnv() {
 	if r.stateDir.Value() == "" {
 		_ = r.stateDir.Parse(cmp.Or(os.Getenv("STATE_DIR"), "./data"))
-	}
-	if r.dbDriver.Value() == "" {
-		if v := cmp.Or(os.Getenv("DB_DRIVER"), os.Getenv("DATABASE_DRIVER")); v != "" {
-			_ = r.dbDriver.Parse(v)
-		}
-	}
-	if r.db.Value() == "" {
-		if v := cmp.Or(os.Getenv("DATABASE_URL"), os.Getenv("DATABASE_DSN")); v != "" {
-			_ = r.db.Parse(v)
-		}
 	}
 }
 
@@ -87,28 +68,8 @@ func resolveAddr(addr string) string {
 	return "127.0.0.1:8080"
 }
 
-func openRepository(ctx context.Context, driver, dsn, stateDir string) (db.Repository, error) {
-	driver = strings.ToLower(strings.TrimSpace(driver))
-	dsn = strings.TrimSpace(dsn)
-	if driver == "" {
-		driver = db.InferDriver(dsn)
-	}
-
-	switch driver {
-	case "postgres", "postgresql":
-		slog.Warn("postgres driver is deprecated; Superfolha targets single-instance SQLite — plan to migrate off postgres")
-		if dsn == "" {
-			return nil, ErrPostgresDSNRequired
-		}
-		return postgres.NewRepository(ctx, dsn)
-	case "sqlite", "sqlite3":
-		if dsn == "" {
-			dsn = filepath.Join(stateDir, "superfolha.db")
-		}
-		return sqlite.NewRepository(dsn)
-	default:
-		return nil, fmt.Errorf("%w %q (want sqlite or postgres)", ErrUnknownDBDriver, driver)
-	}
+func openRepository(stateDir string) (db.Repository, error) {
+	return sqlite.NewRepository(filepath.Join(stateDir, "superfolha.db"))
 }
 
 func (r *root) Run(ctx context.Context) error {
@@ -122,17 +83,13 @@ func (r *root) Run(ctx context.Context) error {
 		return fmt.Errorf("create state directory %q: %w", absStateDir, err)
 	}
 
-	repo, err := openRepository(ctx, r.dbDriver.Value(), r.db.Value(), absStateDir)
+	repo, err := openRepository(absStateDir)
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
 	}
 	defer repo.Close()
 
-	driver := r.dbDriver.Value()
-	if driver == "" {
-		driver = db.InferDriver(r.db.Value())
-	}
-	slog.Info("connected to database", "driver", driver)
+	slog.Info("connected to database", "driver", "sqlite", "path", filepath.Join(absStateDir, "superfolha.db"))
 
 	projectService := project.NewService(absStateDir)
 	authService := auth.NewService(repo)

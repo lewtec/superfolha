@@ -7,9 +7,7 @@ svu = "3.3.0"
 tinytex = "2026.02"
 
 [env]
-# SQLite defaults to {STATE_DIR}/superfolha.db when DATABASE_URL is unset.
-# For Postgres 18+ (uuidv7()):
-# DB_DRIVER=postgres DATABASE_URL=postgres://admin:admin@localhost:5423/superfolha?sslmode=disable
+# SQLite is {STATE_DIR}/superfolha.db (STATE_DIR defaults to ./data).
 JWT_SECRET = "paçoca"
 
 [tasks."install:frontend"]
@@ -117,7 +115,3 @@ depends = ["codegen"]
 wait_for = ["codegen"]
 env = { GO_ENV = "development" }
 run = "mkdir -p data && go run ./cmd/superfolha --state-dir=./data"
-
-[tasks."devdb:up"]
-description = "Start disposable Postgres 18 (uuidv7()) for dual-backend local testing"
-run = "docker run --rm --name superfolha-pg -e POSTGRES_PASSWORD=admin -e POSTGRES_USER=admin -e POSTGRES_DB=superfolha -d -p 5423:5432 postgres:18"

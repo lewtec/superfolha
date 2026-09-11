@@ -1,6 +1,4 @@
-# Superfolha on Render — default: SQLite on the volume (no managed Postgres).
-# For Postgres: drop DATABASE_URL file path, add a databases: entry, and set
-# DB_DRIVER=postgres + DATABASE_URL fromDatabase connectionString.
+# Superfolha on Render — SQLite on the volume at $STATE_DIR/superfolha.db.
 projects:
   - name: superfolha
     environments:
@@ -23,7 +21,3 @@ projects:
                 generateValue: true
               - key: STATE_DIR
                 value: /data
-              - key: DB_DRIVER
-                value: sqlite
-              - key: DATABASE_URL
-                value: /data/superfolha.db
