@@ -31,19 +31,19 @@ func OpenRepository(ctx context.Context, path string) (Repository, error) {
 	if err != nil {
 		return nil, err
 	}
-	var a xdb.Arg[Queries]
+	var a DBArg
 	if err := a.Parse(url); err != nil {
 		return nil, err
 	}
 	return OpenArg(ctx, &a)
 }
 
-// OpenArg migrates a.URL() and wraps it as Repository.
-func OpenArg(ctx context.Context, a *xdb.Arg[Queries]) (Repository, error) {
+// OpenArg migrates a parsed DBArg and wraps it as Repository.
+func OpenArg(ctx context.Context, a *DBArg) (Repository, error) {
 	if a == nil || a.Value() == nil || a.Value().URL() == "" {
 		return nil, ErrEmptyPath
 	}
-	if err := Open(ctx, a); err != nil {
+	if err := a.Open(ctx); err != nil {
 		return nil, err
 	}
 	// Owner-only: DB stores password hashes and session material.

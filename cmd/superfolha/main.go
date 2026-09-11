@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/lewtec/lewkit/x/cmd"
-	xdb "github.com/lewtec/lewkit/x/db"
 	"github.com/lewtec/lewkit/x/release"
 	"github.com/lewtec/superfolha/internal/auth"
 	"github.com/lewtec/superfolha/internal/db"
@@ -22,25 +21,14 @@ import (
 )
 
 type root struct {
-	stateDir cmd.StringArg       `long:"state-dir" env:"STATE_DIR" default:"./data" help:"Directory for Git repositories and SQLite"`
-	addr     cmd.AddrArg         `long:"addr" env:"PORT" default:"127.0.0.1:8080" help:"Listen address"`
-	database xdb.Arg[db.Queries] `long:"database" default:"" help:"SQLite path or URL (default: {state-dir}/superfolha.db)"`
-	version  *versionCmd
+	stateDir cmd.StringArg `long:"state-dir" env:"STATE_DIR" default:"./data" help:"Directory for Git repositories and SQLite"`
+	addr     cmd.AddrArg   `long:"addr" env:"PORT" default:"127.0.0.1:8080" help:"Listen address"`
+	database db.DBArg      `long:"database" default:"" help:"SQLite path or URL (default: {state-dir}/superfolha.db)"`
+	version  *cmd.VersionCmd
 }
 
 func (*root) Description() string {
 	return "Superfolha - A web-based LaTeX editor with Git version control and collaborative features."
-}
-
-type versionCmd struct{}
-
-func (versionCmd) Description() string {
-	return "Print version"
-}
-
-func (*versionCmd) Run(context.Context) error {
-	_, err := fmt.Println(release.Version())
-	return err
 }
 
 func (r *root) Run(ctx context.Context) error {
