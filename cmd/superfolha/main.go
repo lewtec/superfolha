@@ -28,7 +28,7 @@ type root struct {
 	version  *versionCmd
 }
 
-func (root) Description() string {
+func (*root) Description() string {
 	return "Superfolha - A web-based LaTeX editor with Git version control and collaborative features."
 }
 
