@@ -4,8 +4,151 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/lewtec/lewkit/x/cmd"
 )
+
+func TestRootUsage(t *testing.T) {
+	text, err := cmd.Usage[cmd.App[root]]("superfolha")
+	if err != nil {
+		t.Fatalf("Usage: %v", err)
+	}
+	for _, want := range []string{
+		"Superfolha",
+		"--state-dir",
+		"--db-driver",
+		"--db",
+		"--addr",
+		"version",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("usage missing %q\n%s", want, text)
+		}
+	}
+}
+
+func TestParseRootFlags(t *testing.T) {
+	app, err := cmd.Parse[cmd.App[root]](
+		"--state-dir", "/data",
+		"--db-driver", "sqlite",
+		"--db", "/data/superfolha.db",
+		"--addr", "0.0.0.0:9090",
+	)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if got, want := app.Args.stateDir.Value(), "/data"; got != want {
+		t.Errorf("stateDir = %q, want %q", got, want)
+	}
+	if got, want := app.Args.dbDriver.Value(), "sqlite"; got != want {
+		t.Errorf("dbDriver = %q, want %q", got, want)
+	}
+	if got, want := app.Args.db.Value(), "/data/superfolha.db"; got != want {
+		t.Errorf("db = %q, want %q", got, want)
+	}
+	if got, want := app.Args.addr.Value(), "0.0.0.0:9090"; got != want {
+		t.Errorf("addr = %q, want %q", got, want)
+	}
+	if app.Args.version != nil {
+		t.Fatal("version command should be unset")
+	}
+}
+
+func TestParseVersionCommand(t *testing.T) {
+	app, err := cmd.Parse[cmd.App[root]]("version")
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if app.Args.version == nil {
+		t.Fatal("expected version command")
+	}
+}
+
+func TestRootApplyEnv(t *testing.T) {
+	t.Run("defaults when env empty", func(t *testing.T) {
+		t.Setenv("STATE_DIR", "")
+		t.Setenv("DB_DRIVER", "")
+		t.Setenv("DATABASE_DRIVER", "")
+		t.Setenv("DATABASE_URL", "")
+		t.Setenv("DATABASE_DSN", "")
+
+		var r root
+		r.applyEnv()
+		if got, want := r.stateDir.Value(), "./data"; got != want {
+			t.Errorf("stateDir = %q, want %q", got, want)
+		}
+		if got := r.dbDriver.Value(); got != "" {
+			t.Errorf("dbDriver = %q, want empty", got)
+		}
+		if got := r.db.Value(); got != "" {
+			t.Errorf("db = %q, want empty", got)
+		}
+	})
+
+	t.Run("env fills empty flags", func(t *testing.T) {
+		t.Setenv("STATE_DIR", "/var/sf")
+		t.Setenv("DB_DRIVER", "postgres")
+		t.Setenv("DATABASE_URL", "postgres://x")
+
+		var r root
+		r.applyEnv()
+		if got, want := r.stateDir.Value(), "/var/sf"; got != want {
+			t.Errorf("stateDir = %q, want %q", got, want)
+		}
+		if got, want := r.dbDriver.Value(), "postgres"; got != want {
+			t.Errorf("dbDriver = %q, want %q", got, want)
+		}
+		if got, want := r.db.Value(), "postgres://x"; got != want {
+			t.Errorf("db = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("alternate env keys", func(t *testing.T) {
+		t.Setenv("STATE_DIR", "")
+		t.Setenv("DB_DRIVER", "")
+		t.Setenv("DATABASE_DRIVER", "sqlite")
+		t.Setenv("DATABASE_URL", "")
+		t.Setenv("DATABASE_DSN", "/tmp/sf.db")
+
+		var r root
+		r.applyEnv()
+		if got, want := r.dbDriver.Value(), "sqlite"; got != want {
+			t.Errorf("dbDriver = %q, want %q", got, want)
+		}
+		if got, want := r.db.Value(), "/tmp/sf.db"; got != want {
+			t.Errorf("db = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("flags win over env", func(t *testing.T) {
+		t.Setenv("STATE_DIR", "/from-env")
+		t.Setenv("DB_DRIVER", "postgres")
+		t.Setenv("DATABASE_URL", "postgres://env")
+
+		var r root
+		if err := r.stateDir.Parse("/from-flag"); err != nil {
+			t.Fatalf("stateDir.Parse: %v", err)
+		}
+		if err := r.dbDriver.Parse("sqlite"); err != nil {
+			t.Fatalf("dbDriver.Parse: %v", err)
+		}
+		if err := r.db.Parse("/from-flag.db"); err != nil {
+			t.Fatalf("db.Parse: %v", err)
+		}
+		r.applyEnv()
+		if got, want := r.stateDir.Value(), "/from-flag"; got != want {
+			t.Errorf("stateDir = %q, want %q", got, want)
+		}
+		if got, want := r.dbDriver.Value(), "sqlite"; got != want {
+			t.Errorf("dbDriver = %q, want %q", got, want)
+		}
+		if got, want := r.db.Value(), "/from-flag.db"; got != want {
+			t.Errorf("db = %q, want %q", got, want)
+		}
+	})
+}
 
 func TestResolveAddr(t *testing.T) {
 	tests := []struct {

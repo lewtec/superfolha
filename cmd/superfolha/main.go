@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -13,64 +14,59 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/lewtec/lewkit/x/cmd"
+	"github.com/lewtec/lewkit/x/release"
 	"github.com/lewtec/superfolha/internal/auth"
 	"github.com/lewtec/superfolha/internal/db"
 	"github.com/lewtec/superfolha/internal/db/postgres"
 	"github.com/lewtec/superfolha/internal/db/sqlite"
 	"github.com/lewtec/superfolha/internal/project"
 	"github.com/lewtec/superfolha/internal/server"
-	"github.com/spf13/cobra"
 )
 
 var (
-	// version is set by GoReleaser (-X main.version=...).
-	version    = "dev"
-	stateDir   string
-	dbDriver   string
-	dbDSN      string
-	listenAddr string
-
 	// Driver configuration errors (errors.Is).
 	ErrPostgresDSNRequired = errors.New("postgres driver requires a DSN (--db / DATABASE_URL)")
 	ErrUnknownDBDriver     = errors.New("unknown database driver")
 )
 
-var rootCmd = &cobra.Command{
-	Use:   "server",
-	Short: "Superfolha Server",
-	Long:  `Superfolha - A web-based LaTeX editor with Git version control and collaborative features.`,
-	Run:   runServer,
+type root struct {
+	stateDir cmd.StringArg `long:"state-dir" help:"Directory for Git repositories (and default SQLite path)"`
+	dbDriver cmd.StringArg `long:"db-driver" help:"Database driver: sqlite (default) or postgres"`
+	db       cmd.StringArg `long:"db" help:"Database DSN (sqlite path or postgres:// URL)"`
+	addr     cmd.StringArg `long:"addr" help:"Listen address (default: :$PORT if set, else 127.0.0.1:8080)"`
+	version  *versionCmd
 }
 
-func init() {
-	rootCmd.AddCommand(&cobra.Command{
-		Use:   "version",
-		Short: "Print version",
-		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println(version)
-		},
-	})
-	rootCmd.Flags().StringVar(&stateDir, "state-dir", getEnv("STATE_DIR", "./data"), "Directory for Git repositories (and default SQLite path)")
-	rootCmd.Flags().StringVar(&dbDriver, "db-driver", firstEnv("DB_DRIVER", "DATABASE_DRIVER"), "Database driver: sqlite (default) or postgres")
-	rootCmd.Flags().StringVar(&dbDSN, "db", firstEnv("DATABASE_URL", "DATABASE_DSN"), "Database DSN (sqlite path or postgres:// URL)")
-	// Empty default: resolveAddr picks $PORT or 127.0.0.1:8080.
-	rootCmd.Flags().StringVar(&listenAddr, "addr", "", "Listen address (default: :$PORT if set, else 127.0.0.1:8080)")
+func (root) Description() string {
+	return "Superfolha - A web-based LaTeX editor with Git version control and collaborative features."
 }
 
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
+func (r *root) applyEnv() {
+	if r.stateDir.Value() == "" {
+		_ = r.stateDir.Parse(cmp.Or(os.Getenv("STATE_DIR"), "./data"))
 	}
-	return defaultValue
-}
-
-func firstEnv(keys ...string) string {
-	for _, key := range keys {
-		if value := os.Getenv(key); value != "" {
-			return value
+	if r.dbDriver.Value() == "" {
+		if v := cmp.Or(os.Getenv("DB_DRIVER"), os.Getenv("DATABASE_DRIVER")); v != "" {
+			_ = r.dbDriver.Parse(v)
 		}
 	}
-	return ""
+	if r.db.Value() == "" {
+		if v := cmp.Or(os.Getenv("DATABASE_URL"), os.Getenv("DATABASE_DSN")); v != "" {
+			_ = r.db.Parse(v)
+		}
+	}
+}
+
+type versionCmd struct{}
+
+func (versionCmd) Description() string {
+	return "Print version"
+}
+
+func (*versionCmd) Run(context.Context) error {
+	_, err := fmt.Println(release.Version())
+	return err
 }
 
 // resolveAddr picks the listen address:
@@ -115,40 +111,35 @@ func openRepository(ctx context.Context, driver, dsn, stateDir string) (db.Repos
 	}
 }
 
-func runServer(cmd *cobra.Command, args []string) {
-	ctx := cmd.Context()
+func (r *root) Run(ctx context.Context) error {
+	r.applyEnv()
 
-	absStateDir, err := filepath.Abs(stateDir)
+	absStateDir, err := filepath.Abs(r.stateDir.Value())
 	if err != nil {
-		slog.Error("failed to get absolute path for state directory", "state_dir", stateDir, "err", err)
-		os.Exit(1)
+		return fmt.Errorf("state directory %q: %w", r.stateDir.Value(), err)
 	}
-	stateDir = absStateDir
-
-	if err := os.MkdirAll(stateDir, 0o755); err != nil {
-		slog.Error("failed to create state directory", "err", err)
-		os.Exit(1)
+	if err := os.MkdirAll(absStateDir, 0o755); err != nil {
+		return fmt.Errorf("create state directory %q: %w", absStateDir, err)
 	}
 
-	repo, err := openRepository(ctx, dbDriver, dbDSN, stateDir)
+	repo, err := openRepository(ctx, r.dbDriver.Value(), r.db.Value(), absStateDir)
 	if err != nil {
-		slog.Error("unable to open database", "err", err)
-		os.Exit(1)
+		return fmt.Errorf("open database: %w", err)
 	}
 	defer repo.Close()
 
-	driver := dbDriver
+	driver := r.dbDriver.Value()
 	if driver == "" {
-		driver = db.InferDriver(dbDSN)
+		driver = db.InferDriver(r.db.Value())
 	}
 	slog.Info("connected to database", "driver", driver)
 
-	projectService := project.NewService(stateDir)
+	projectService := project.NewService(absStateDir)
 	authService := auth.NewService(repo)
-	srv := server.NewServer(repo, stateDir, projectService, authService)
+	srv := server.NewServer(repo, absStateDir, projectService, authService)
 
-	addr := resolveAddr(listenAddr)
-	slog.Info("starting server", "addr", addr, "version", version)
+	addr := resolveAddr(r.addr.Value())
+	slog.Info("starting server", "addr", addr, "version", release.Version())
 
 	httpServer := &http.Server{
 		Addr:              addr,
@@ -167,9 +158,9 @@ func runServer(cmd *cobra.Command, args []string) {
 	select {
 	case err := <-serverErr:
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			slog.Error("server failed", "err", err)
-			os.Exit(1)
+			return fmt.Errorf("listen: %w", err)
 		}
+		return nil
 	case <-ctx.Done():
 		slog.Info("shutting down server", "cause", ctx.Err())
 		// Parent is already cancelled (signal); WithoutCancel keeps values without inheriting cancel.
@@ -180,16 +171,22 @@ func runServer(cmd *cobra.Command, args []string) {
 		}
 		srv.CloseHubs()
 		if err := <-serverErr; err != nil && !errors.Is(err, http.ErrServerClosed) {
-			slog.Error("server error after shutdown", "err", err)
+			return fmt.Errorf("server after shutdown: %w", err)
 		}
+		return nil
 	}
 }
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	if err := rootCmd.ExecuteContext(ctx); err != nil {
+	app, err := cmd.Parse[cmd.App[root]](os.Args[1:]...)
+	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	if err := app.Run(ctx); err != nil {
+		slog.Error(err.Error())
 		os.Exit(1)
 	}
 }
