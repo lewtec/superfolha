@@ -22,7 +22,7 @@ A complete web-based LaTeX editor with Git version control, real-time compilatio
 ### Backend (Go)
 - HTTP server with stdlib router
 - GraphQL API via gqlgen
-- SQLite (modernc.org/sqlite) via sqlc; PostgreSQL driver still present but **deprecated** (single-instance target)
+- SQLite (modernc.org/sqlite) via lewkit `x/db` + sqlc (`go generate ./...`)
 - Git operations
 - JWT authentication
 - LaTeX compilation with latexmk / TeX Live
@@ -40,7 +40,7 @@ A complete web-based LaTeX editor with Git version control, real-time compilatio
 - [mise](https://mise.jdx.dev/) - Runtime and task manager
 - TexLive / latexmk (for LaTeX compilation)
 
-Go and Node.js will be automatically installed via mise. Default is SQLite (no server). Optional **PostgreSQL 18+** for multi-instance (migrations use native `uuidv7()`).
+Go and Node.js will be automatically installed via mise. Storage is SQLite under `--state-dir` (default `./data`).
 
 ### Quick Start
 
@@ -51,22 +51,13 @@ mise run install
 export JWT_SECRET="dev-secret-key-change-in-production"
 export GO_ENV="development"
 
-# CSS + editor island + templ
-mise run codegen
+# CSS + editor islands + templ + sqlc
+go generate ./...
 
-# SQLite (default)
 go run ./cmd/superfolha --state-dir=./data
-
-# or Postgres 18+ (provides uuidv7() for migrations)
-# mise run devdb:up   # docker postgres:18 on :5423
-# export DB_DRIVER=postgres
-# export DATABASE_URL="postgres://admin:admin@localhost:5423/superfolha?sslmode=disable"
-# go run ./cmd/superfolha --state-dir=./data
 ```
 
-If `DATABASE_URL` / `--db` is omitted with SQLite, the server uses `{state-dir}/superfolha.db`.
-A `postgres://` DSN auto-selects the postgres driver when `DB_DRIVER` is unset.
-Postgres migrations require **18+** (`DEFAULT uuidv7()`).
+SQLite lives at `{state-dir}/superfolha.db`. Git repos live at `{state-dir}/repos/{uuid}`.
 
 ### Available Tasks
 
@@ -74,7 +65,7 @@ Postgres migrations require **18+** (`DEFAULT uuidv7()`).
 mise tasks
 mise run install
 mise run build
-mise run gen
+go generate ./...
 mise run docker
 mise run test
 mise run fmt
@@ -90,7 +81,7 @@ mise run build
 go generate ./...
 go build -o superfolha ./cmd/superfolha
 
-./superfolha --state-dir=/var/superfolha --db=/var/superfolha/superfolha.db
+./superfolha --state-dir=/var/superfolha
 ```
 
 ## Docker
@@ -103,7 +94,6 @@ mise run docker   # docker build -f Dockerfile.build -t superfolha .
 docker run -v /var/lib/superfolha:/data -p 8080:8080 \
   -e JWT_SECRET="your-secure-random-secret" \
   -e STATE_DIR=/data \
-  -e DATABASE_URL=/data/superfolha.db \
   superfolha
 ```
 
@@ -148,27 +138,23 @@ Use root `railway.toml`. Attach a volume at `/data`, set `JWT_SECRET`. SQLite de
 
 ### Environment Variables
 
-- `DB_DRIVER` / `DATABASE_DRIVER`: `sqlite` (default) or `postgres`
-- `DATABASE_URL` / `DATABASE_DSN`: SQLite path/`file:` DSN, or `postgres://...` URL
 - `JWT_SECRET`: Secret key for JWT token signing (required in production)
 - `GITHUB_APP_ID`, `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_CLIENT_SECRET`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_APP_SLUG`: GitHub App for login and installation tokens
-- `STATE_DIR`: Root for Git repositories (default: `./data`; Docker: `/data`). Projects live at `{STATE_DIR}/repos/{uuid}`
+- `STATE_DIR`: Data root (default: `./data`; Docker: `/data`). SQLite is `{STATE_DIR}/superfolha.db`. Projects live at `{STATE_DIR}/repos/{uuid}`
 - `PORT`: Used as listen port when `--addr` is not set (platforms like Railway inject this)
 - `GO_ENV`: Set to `development` for dev mode only (allows JWT_SECRET fallback)
 
 ### CLI Flags
 
-- `--db-driver`: `sqlite` or `postgres` (overrides `DB_DRIVER`)
-- `--db`: DSN/path (overrides `DATABASE_URL`)
-- `--state-dir`: State directory (overrides `STATE_DIR`)
-- `--addr`: Listen address (default: `:$PORT` if `PORT` is set, else `127.0.0.1:8080`)
+- `--state-dir`: Data directory (env `STATE_DIR`, default `./data`)
+- `--addr`: Listen address (env `PORT`, default `127.0.0.1:8080`). A bare port becomes `:port`.
+- `--database`: SQLite path or URL (default `{state-dir}/superfolha.db`)
 
 ### Example Configuration
 
 ```bash
 export JWT_SECRET="your-secure-random-secret-key-min-32-chars"
 export STATE_DIR="/var/superfolha"
-export DATABASE_URL="/var/superfolha/superfolha.db"
 # optional; default is 127.0.0.1:8080 without PORT
 # export PORT=8080
 

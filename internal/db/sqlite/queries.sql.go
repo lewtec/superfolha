@@ -17,10 +17,10 @@ RETURNING id, user_id, name, git_path, created_at, updated_at
 `
 
 type CreateProjectParams struct {
-	ID      string         `json:"id"`
-	UserID  sql.NullString `json:"user_id"`
-	Name    string         `json:"name"`
-	GitPath string         `json:"git_path"`
+	ID      string
+	UserID  sql.NullString
+	Name    string
+	GitPath string
 }
 
 func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (Project, error) {
@@ -49,9 +49,9 @@ RETURNING id, email, password_hash, created_at
 `
 
 type CreateUserParams struct {
-	ID           string `json:"id"`
-	Email        string `json:"email"`
-	PasswordHash string `json:"password_hash"`
+	ID           string
+	Email        string
+	PasswordHash string
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
@@ -141,7 +141,7 @@ func (q *Queries) GetUserProjects(ctx context.Context, userID sql.NullString) ([
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Project{}
+	var items []Project
 	for rows.Next() {
 		var i Project
 		if err := rows.Scan(
