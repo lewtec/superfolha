@@ -1,7 +1,6 @@
 package main
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -10,7 +9,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strings"
 	"syscall"
 	"time"
 
@@ -22,27 +20,14 @@ import (
 	"github.com/lewtec/superfolha/internal/server"
 )
 
-// optionalString may be omitted. Empty stays empty so applyEnv / resolveAddr can fill it.
-type optionalString struct {
-	cmd.StringArg
-}
-
-func (optionalString) ArgDefault() string { return "" }
-
 type root struct {
-	stateDir optionalString `long:"state-dir" help:"Directory for Git repositories and SQLite"`
-	addr     optionalString `long:"addr" help:"Listen address (default: :$PORT if set, else 127.0.0.1:8080)"`
+	stateDir cmd.StringArg `long:"state-dir" env:"STATE_DIR" default:"./data" help:"Directory for Git repositories and SQLite"`
+	addr     cmd.AddrArg   `long:"addr" env:"PORT" default:"127.0.0.1:8080" help:"Listen address"`
 	version  *versionCmd
 }
 
 func (root) Description() string {
 	return "Superfolha - A web-based LaTeX editor with Git version control and collaborative features."
-}
-
-func (r *root) applyEnv() {
-	if r.stateDir.Value() == "" {
-		_ = r.stateDir.Parse(cmp.Or(os.Getenv("STATE_DIR"), "./data"))
-	}
 }
 
 type versionCmd struct{}
@@ -56,31 +41,11 @@ func (*versionCmd) Run(context.Context) error {
 	return err
 }
 
-// resolveAddr picks the listen address:
-//  1. --addr if set
-//  2. else PORT env (":$PORT" if PORT is only a port number)
-//  3. else loopback 127.0.0.1:8080
-func resolveAddr(addr string) string {
-	addr = strings.TrimSpace(addr)
-	if addr != "" {
-		return addr
-	}
-	if port := strings.TrimSpace(os.Getenv("PORT")); port != "" {
-		if strings.Contains(port, ":") {
-			return port
-		}
-		return ":" + port
-	}
-	return "127.0.0.1:8080"
-}
-
 func openRepository(ctx context.Context, stateDir string) (db.Repository, error) {
 	return db.OpenRepository(ctx, filepath.Join(stateDir, "superfolha.db"))
 }
 
 func (r *root) Run(ctx context.Context) error {
-	r.applyEnv()
-
 	absStateDir, err := filepath.Abs(r.stateDir.Value())
 	if err != nil {
 		return fmt.Errorf("state directory %q: %w", r.stateDir.Value(), err)
@@ -101,7 +66,7 @@ func (r *root) Run(ctx context.Context) error {
 	authService := auth.NewService(repo)
 	srv := server.NewServer(repo, absStateDir, projectService, authService)
 
-	addr := resolveAddr(r.addr.Value())
+	addr := r.addr.Value()
 	slog.Info("starting server", "addr", addr, "version", release.Version())
 
 	httpServer := &http.Server{

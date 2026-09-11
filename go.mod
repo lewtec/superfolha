@@ -8,7 +8,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
-	github.com/lewtec/lewkit v0.0.0-20260911180403-afcb284f618a
+	github.com/lewtec/lewkit v0.0.0-20260911185231-f58951058b23
 	github.com/nicksnyder/go-i18n/v2 v2.6.1
 	github.com/reearth/ygo v1.31.6
 	golang.org/x/crypto v0.57.0

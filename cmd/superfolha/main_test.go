@@ -18,6 +18,8 @@ func TestRootUsage(t *testing.T) {
 		"Superfolha",
 		"--state-dir",
 		"--addr",
+		"env: STATE_DIR",
+		"env: PORT",
 		"version",
 	} {
 		if !strings.Contains(text, want) {
@@ -60,103 +62,85 @@ func TestParseVersionCommand(t *testing.T) {
 	}
 }
 
-func TestRootApplyEnv(t *testing.T) {
-	t.Run("defaults when env empty", func(t *testing.T) {
-		t.Setenv("STATE_DIR", "")
+func unsetenv(t *testing.T, key string) {
+	t.Helper()
+	prev, ok := os.LookupEnv(key)
+	if err := os.Unsetenv(key); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if !ok {
+			if err := os.Unsetenv(key); err != nil {
+				t.Errorf("unset %s: %v", key, err)
+			}
+			return
+		}
+		if err := os.Setenv(key, prev); err != nil {
+			t.Errorf("restore %s: %v", key, err)
+		}
+	})
+}
 
-		var r root
-		r.applyEnv()
-		if got, want := r.stateDir.Value(), "./data"; got != want {
+func TestParseStateDirEnv(t *testing.T) {
+	t.Run("default", func(t *testing.T) {
+		unsetenv(t, "STATE_DIR")
+		app, err := cmd.Parse[cmd.App[root]]()
+		if err != nil {
+			t.Fatalf("Parse: %v", err)
+		}
+		if got, want := app.Args.stateDir.Value(), "./data"; got != want {
 			t.Errorf("stateDir = %q, want %q", got, want)
 		}
 	})
 
-	t.Run("env fills empty flag", func(t *testing.T) {
+	t.Run("STATE_DIR", func(t *testing.T) {
 		t.Setenv("STATE_DIR", "/var/sf")
-
-		var r root
-		r.applyEnv()
-		if got, want := r.stateDir.Value(), "/var/sf"; got != want {
+		app, err := cmd.Parse[cmd.App[root]]()
+		if err != nil {
+			t.Fatalf("Parse: %v", err)
+		}
+		if got, want := app.Args.stateDir.Value(), "/var/sf"; got != want {
 			t.Errorf("stateDir = %q, want %q", got, want)
 		}
 	})
 
-	t.Run("flag wins over env", func(t *testing.T) {
+	t.Run("flag wins", func(t *testing.T) {
 		t.Setenv("STATE_DIR", "/from-env")
-
-		var r root
-		if err := r.stateDir.Parse("/from-flag"); err != nil {
-			t.Fatalf("stateDir.Parse: %v", err)
+		app, err := cmd.Parse[cmd.App[root]]("--state-dir", "/from-flag")
+		if err != nil {
+			t.Fatalf("Parse: %v", err)
 		}
-		r.applyEnv()
-		if got, want := r.stateDir.Value(), "/from-flag"; got != want {
+		if got, want := app.Args.stateDir.Value(), "/from-flag"; got != want {
 			t.Errorf("stateDir = %q, want %q", got, want)
 		}
 	})
 }
 
-func TestResolveAddr(t *testing.T) {
+func TestParseAddr(t *testing.T) {
 	tests := []struct {
 		name string
-		addr string
-		port string // "" clears PORT; non-empty sets PORT
+		args []string
+		port string
 		want string
 	}{
-		{
-			name: "explicit addr wins over PORT",
-			addr: "0.0.0.0:9090",
-			port: "1234",
-			want: "0.0.0.0:9090",
-		},
-		{
-			name: "explicit addr with surrounding spaces",
-			addr: "  :3000  ",
-			port: "",
-			want: ":3000",
-		},
-		{
-			name: "PORT as port number",
-			addr: "",
-			port: "8081",
-			want: ":8081",
-		},
-		{
-			name: "PORT as host:port",
-			addr: "",
-			port: "0.0.0.0:9090",
-			want: "0.0.0.0:9090",
-		},
-		{
-			name: "PORT with surrounding spaces",
-			addr: "",
-			port: "  4000  ",
-			want: ":4000",
-		},
-		{
-			name: "empty addr and empty PORT defaults to loopback",
-			addr: "",
-			port: "",
-			want: "127.0.0.1:8080",
-		},
-		{
-			name: "whitespace addr treated as empty",
-			addr: "   ",
-			port: "",
-			want: "127.0.0.1:8080",
-		},
+		{name: "flag wins over PORT", args: []string{"--addr", "0.0.0.0:9090"}, port: "1234", want: "0.0.0.0:9090"},
+		{name: "PORT as port number", port: "8081", want: ":8081"},
+		{name: "PORT as host:port", port: "0.0.0.0:9090", want: "0.0.0.0:9090"},
+		{name: "default loopback", want: "127.0.0.1:8080"},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Always clear first so ambient PORT cannot leak into the default case.
-			t.Setenv("PORT", "")
-			if tt.port != "" {
+			if tt.port == "" {
+				unsetenv(t, "PORT")
+			} else {
 				t.Setenv("PORT", tt.port)
 			}
-
-			got := resolveAddr(tt.addr)
-			if got != tt.want {
-				t.Fatalf("resolveAddr(%q) with PORT=%q: got %q, want %q", tt.addr, tt.port, got, tt.want)
+			app, err := cmd.Parse[cmd.App[root]](tt.args...)
+			if err != nil {
+				t.Fatalf("Parse: %v", err)
+			}
+			if got := app.Args.addr.Value(); got != tt.want {
+				t.Fatalf("addr = %q, want %q (PORT=%q)", got, tt.want, tt.port)
 			}
 		})
 	}

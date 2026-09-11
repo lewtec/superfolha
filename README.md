@@ -146,8 +146,8 @@ Use root `railway.toml`. Attach a volume at `/data`, set `JWT_SECRET`. SQLite de
 
 ### CLI Flags
 
-- `--state-dir`: Data directory (overrides `STATE_DIR`)
-- `--addr`: Listen address (default: `:$PORT` if `PORT` is set, else `127.0.0.1:8080`)
+- `--state-dir`: Data directory (env `STATE_DIR`, default `./data`)
+- `--addr`: Listen address (env `PORT`, default `127.0.0.1:8080`). A bare port becomes `:port`.
 
 ### Example Configuration
 
