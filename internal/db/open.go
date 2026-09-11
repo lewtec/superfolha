@@ -27,7 +27,7 @@ type repository struct {
 
 // OpenRepository migrates and opens SQLite at path via lewkit x/db.
 func OpenRepository(ctx context.Context, path string) (Repository, error) {
-	url, filePath, err := sqliteURL(path)
+	url, err := FileURL(path)
 	if err != nil {
 		return nil, err
 	}
@@ -35,14 +35,28 @@ func OpenRepository(ctx context.Context, path string) (Repository, error) {
 	if err := a.Parse(url); err != nil {
 		return nil, err
 	}
-	if err := Open(ctx, &a); err != nil {
+	return OpenArg(ctx, &a)
+}
+
+// OpenArg migrates a.URL() and wraps it as Repository.
+func OpenArg(ctx context.Context, a *xdb.Arg[Queries]) (Repository, error) {
+	if a == nil || a.Value() == nil || a.Value().URL() == "" {
+		return nil, ErrEmptyPath
+	}
+	if err := Open(ctx, a); err != nil {
 		return nil, err
 	}
 	// Owner-only: DB stores password hashes and session material.
-	if err := ensureOwnerOnlyFile(filePath); err != nil {
+	if err := ensureOwnerOnlyFile(sqliteFilePath(a.Value().URL())); err != nil {
 		return nil, errors.Join(err, a.Value().Close())
 	}
 	return &repository{conn: a.Value()}, nil
+}
+
+// FileURL is a file: SQLite URL with the usual pragmas.
+func FileURL(path string) (string, error) {
+	url, _, err := sqliteURL(path)
+	return url, err
 }
 
 func sqliteURL(path string) (url, filePath string, err error) {

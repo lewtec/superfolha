@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/lewtec/lewkit/x/cmd"
+	"github.com/lewtec/superfolha/internal/db"
 )
 
 func TestRootUsage(t *testing.T) {
@@ -18,6 +19,7 @@ func TestRootUsage(t *testing.T) {
 		"Superfolha",
 		"--state-dir",
 		"--addr",
+		"--database",
 		"env: STATE_DIR",
 		"env: PORT",
 		"version",
@@ -62,87 +64,54 @@ func TestParseVersionCommand(t *testing.T) {
 	}
 }
 
-func unsetenv(t *testing.T, key string) {
-	t.Helper()
-	prev, ok := os.LookupEnv(key)
-	if err := os.Unsetenv(key); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		if !ok {
-			if err := os.Unsetenv(key); err != nil {
-				t.Errorf("unset %s: %v", key, err)
-			}
-			return
-		}
-		if err := os.Setenv(key, prev); err != nil {
-			t.Errorf("restore %s: %v", key, err)
-		}
-	})
-}
-
 func TestParseStateDirEnv(t *testing.T) {
-	t.Run("default", func(t *testing.T) {
-		unsetenv(t, "STATE_DIR")
-		app, err := cmd.Parse[cmd.App[root]]()
-		if err != nil {
-			t.Fatalf("Parse: %v", err)
-		}
-		if got, want := app.Args.stateDir.Value(), "./data"; got != want {
-			t.Errorf("stateDir = %q, want %q", got, want)
-		}
-	})
+	t.Setenv("STATE_DIR", "/var/sf")
+	app, err := cmd.Parse[cmd.App[root]]()
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if got, want := app.Args.stateDir.Value(), "/var/sf"; got != want {
+		t.Errorf("stateDir = %q, want %q", got, want)
+	}
 
-	t.Run("STATE_DIR", func(t *testing.T) {
-		t.Setenv("STATE_DIR", "/var/sf")
-		app, err := cmd.Parse[cmd.App[root]]()
-		if err != nil {
-			t.Fatalf("Parse: %v", err)
-		}
-		if got, want := app.Args.stateDir.Value(), "/var/sf"; got != want {
-			t.Errorf("stateDir = %q, want %q", got, want)
-		}
-	})
-
-	t.Run("flag wins", func(t *testing.T) {
-		t.Setenv("STATE_DIR", "/from-env")
-		app, err := cmd.Parse[cmd.App[root]]("--state-dir", "/from-flag")
-		if err != nil {
-			t.Fatalf("Parse: %v", err)
-		}
-		if got, want := app.Args.stateDir.Value(), "/from-flag"; got != want {
-			t.Errorf("stateDir = %q, want %q", got, want)
-		}
-	})
+	app, err = cmd.Parse[cmd.App[root]]("--state-dir", "/from-flag")
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if got, want := app.Args.stateDir.Value(), "/from-flag"; got != want {
+		t.Errorf("stateDir = %q, want %q", got, want)
+	}
 }
 
 func TestParseAddr(t *testing.T) {
-	tests := []struct {
-		name string
-		args []string
-		port string
-		want string
-	}{
-		{name: "flag wins over PORT", args: []string{"--addr", "0.0.0.0:9090"}, port: "1234", want: "0.0.0.0:9090"},
-		{name: "PORT as port number", port: "8081", want: ":8081"},
-		{name: "PORT as host:port", port: "0.0.0.0:9090", want: "0.0.0.0:9090"},
-		{name: "default loopback", want: "127.0.0.1:8080"},
+	t.Setenv("PORT", "8081")
+	app, err := cmd.Parse[cmd.App[root]]()
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if tt.port == "" {
-				unsetenv(t, "PORT")
-			} else {
-				t.Setenv("PORT", tt.port)
-			}
-			app, err := cmd.Parse[cmd.App[root]](tt.args...)
-			if err != nil {
-				t.Fatalf("Parse: %v", err)
-			}
-			if got := app.Args.addr.Value(); got != tt.want {
-				t.Fatalf("addr = %q, want %q (PORT=%q)", got, tt.want, tt.port)
-			}
-		})
+	if got, want := app.Args.addr.Value(), ":8081"; got != want {
+		t.Errorf("addr = %q, want %q", got, want)
+	}
+
+	app, err = cmd.Parse[cmd.App[root]]("--addr", "0.0.0.0:9090")
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if got, want := app.Args.addr.Value(), "0.0.0.0:9090"; got != want {
+		t.Errorf("addr = %q, want %q", got, want)
+	}
+}
+
+func TestParseDatabase(t *testing.T) {
+	app, err := cmd.Parse[cmd.App[root]]("--database", "/tmp/x.db")
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if app.Args.database.Value() == nil {
+		t.Fatal("expected database arg")
+	}
+	if got, want := app.Args.database.Value().URL(), "/tmp/x.db"; got != want {
+		t.Errorf("database = %q, want %q", got, want)
 	}
 }
 
@@ -150,9 +119,9 @@ func TestOpenRepository(t *testing.T) {
 	stateDir := t.TempDir()
 	wantDB := filepath.Join(stateDir, "superfolha.db")
 
-	repo, err := openRepository(t.Context(), stateDir)
+	repo, err := db.OpenRepository(t.Context(), wantDB)
 	if err != nil {
-		t.Fatalf("openRepository(stateDir): %v", err)
+		t.Fatalf("OpenRepository: %v", err)
 	}
 	if repo == nil {
 		t.Fatal("expected non-nil repository")

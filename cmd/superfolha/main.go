@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/lewtec/lewkit/x/cmd"
+	xdb "github.com/lewtec/lewkit/x/db"
 	"github.com/lewtec/lewkit/x/release"
 	"github.com/lewtec/superfolha/internal/auth"
 	"github.com/lewtec/superfolha/internal/db"
@@ -21,8 +22,9 @@ import (
 )
 
 type root struct {
-	stateDir cmd.StringArg `long:"state-dir" env:"STATE_DIR" default:"./data" help:"Directory for Git repositories and SQLite"`
-	addr     cmd.AddrArg   `long:"addr" env:"PORT" default:"127.0.0.1:8080" help:"Listen address"`
+	stateDir cmd.StringArg       `long:"state-dir" env:"STATE_DIR" default:"./data" help:"Directory for Git repositories and SQLite"`
+	addr     cmd.AddrArg         `long:"addr" env:"PORT" default:"127.0.0.1:8080" help:"Listen address"`
+	database xdb.Arg[db.Queries] `long:"database" default:"" help:"SQLite path or URL (default: {state-dir}/superfolha.db)"`
 	version  *versionCmd
 }
 
@@ -41,10 +43,6 @@ func (*versionCmd) Run(context.Context) error {
 	return err
 }
 
-func openRepository(ctx context.Context, stateDir string) (db.Repository, error) {
-	return db.OpenRepository(ctx, filepath.Join(stateDir, "superfolha.db"))
-}
-
 func (r *root) Run(ctx context.Context) error {
 	absStateDir, err := filepath.Abs(r.stateDir.Value())
 	if err != nil {
@@ -54,7 +52,16 @@ func (r *root) Run(ctx context.Context) error {
 		return fmt.Errorf("create state directory %q: %w", absStateDir, err)
 	}
 
-	repo, err := openRepository(ctx, absStateDir)
+	if r.database.Value() == nil || r.database.Value().URL() == "" {
+		u, err := db.FileURL(filepath.Join(absStateDir, "superfolha.db"))
+		if err != nil {
+			return err
+		}
+		if err := r.database.Parse(u); err != nil {
+			return err
+		}
+	}
+	repo, err := db.OpenArg(ctx, &r.database)
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
 	}

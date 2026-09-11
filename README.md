@@ -148,6 +148,7 @@ Use root `railway.toml`. Attach a volume at `/data`, set `JWT_SECRET`. SQLite de
 
 - `--state-dir`: Data directory (env `STATE_DIR`, default `./data`)
 - `--addr`: Listen address (env `PORT`, default `127.0.0.1:8080`). A bare port becomes `:port`.
+- `--database`: SQLite path or URL (default `{state-dir}/superfolha.db`)
 
 ### Example Configuration
 
