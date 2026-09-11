@@ -166,7 +166,7 @@ func TestOpenRepository(t *testing.T) {
 	stateDir := t.TempDir()
 	wantDB := filepath.Join(stateDir, "superfolha.db")
 
-	repo, err := openRepository(stateDir)
+	repo, err := openRepository(t.Context(), stateDir)
 	if err != nil {
 		t.Fatalf("openRepository(stateDir): %v", err)
 	}

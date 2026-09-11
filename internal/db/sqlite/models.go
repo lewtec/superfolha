@@ -9,17 +9,17 @@ import (
 )
 
 type Project struct {
-	ID        string         `json:"id"`
-	UserID    sql.NullString `json:"user_id"`
-	Name      string         `json:"name"`
-	GitPath   string         `json:"git_path"`
-	CreatedAt sql.NullString `json:"created_at"`
-	UpdatedAt sql.NullString `json:"updated_at"`
+	ID        string
+	UserID    sql.NullString
+	Name      string
+	GitPath   string
+	CreatedAt sql.NullString
+	UpdatedAt sql.NullString
 }
 
 type User struct {
-	ID           string         `json:"id"`
-	Email        string         `json:"email"`
-	PasswordHash string         `json:"password_hash"`
-	CreatedAt    sql.NullString `json:"created_at"`
+	ID           string
+	Email        string
+	PasswordHash string
+	CreatedAt    sql.NullString
 }

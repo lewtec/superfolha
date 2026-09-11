@@ -18,14 +18,20 @@ import (
 	"github.com/lewtec/lewkit/x/release"
 	"github.com/lewtec/superfolha/internal/auth"
 	"github.com/lewtec/superfolha/internal/db"
-	"github.com/lewtec/superfolha/internal/db/sqlite"
 	"github.com/lewtec/superfolha/internal/project"
 	"github.com/lewtec/superfolha/internal/server"
 )
 
+// optionalString may be omitted. Empty stays empty so applyEnv / resolveAddr can fill it.
+type optionalString struct {
+	cmd.StringArg
+}
+
+func (optionalString) ArgDefault() string { return "" }
+
 type root struct {
-	stateDir cmd.StringArg `long:"state-dir" help:"Directory for Git repositories and SQLite"`
-	addr     cmd.StringArg `long:"addr" help:"Listen address (default: :$PORT if set, else 127.0.0.1:8080)"`
+	stateDir optionalString `long:"state-dir" help:"Directory for Git repositories and SQLite"`
+	addr     optionalString `long:"addr" help:"Listen address (default: :$PORT if set, else 127.0.0.1:8080)"`
 	version  *versionCmd
 }
 
@@ -68,8 +74,8 @@ func resolveAddr(addr string) string {
 	return "127.0.0.1:8080"
 }
 
-func openRepository(stateDir string) (db.Repository, error) {
-	return sqlite.NewRepository(filepath.Join(stateDir, "superfolha.db"))
+func openRepository(ctx context.Context, stateDir string) (db.Repository, error) {
+	return db.OpenRepository(ctx, filepath.Join(stateDir, "superfolha.db"))
 }
 
 func (r *root) Run(ctx context.Context) error {
@@ -83,7 +89,7 @@ func (r *root) Run(ctx context.Context) error {
 		return fmt.Errorf("create state directory %q: %w", absStateDir, err)
 	}
 
-	repo, err := openRepository(absStateDir)
+	repo, err := openRepository(ctx, absStateDir)
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
 	}

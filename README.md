@@ -22,7 +22,7 @@ A complete web-based LaTeX editor with Git version control, real-time compilatio
 ### Backend (Go)
 - HTTP server with stdlib router
 - GraphQL API via gqlgen
-- SQLite (modernc.org/sqlite) via sqlc
+- SQLite (modernc.org/sqlite) via lewkit `x/db` + sqlc (`go generate ./internal/db`)
 - Git operations
 - JWT authentication
 - LaTeX compilation with latexmk / TeX Live
