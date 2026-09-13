@@ -7,7 +7,10 @@ import (
 	"testing"
 
 	"github.com/lewtec/lewkit/x/cmd"
+	xtest "github.com/lewtec/lewkit/x/test"
 	"github.com/lewtec/superfolha/internal/db"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRootUsage(t *testing.T) {
@@ -36,83 +39,61 @@ func TestRootUsage(t *testing.T) {
 }
 
 func TestParseRootFlags(t *testing.T) {
+	dir := t.TempDir()
 	app, err := cmd.Parse[cmd.App[root]](
-		"--state-dir", "/data",
+		"--state-dir", dir,
 		"--addr", "0.0.0.0:9090",
 	)
-	if err != nil {
-		t.Fatalf("Parse: %v", err)
-	}
-	if got, want := app.Args.stateDir.Value(), "/data"; got != want {
-		t.Errorf("stateDir = %q, want %q", got, want)
-	}
-	if got, want := app.Args.addr.Value(), "0.0.0.0:9090"; got != want {
-		t.Errorf("addr = %q, want %q", got, want)
-	}
-	if app.Args.version != nil {
-		t.Fatal("version command should be unset")
-	}
+	require.NoError(t, err)
+	assert.Equal(t, dir, app.Args.stateDir.Value())
+	assert.Equal(t, "0.0.0.0:9090", app.Args.addr.Value())
+	assert.Nil(t, app.Args.version)
 }
 
 func TestParseVersionCommand(t *testing.T) {
+	t.Setenv("STATE_DIR", t.TempDir())
 	app, err := cmd.Parse[cmd.App[root]]("version")
-	if err != nil {
-		t.Fatalf("Parse: %v", err)
-	}
-	if app.Args.version == nil {
-		t.Fatal("expected version command")
-	}
+	require.NoError(t, err)
+	require.NotNil(t, app.Args.version)
 }
 
 func TestParseStateDirEnv(t *testing.T) {
-	t.Setenv("STATE_DIR", "/var/sf")
+	dir := t.TempDir()
+	t.Setenv("STATE_DIR", dir)
 	app, err := cmd.Parse[cmd.App[root]]()
-	if err != nil {
-		t.Fatalf("Parse: %v", err)
-	}
-	if got, want := app.Args.stateDir.Value(), "/var/sf"; got != want {
-		t.Errorf("stateDir = %q, want %q", got, want)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, dir, app.Args.stateDir.Value())
 
-	app, err = cmd.Parse[cmd.App[root]]("--state-dir", "/from-flag")
-	if err != nil {
-		t.Fatalf("Parse: %v", err)
-	}
-	if got, want := app.Args.stateDir.Value(), "/from-flag"; got != want {
-		t.Errorf("stateDir = %q, want %q", got, want)
-	}
+	flagDir := t.TempDir()
+	app, err = cmd.Parse[cmd.App[root]]("--state-dir", flagDir)
+	require.NoError(t, err)
+	assert.Equal(t, flagDir, app.Args.stateDir.Value())
 }
 
 func TestParseAddr(t *testing.T) {
+	t.Setenv("STATE_DIR", t.TempDir())
 	t.Setenv("PORT", "8081")
 	app, err := cmd.Parse[cmd.App[root]]()
-	if err != nil {
-		t.Fatalf("Parse: %v", err)
-	}
-	if got, want := app.Args.addr.Value(), ":8081"; got != want {
-		t.Errorf("addr = %q, want %q", got, want)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, ":8081", app.Args.addr.Value())
 
 	app, err = cmd.Parse[cmd.App[root]]("--addr", "0.0.0.0:9090")
-	if err != nil {
-		t.Fatalf("Parse: %v", err)
-	}
-	if got, want := app.Args.addr.Value(), "0.0.0.0:9090"; got != want {
-		t.Errorf("addr = %q, want %q", got, want)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "0.0.0.0:9090", app.Args.addr.Value())
 }
 
 func TestParseDatabase(t *testing.T) {
+	t.Setenv("STATE_DIR", t.TempDir())
 	app, err := cmd.Parse[cmd.App[root]]("--database", "/tmp/x.db")
-	if err != nil {
-		t.Fatalf("Parse: %v", err)
-	}
-	if app.Args.database.Value() == nil {
-		t.Fatal("expected database arg")
-	}
-	if got, want := app.Args.database.Value().URL(), "/tmp/x.db"; got != want {
-		t.Errorf("database = %q, want %q", got, want)
-	}
+	require.NoError(t, err)
+	require.NotNil(t, app.Args.database.Value())
+	assert.Equal(t, "/tmp/x.db", app.Args.database.Value().URL())
+}
+
+func TestParseStateDirMissing(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "nope")
+	_, err := cmd.Parse[cmd.App[root]]("--state-dir", missing)
+	assert.ErrorIs(t, err, os.ErrNotExist)
 }
 
 func TestOpenRepository(t *testing.T) {
@@ -120,19 +101,10 @@ func TestOpenRepository(t *testing.T) {
 	wantDB := filepath.Join(stateDir, "superfolha.db")
 
 	repo, err := db.OpenRepository(t.Context(), wantDB)
-	if err != nil {
-		t.Fatalf("OpenRepository: %v", err)
-	}
-	if repo == nil {
-		t.Fatal("expected non-nil repository")
-	}
-	t.Cleanup(func() {
-		if err := repo.Close(); err != nil {
-			t.Errorf("repo.Close(): %v", err)
-		}
-	})
+	require.NoError(t, err)
+	require.NotNil(t, repo)
+	xtest.CloseOnCleanup(t, repo)
 
-	if _, err := os.Stat(wantDB); err != nil {
-		t.Fatalf("expected sqlite file at %s: %v", wantDB, err)
-	}
+	_, err = os.Stat(wantDB)
+	require.NoError(t, err)
 }

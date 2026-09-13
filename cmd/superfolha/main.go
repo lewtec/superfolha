@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/lewtec/lewkit/x/cmd"
+	"github.com/lewtec/lewkit/x/path"
 	"github.com/lewtec/lewkit/x/release"
 	"github.com/lewtec/superfolha/internal/auth"
 	"github.com/lewtec/superfolha/internal/db"
@@ -21,9 +22,9 @@ import (
 )
 
 type root struct {
-	stateDir cmd.StringArg `long:"state-dir" env:"STATE_DIR" default:"./data" help:"Directory for Git repositories and SQLite"`
-	addr     cmd.AddrArg   `long:"addr" env:"PORT" default:"127.0.0.1:8080" help:"Listen address"`
-	database db.DBArg      `long:"database" default:"" help:"SQLite path or URL (default: {state-dir}/superfolha.db)"`
+	stateDir cmd.DataDirArg `long:"state-dir" env:"STATE_DIR" default:"./data" help:"Directory for Git repositories and SQLite"`
+	addr     cmd.AddrArg    `long:"addr" env:"PORT" default:"127.0.0.1:8080" help:"Listen address"`
+	database db.DBArg       `long:"database" default:"" help:"SQLite path or URL (default: {state-dir}/superfolha.db)"`
 	version  *cmd.VersionCmd
 }
 
@@ -32,16 +33,14 @@ func (*root) Description() string {
 }
 
 func (r *root) Run(ctx context.Context) error {
-	absStateDir, err := filepath.Abs(r.stateDir.Value())
+	state, err := path.Open(r.stateDir.Value())
 	if err != nil {
 		return fmt.Errorf("state directory %q: %w", r.stateDir.Value(), err)
 	}
-	if err := os.MkdirAll(absStateDir, 0o755); err != nil {
-		return fmt.Errorf("create state directory %q: %w", absStateDir, err)
-	}
+	defer state.Close()
 
 	if r.database.Value() == nil || r.database.Value().URL() == "" {
-		u, err := db.FileURL(filepath.Join(absStateDir, "superfolha.db"))
+		u, err := db.FileURL(filepath.Join(state.Name(), path.New("superfolha.db").String()))
 		if err != nil {
 			return err
 		}
@@ -55,11 +54,12 @@ func (r *root) Run(ctx context.Context) error {
 	}
 	defer repo.Close()
 
-	slog.Info("connected to database", "driver", "sqlite", "path", filepath.Join(absStateDir, "superfolha.db"))
+	stateDir := state.Name()
+	slog.Info("connected to database", "driver", "sqlite", "path", r.database.Value().URL())
 
-	projectService := project.NewService(absStateDir)
+	projectService := project.NewService(stateDir)
 	authService := auth.NewService(repo)
-	srv := server.NewServer(repo, absStateDir, projectService, authService)
+	srv := server.NewServer(repo, stateDir, projectService, authService)
 
 	addr := r.addr.Value()
 	slog.Info("starting server", "addr", addr, "version", release.Version())

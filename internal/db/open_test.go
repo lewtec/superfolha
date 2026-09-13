@@ -4,182 +4,105 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
 
+	xtest "github.com/lewtec/lewkit/x/test"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	moderncsqlite "modernc.org/sqlite"
 	sqlite3 "modernc.org/sqlite/lib"
 )
 
 func TestOpenRepositorySetsOwnerOnlyMode(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "superfolha.db")
-	if err := os.WriteFile(path, []byte{}, 0o644); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.WriteFile(path, []byte{}, 0o644))
 	repo, err := OpenRepository(t.Context(), path)
-	if err != nil {
-		t.Fatalf("OpenRepository: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := repo.Close(); err != nil {
-			t.Errorf("repo.Close(): %v", err)
-		}
-	})
+	require.NoError(t, err)
+	xtest.CloseOnCleanup(t, repo)
 
 	info, err := os.Stat(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if perm := info.Mode().Perm(); perm != 0o600 {
-		t.Fatalf("db mode=%o want 0600", perm)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, fs.FileMode(0o600), info.Mode().Perm())
 }
 
 func TestEnsureOwnerOnlyFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "x.db")
-	if err := os.WriteFile(path, []byte("x"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := ensureOwnerOnlyFile(path); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.WriteFile(path, []byte("x"), 0o644))
+	require.NoError(t, ensureOwnerOnlyFile(path))
 	info, err := os.Stat(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if info.Mode().Perm() != 0o600 {
-		t.Fatalf("mode=%o", info.Mode().Perm())
-	}
-	if err := ensureOwnerOnlyFile(""); err != nil {
-		t.Fatal(err)
-	}
-	if err := ensureOwnerOnlyFile(":memory:"); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, fs.FileMode(0o600), info.Mode().Perm())
+	require.NoError(t, ensureOwnerOnlyFile(""))
+	require.NoError(t, ensureOwnerOnlyFile(":memory:"))
 }
 
 func TestOpenRepositoryEmptyPath(t *testing.T) {
 	_, err := OpenRepository(t.Context(), "")
-	if !errors.Is(err, ErrEmptyPath) {
-		t.Fatalf("error = %v, want %v", err, ErrEmptyPath)
-	}
+	assert.ErrorIs(t, err, ErrEmptyPath)
 }
 
 func TestIsUniqueViolation_EmailConflict(t *testing.T) {
 	repo, err := OpenRepository(t.Context(), filepath.Join(t.TempDir(), "unique.db"))
-	if err != nil {
-		t.Fatalf("OpenRepository: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := repo.Close(); err != nil {
-			t.Errorf("repo.Close(): %v", err)
-		}
-	})
+	require.NoError(t, err)
+	xtest.CloseOnCleanup(t, repo)
 
 	ctx := t.Context()
 	_, err = repo.CreateUser(ctx, CreateUserParams{
 		ID: "user-1", Email: "dup@example.com", PasswordHash: "hash-a",
 	})
-	if err != nil {
-		t.Fatalf("first CreateUser: %v", err)
-	}
+	require.NoError(t, err)
 
 	_, err = repo.CreateUser(ctx, CreateUserParams{
 		ID: "user-2", Email: "dup@example.com", PasswordHash: "hash-b",
 	})
-	if err == nil {
-		t.Fatal("second CreateUser with same email: want unique violation, got nil")
-	}
-	if !repo.IsUniqueViolation(err) {
-		t.Fatalf("IsUniqueViolation(email dup)=false, err=%v", err)
-	}
-
-	if !repo.IsUniqueViolation(fmt.Errorf("create user: %w", err)) {
-		t.Fatal("IsUniqueViolation should unwrap via errors.As")
-	}
+	require.Error(t, err)
+	assert.True(t, repo.IsUniqueViolation(err), "email dup: %v", err)
+	assert.True(t, repo.IsUniqueViolation(fmt.Errorf("create user: %w", err)), "should unwrap")
 
 	var se *moderncsqlite.Error
-	if !errors.As(err, &se) {
-		t.Fatalf("expected *sqlite.Error, got %T: %v", err, err)
-	}
-	if se.Code() != sqlite3.SQLITE_CONSTRAINT_UNIQUE {
-		t.Fatalf("Code()=%d, want SQLITE_CONSTRAINT_UNIQUE (%d)", se.Code(), sqlite3.SQLITE_CONSTRAINT_UNIQUE)
-	}
+	require.ErrorAs(t, err, &se)
+	assert.Equal(t, sqlite3.SQLITE_CONSTRAINT_UNIQUE, se.Code())
 }
 
 func TestIsUniqueViolation_PrimaryKey(t *testing.T) {
 	repo, err := OpenRepository(t.Context(), filepath.Join(t.TempDir(), "pk.db"))
-	if err != nil {
-		t.Fatalf("OpenRepository: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := repo.Close(); err != nil {
-			t.Errorf("repo.Close(): %v", err)
-		}
-	})
+	require.NoError(t, err)
+	xtest.CloseOnCleanup(t, repo)
 
 	ctx := t.Context()
-	if _, err := repo.CreateUser(ctx, CreateUserParams{
+	_, err = repo.CreateUser(ctx, CreateUserParams{
 		ID: "same-id", Email: "a@example.com", PasswordHash: "h",
-	}); err != nil {
-		t.Fatalf("first CreateUser: %v", err)
-	}
+	})
+	require.NoError(t, err)
 	_, err = repo.CreateUser(ctx, CreateUserParams{
 		ID: "same-id", Email: "b@example.com", PasswordHash: "h",
 	})
-	if err == nil {
-		t.Fatal("duplicate primary key: want error")
-	}
-	if !repo.IsUniqueViolation(err) {
-		t.Fatalf("IsUniqueViolation(pk dup)=false, err=%v", err)
-	}
+	require.Error(t, err)
+	assert.True(t, repo.IsUniqueViolation(err), "pk dup: %v", err)
 
 	var se *moderncsqlite.Error
-	if !errors.As(err, &se) {
-		t.Fatalf("expected *sqlite.Error, got %T: %v", err, err)
-	}
-	if se.Code() != sqlite3.SQLITE_CONSTRAINT_PRIMARYKEY {
-		t.Fatalf("Code()=%d, want SQLITE_CONSTRAINT_PRIMARYKEY (%d)", se.Code(), sqlite3.SQLITE_CONSTRAINT_PRIMARYKEY)
-	}
+	require.ErrorAs(t, err, &se)
+	assert.Equal(t, sqlite3.SQLITE_CONSTRAINT_PRIMARYKEY, se.Code())
 }
 
 func TestIsUniqueViolation_NonUnique(t *testing.T) {
 	repo := &repository{}
-
-	if repo.IsUniqueViolation(nil) {
-		t.Fatal("nil should not be unique violation")
-	}
-	if repo.IsUniqueViolation(errors.New("UNIQUE constraint failed: users.email")) {
-		t.Fatal("plain error with UNIQUE message must not match without *sqlite.Error")
-	}
+	assert.False(t, repo.IsUniqueViolation(nil))
+	assert.False(t, repo.IsUniqueViolation(errors.New("UNIQUE constraint failed: users.email")))
 
 	path := filepath.Join(t.TempDir(), "notnull.db")
 	r, err := OpenRepository(t.Context(), path)
-	if err != nil {
-		t.Fatalf("OpenRepository: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := r.Close(); err != nil {
-			t.Errorf("repo.Close(): %v", err)
-		}
-	})
+	require.NoError(t, err)
+	xtest.CloseOnCleanup(t, r)
 
 	conn, err := sql.Open("sqlite", path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		if err := conn.Close(); err != nil {
-			t.Errorf("conn.Close(): %v", err)
-		}
-	})
+	require.NoError(t, err)
+	xtest.CloseOnCleanup(t, conn)
 	_, execErr := conn.ExecContext(t.Context(),
 		`INSERT INTO users (id, email, password_hash) VALUES ('x', NULL, 'h')`)
-	if execErr == nil {
-		t.Fatal("want NOT NULL error")
-	}
-	if r.IsUniqueViolation(execErr) {
-		t.Fatalf("NOT NULL should not be unique violation, err=%v", execErr)
-	}
+	require.Error(t, execErr)
+	assert.False(t, r.IsUniqueViolation(execErr), "NOT NULL: %v", execErr)
 }

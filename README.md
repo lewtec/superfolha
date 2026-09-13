@@ -140,13 +140,13 @@ Use root `railway.toml`. Attach a volume at `/data`, set `JWT_SECRET`. SQLite de
 
 - `JWT_SECRET`: Secret key for JWT token signing (required in production)
 - `GITHUB_APP_ID`, `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_CLIENT_SECRET`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_APP_SLUG`: GitHub App for login and installation tokens
-- `STATE_DIR`: Data root (default: `./data`; Docker: `/data`). SQLite is `{STATE_DIR}/superfolha.db`. Projects live at `{STATE_DIR}/repos/{uuid}`
+- `STATE_DIR`: Data root (default: `./data`; Docker: `/data`; must exist). SQLite is `{STATE_DIR}/superfolha.db`. Projects live at `{STATE_DIR}/repos/{uuid}`
 - `PORT`: Used as listen port when `--addr` is not set (platforms like Railway inject this)
 - `GO_ENV`: Set to `development` for dev mode only (allows JWT_SECRET fallback)
 
 ### CLI Flags
 
-- `--state-dir`: Data directory (env `STATE_DIR`, default `./data`)
+- `--state-dir`: Data directory (env `STATE_DIR`, default `./data`; must exist)
 - `--addr`: Listen address (env `PORT`, default `127.0.0.1:8080`). A bare port becomes `:port`.
 - `--database`: SQLite path or URL (default `{state-dir}/superfolha.db`)
 
