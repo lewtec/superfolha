@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -37,12 +36,7 @@ func ParseOAuthState(state string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	parsed, err := jwt.ParseWithClaims(state, &oauthStateClaims{}, func(t *jwt.Token) (any, error) {
-		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("%w: %v", ErrUnexpectedSigning, t.Header["alg"])
-		}
-		return secret, nil
-	})
+	parsed, err := jwt.ParseWithClaims(state, &oauthStateClaims{}, HMACKeyfunc(secret))
 	if err != nil {
 		return "", err
 	}
