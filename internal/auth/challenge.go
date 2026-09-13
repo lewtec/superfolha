@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"sync"
 	"time"
 
@@ -91,12 +90,7 @@ func VerifyChallenge(challenge, publicKeyB64, signatureB64 string) (Identity, er
 	if err != nil {
 		return zero, err
 	}
-	parsed, err := jwt.ParseWithClaims(challenge, &challengeClaims{}, func(t *jwt.Token) (any, error) {
-		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("%w: %v", ErrUnexpectedSigning, t.Header["alg"])
-		}
-		return secret, nil
-	}, jwt.WithAudience(challengeAud))
+	parsed, err := jwt.ParseWithClaims(challenge, &challengeClaims{}, HMACKeyfunc(secret), jwt.WithAudience(challengeAud))
 	if err != nil || !parsed.Valid {
 		return zero, ErrChallengeInvalid
 	}

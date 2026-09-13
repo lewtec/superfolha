@@ -2,7 +2,6 @@ package session
 
 import (
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -44,12 +43,7 @@ func ParsePreauth(token string) (sessionID string, err error) {
 	if err != nil {
 		return "", err
 	}
-	parsed, err := jwt.ParseWithClaims(token, &preauthClaims{}, func(t *jwt.Token) (any, error) {
-		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("%w: %v", auth.ErrUnexpectedSigning, t.Header["alg"])
-		}
-		return secret, nil
-	})
+	parsed, err := jwt.ParseWithClaims(token, &preauthClaims{}, auth.HMACKeyfunc(secret))
 	if err != nil {
 		return "", ErrPreauthInvalid
 	}

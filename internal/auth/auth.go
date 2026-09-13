@@ -61,6 +61,16 @@ func JWTSecret() ([]byte, error) {
 	return getJWTSecret()
 }
 
+// HMACKeyfunc rejects non-HMAC algorithms (alg confusion).
+func HMACKeyfunc(secret []byte) jwt.Keyfunc {
+	return func(t *jwt.Token) (any, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("%w: %v", ErrUnexpectedSigning, t.Header["alg"])
+		}
+		return secret, nil
+	}
+}
+
 // getJWTSecret retrieves the JWT secret from the environment once and caches it.
 // Logs only on the first resolution so authenticated requests do not spam logs.
 func getJWTSecret() ([]byte, error) {
@@ -136,13 +146,7 @@ func ValidateToken(tokenString string) (*Claims, error) {
 		return nil, err
 	}
 
-	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (any, error) {
-		// Reject non-HMAC algorithms (classic alg confusion).
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("%w: %v", ErrUnexpectedSigning, token.Header["alg"])
-		}
-		return secret, nil
-	})
+	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, HMACKeyfunc(secret))
 
 	if err != nil {
 		return nil, err

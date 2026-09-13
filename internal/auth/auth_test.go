@@ -69,6 +69,29 @@ func TestValidateToken_RejectsNoneAlg(t *testing.T) {
 	}
 }
 
+func TestHMACKeyfunc_RejectsNonHMAC(t *testing.T) {
+	fn := HMACKeyfunc([]byte("secret"))
+	tok := jwt.New(jwt.SigningMethodRS256)
+	_, err := fn(tok)
+	if !errors.Is(err, ErrUnexpectedSigning) {
+		t.Fatalf("err = %v, want ErrUnexpectedSigning", err)
+	}
+}
+
+func TestHMACKeyfunc_AcceptsHMAC(t *testing.T) {
+	secret := []byte("secret")
+	fn := HMACKeyfunc(secret)
+	tok := jwt.New(jwt.SigningMethodHS256)
+	got, err := fn(tok)
+	if err != nil {
+		t.Fatalf("HMACKeyfunc: %v", err)
+	}
+	b, ok := got.([]byte)
+	if !ok || string(b) != "secret" {
+		t.Fatalf("key = %v, want secret", got)
+	}
+}
+
 func TestValidateToken_RejectsNonHMAC(t *testing.T) {
 	withJWTEnv(t, "test-secret-for-jwt-validation", "")
 
