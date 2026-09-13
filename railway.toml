@@ -1,10 +1,7 @@
 # Superfolha — Railway config as code (single service).
 # https://docs.railway.com/config-as-code
 #
-# Default persistence: SQLite on the volume (DB_DRIVER=sqlite).
-# Optional Postgres: add Railway Postgres plugin, set
-#   DB_DRIVER=postgres
-#   DATABASE_URL=${{Postgres.DATABASE_URL}}  (or link variable)
+# Persistence: SQLite at $STATE_DIR/superfolha.db on the volume.
 #
 # Always: volume at /data, JWT_SECRET, public domain.
 # PORT is injected by Railway.

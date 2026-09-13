@@ -2,8 +2,7 @@ package db
 
 import "context"
 
-// Repository is the storage abstraction implemented by sqlite and postgres backends
-// (same idea as ciborg's dual repository packages).
+// Repository is the storage handle used by auth and the HTTP server.
 type Repository interface {
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)

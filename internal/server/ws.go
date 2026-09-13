@@ -83,7 +83,7 @@ func (s *Server) handleProjectWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hub, err := s.hubs.GetOrOpen(projectID, proj.UserID)
+	hub, err := s.hubs.GetOrOpen(projectID, proj.UserID.String)
 	if err != nil {
 		slog.Error("hub open", "project", projectID, "user", user.UserID, "err", err)
 		http.Error(w, "failed to open project session", http.StatusInternalServerError)

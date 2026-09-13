@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/google/uuid"
 	"github.com/lewtec/superfolha/internal/apierrors"
@@ -49,7 +50,7 @@ func (r *Resolver) getAndCheckProject(ctx context.Context, projectID string) (*d
 	projectPath := r.projectService.GetProjectPath(projectID)
 	proj := db.Project{
 		ID:      info.ID,
-		UserID:  info.HostLogin,
+		UserID:  sql.NullString{String: info.HostLogin, Valid: info.HostLogin != ""},
 		Name:    info.Remote,
 		GitPath: projectPath,
 	}

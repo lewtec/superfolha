@@ -1,15 +1,12 @@
 [tools]
 bun = "1.3.8"
-"github:sqlc-dev/sqlc" = "1.31.1"
 go = "1.27.0"
 goreleaser = "2.15.4"
 svu = "3.3.0"
 tinytex = "2026.02"
 
 [env]
-# SQLite defaults to {STATE_DIR}/superfolha.db when DATABASE_URL is unset.
-# For Postgres 18+ (uuidv7()):
-# DB_DRIVER=postgres DATABASE_URL=postgres://admin:admin@localhost:5423/superfolha?sslmode=disable
+# SQLite is {STATE_DIR}/superfolha.db (STATE_DIR defaults to ./data).
 JWT_SECRET = "paçoca"
 
 [tasks."install:frontend"]
@@ -25,7 +22,7 @@ description = "Install all dependencies"
 depends = ["install:*"]
 
 [tasks.codegen]
-description = "tailgopher CSS + editor islands + templ generate"
+description = "go generate ./... (CSS, editor islands, templ, sqlc)"
 run = "go generate ./..."
 
 [tasks."build:frontend"]
@@ -44,15 +41,6 @@ run = "go build -o superfolha ./cmd/superfolha"
 description = "Build complete application"
 depends = ["build:backend"]
 run = "echo 'Build complete! Binary: ./superfolha'"
-
-[tasks."gen:sqlc"]
-run = "sqlc generate"
-
-[tasks."gen:templ"]
-run = "go tool templ generate"
-
-[tasks.gen]
-depends = ["codegen", "gen:sqlc"]
 
 [tasks.docker]
 description = "Build production Docker image from source (multi-stage Dockerfile.build)"
@@ -117,7 +105,3 @@ depends = ["codegen"]
 wait_for = ["codegen"]
 env = { GO_ENV = "development" }
 run = "mkdir -p data && go run ./cmd/superfolha --state-dir=./data"
-
-[tasks."devdb:up"]
-description = "Start disposable Postgres 18 (uuidv7()) for dual-backend local testing"
-run = "docker run --rm --name superfolha-pg -e POSTGRES_PASSWORD=admin -e POSTGRES_USER=admin -e POSTGRES_DB=superfolha -d -p 5423:5432 postgres:18"

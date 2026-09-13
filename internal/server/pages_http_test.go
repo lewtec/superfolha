@@ -16,7 +16,7 @@ import (
 	"testing"
 
 	"github.com/lewtec/superfolha/internal/auth"
-	"github.com/lewtec/superfolha/internal/db/sqlite"
+	"github.com/lewtec/superfolha/internal/db"
 	igit "github.com/lewtec/superfolha/internal/git"
 	"github.com/lewtec/superfolha/internal/paths"
 	"github.com/lewtec/superfolha/internal/project"
@@ -25,7 +25,11 @@ import (
 func testServer(t *testing.T) *Server {
 	t.Helper()
 	dir := t.TempDir()
-	repo, err := sqlite.NewRepository(dir + "/t.db")
+	var a db.DBArg
+	if err := a.Parse(dir + "/t.db"); err != nil {
+		t.Fatal(err)
+	}
+	repo, err := db.OpenArg(t.Context(), &a)
 	if err != nil {
 		t.Fatal(err)
 	}
