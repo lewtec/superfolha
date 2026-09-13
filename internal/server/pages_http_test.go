@@ -25,7 +25,11 @@ import (
 func testServer(t *testing.T) *Server {
 	t.Helper()
 	dir := t.TempDir()
-	repo, err := db.OpenRepository(t.Context(), dir+"/t.db")
+	var a db.DBArg
+	if err := a.Parse(dir + "/t.db"); err != nil {
+		t.Fatal(err)
+	}
+	repo, err := db.OpenArg(t.Context(), &a)
 	if err != nil {
 		t.Fatal(err)
 	}
