@@ -137,6 +137,7 @@ github.com/lewtec/lewkit v0.0.0-20260913142926-fbe1eee8fa14 h1:sbB14QAwXVI3U3qaX
 github.com/lewtec/lewkit v0.0.0-20260913142926-fbe1eee8fa14/go.mod h1:7w4JA8eKMa2Kt4P/tLUvZdp2u0s1UgRGPq7OYaWu9Oc=
 github.com/lewtec/tailgopher v0.0.0-20260905002949-8a94d7d5b2e0 h1:0aH6Uew/9eJSpMTlHo4X67ne/EIxg8kkqDGZf1YDO4A=
 github.com/lewtec/tailgopher v0.0.0-20260905002949-8a94d7d5b2e0/go.mod h1:wNGs3imOPr9sco1Jyu3XkAdVwkc6vCLR2zc3Ba8asII=
+github.com/lewtec/tailgopher v0.0.0-20260905113308-ac140dd664b5/go.mod h1:wNGs3imOPr9sco1Jyu3XkAdVwkc6vCLR2zc3Ba8asII=
 github.com/lib/pq v1.12.3 h1:tTWxr2YLKwIvK90ZXEw8GP7UFHtcbTtty8zsI+YjrfQ=
 github.com/lib/pq v1.12.3/go.mod h1:/p+8NSbOcwzAEI7wiMXFlgydTwcgTr3OSKMsD2BitpA=
 github.com/mattn/go-colorable v0.1.13 h1:fFA4WZxdEF4tXPZVKMLwD8oUnCTTo08duU7wxecdEvA=
