@@ -13,21 +13,25 @@ import (
 	ysync "github.com/reearth/ygo/sync"
 )
 
-func TestHubFenceAndFlush(t *testing.T) {
-	state := t.TempDir()
-	svc := project.NewService(state)
-	projectID := "11111111-1111-1111-1111-111111111111"
+func openSeededHub(t *testing.T, projectID, main string) *Hub {
+	t.Helper()
+	svc := project.NewService(t.TempDir())
 	if err := svc.InitProjectRepo(projectID); err != nil {
 		t.Fatal(err)
 	}
-	if err := svc.SaveFile(projectID, "main.tex", "hello\n"); err != nil {
+	if err := svc.SaveFile(projectID, "main.tex", main); err != nil {
 		t.Fatal(err)
 	}
-
 	h, err := Open(svc, projectID, "owner@example.com")
 	if err != nil {
 		t.Fatal(err)
 	}
+	return h
+}
+
+func TestHubFenceAndFlush(t *testing.T) {
+	projectID := "11111111-1111-1111-1111-111111111111"
+	h := openSeededHub(t, projectID, "hello\n")
 	defer h.Close()
 
 	if h.SessionID == "" {
@@ -85,20 +89,7 @@ func TestHubFenceAndFlush(t *testing.T) {
 }
 
 func TestHubBootstrapFullStateAndClientStep1(t *testing.T) {
-	state := t.TempDir()
-	svc := project.NewService(state)
-	projectID := "22222222-2222-2222-2222-222222222222"
-	if err := svc.InitProjectRepo(projectID); err != nil {
-		t.Fatal(err)
-	}
-	if err := svc.SaveFile(projectID, "main.tex", "\\title{Loaded}\n"); err != nil {
-		t.Fatal(err)
-	}
-
-	h, err := Open(svc, projectID, "owner@example.com")
-	if err != nil {
-		t.Fatal(err)
-	}
+	h := openSeededHub(t, "22222222-2222-2222-2222-222222222222", "\\title{Loaded}\n")
 	defer h.Close()
 
 	full := h.EncodeFullStateUpdate()
@@ -186,19 +177,7 @@ func TestRegistryCloseProject(t *testing.T) {
 }
 
 func TestPersistFromRequiresSigner(t *testing.T) {
-	state := t.TempDir()
-	svc := project.NewService(state)
-	id := "55555555-5555-5555-5555-555555555555"
-	if err := svc.InitProjectRepo(id); err != nil {
-		t.Fatal(err)
-	}
-	if err := svc.SaveFile(id, "main.tex", "hello\n"); err != nil {
-		t.Fatal(err)
-	}
-	h, err := Open(svc, id, "owner@example.com")
-	if err != nil {
-		t.Fatal(err)
-	}
+	h := openSeededHub(t, "55555555-5555-5555-5555-555555555555", "hello\n")
 	defer h.Close()
 	h.SSHPublic = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIqI4910CfGV/VLbLTy6XXLKZwm/HZQSG/N0iAG0D29c x"
 	c := h.AddClient("c1")
