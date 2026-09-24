@@ -6,27 +6,13 @@ import (
 	"testing"
 
 	"errors"
-	"github.com/lewtec/superfolha/internal/project"
 	"io/fs"
 )
 
 // Close must not recreate a project tree that was already removed (deleteProject
 // race / late idle eviction after RemoveAll).
 func TestHubCloseDoesNotRecreateRemovedRoot(t *testing.T) {
-	state := t.TempDir()
-	svc := project.NewService(state)
-	projectID := "33333333-3333-3333-3333-333333333333"
-	if err := svc.InitProjectRepo(projectID); err != nil {
-		t.Fatal(err)
-	}
-	if err := svc.SaveFile(projectID, "main.tex", "hello\n"); err != nil {
-		t.Fatal(err)
-	}
-
-	h, err := Open(svc, projectID, "owner@example.com")
-	if err != nil {
-		t.Fatal(err)
-	}
+	h := openSeededHub(t, "33333333-3333-3333-3333-333333333333", "hello\n")
 	root := h.Root
 	if _, err := os.Stat(root); err != nil {
 		t.Fatalf("expected root before delete: %v", err)
@@ -54,20 +40,7 @@ func TestHubCloseDoesNotRecreateRemovedRoot(t *testing.T) {
 
 // Normal close still flushes collaborative text when the tree remains.
 func TestHubCloseFlushesWhenRootExists(t *testing.T) {
-	state := t.TempDir()
-	svc := project.NewService(state)
-	projectID := "44444444-4444-4444-4444-444444444444"
-	if err := svc.InitProjectRepo(projectID); err != nil {
-		t.Fatal(err)
-	}
-	if err := svc.SaveFile(projectID, "main.tex", "hello\n"); err != nil {
-		t.Fatal(err)
-	}
-
-	h, err := Open(svc, projectID, "owner@example.com")
-	if err != nil {
-		t.Fatal(err)
-	}
+	h := openSeededHub(t, "44444444-4444-4444-4444-444444444444", "hello\n")
 	if err := h.Doc.SetTextServer("main.tex", "closed\n"); err != nil {
 		t.Fatal(err)
 	}
