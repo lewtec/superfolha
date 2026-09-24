@@ -50,6 +50,13 @@ func TestIsSSHAndTransport(t *testing.T) {
 	if got != "git@github.com:Foo/Bar" {
 		t.Fatalf("TransportURL = %q", got)
 	}
+	// Clone URL keeps the host spelling; Canonical lowercases it.
+	if got := TransportURL("git@GitHub.com:Foo/Bar.git"); got != "git@GitHub.com:Foo/Bar" {
+		t.Fatalf("TransportURL host case = %q", got)
+	}
+	if got := Canonical("git@GitHub.com:Foo/Bar.git"); got != "https://github.com/Foo/Bar" {
+		t.Fatalf("Canonical host case = %q", got)
+	}
 }
 
 func TestValidate(t *testing.T) {
