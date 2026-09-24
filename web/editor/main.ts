@@ -9,6 +9,7 @@ import { latexCompletions, latexLanguage } from "./latexCompletions";
 import { buildFileTree, type FileTreeNode } from "./utils/fileTree";
 import { isBinaryContent } from "./utils/fileUtils";
 import { getLoginSeed } from "../ssh/identity";
+import { decodeStdB64 } from "../ssh/b64";
 import { publicLine } from "../ssh/sessionKey";
 
 type Tab = "code" | "pdf" | "logs";
@@ -135,9 +136,7 @@ function toPdfBlobUrl(pdfData: string): string {
   const base64 = pdfData.startsWith("data:")
     ? pdfData.replace(/^data:application\/pdf;base64,/, "")
     : pdfData;
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  const bytes = decodeStdB64(base64);
   return URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
 }
 
