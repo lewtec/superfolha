@@ -246,6 +246,34 @@ func TestCloneAuthFailsAfterLsRemote(t *testing.T) {
 	}
 }
 
+func TestCloneFailureRemovesDest(t *testing.T) {
+	t.Setenv("JWT_SECRET", "test-secret-for-session")
+	t.Setenv("GO_ENV", "development")
+	reg := NewRegistry(project.NewService(t.TempDir()))
+	reg.SetCloner(func(dest, _, _ string, _ igit.SessionSSH) error {
+		if err := os.MkdirAll(dest, 0o755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(dest, "left.txt"), []byte("x"), 0o644); err != nil {
+			return err
+		}
+		return errPermDeniedPublickey
+	})
+	reg.SetLister(func(string, igit.SessionSSH) error { return errPermDeniedPublickey })
+	k := testKey(t)
+	live, err := reg.Create("alice", "git@github.com:t/paper", "main", k.Authorized)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := reg.CloneAndProbe(live.ID, "alice", k); !errors.Is(err, ErrUnauthorized) {
+		t.Fatalf("clone auth: %v; want ErrUnauthorized", err)
+	}
+	dest := reg.svc.GetProjectPath(live.ID)
+	if _, err := os.Stat(dest); !os.IsNotExist(err) {
+		t.Fatalf("failed clone left dest: %v", err)
+	}
+}
+
 func TestCloneFailAfterPullWorksIsNotUnauthorized(t *testing.T) {
 	t.Setenv("JWT_SECRET", "test-secret-for-session")
 	t.Setenv("GO_ENV", "development")

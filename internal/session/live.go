@@ -240,9 +240,7 @@ func (r *Registry) CloneAndProbe(sessionID, hostLogin string, ssh igit.SessionSS
 		return err
 	}
 	if err := r.cloner(dest, l.CloneURL, l.Branch, ssh); err != nil {
-		if rmErr := os.RemoveAll(dest); rmErr != nil {
-			slog.Error("remove failed clone dest", "path", dest, "err", rmErr)
-		}
+		discardTree(dest, "clone")
 		lsErr := r.lister(l.CloneURL, ssh)
 		if lsErr != nil && (igit.AuthFailed(err) || igit.AuthFailed(lsErr)) {
 			return ErrUnauthorized
@@ -250,16 +248,12 @@ func (r *Registry) CloneAndProbe(sessionID, hostLogin string, ssh igit.SessionSS
 		return errors.Join(ErrClone, err)
 	}
 	if err := r.svc.EnsureMainTeX(sessionID); err != nil {
-		if rmErr := os.RemoveAll(dest); rmErr != nil {
-			slog.Error("remove failed seed dest", "path", dest, "err", rmErr)
-		}
+		discardTree(dest, "seed")
 		return err
 	}
 	if err := r.prober(dest, l.Branch, ssh); err != nil {
 		pullErr := r.puller(dest, l.Branch, ssh)
-		if rmErr := os.RemoveAll(dest); rmErr != nil {
-			slog.Error("remove failed probe dest", "path", dest, "err", rmErr)
-		}
+		discardTree(dest, "probe")
 		if pullErr == nil {
 			return ErrNoWrite
 		}
@@ -270,9 +264,7 @@ func (r *Registry) CloneAndProbe(sessionID, hostLogin string, ssh igit.SessionSS
 	}
 	h, err := Open(r.svc, sessionID, hostLogin)
 	if err != nil {
-		if rmErr := os.RemoveAll(dest); rmErr != nil {
-			slog.Error("remove failed open dest", "path", dest, "err", rmErr)
-		}
+		discardTree(dest, "open")
 		return err
 	}
 	r.markReady(l, h)
@@ -292,26 +284,27 @@ func (r *Registry) cloneEphemeral(sessionID string, l *Live) error {
 		return errors.Join(ErrClone, err)
 	}
 	if err := igit.CloneLocal(dest, src, l.Branch); err != nil {
-		if rmErr := os.RemoveAll(dest); rmErr != nil {
-			slog.Error("remove failed local dest", "path", dest, "err", rmErr)
-		}
+		discardTree(dest, "local")
 		return errors.Join(ErrClone, err)
 	}
 	if err := r.svc.EnsureMainTeX(sessionID); err != nil {
-		if rmErr := os.RemoveAll(dest); rmErr != nil {
-			slog.Error("remove failed seed dest", "path", dest, "err", rmErr)
-		}
+		discardTree(dest, "seed")
 		return err
 	}
 	h, err := Open(r.svc, sessionID, l.HostLogin)
 	if err != nil {
-		if rmErr := os.RemoveAll(dest); rmErr != nil {
-			slog.Error("remove failed open dest", "path", dest, "err", rmErr)
-		}
+		discardTree(dest, "open")
 		return err
 	}
 	r.markReady(l, h)
 	return nil
+}
+
+// discardTree removes dest. stage is only the log label: "remove failed <stage> dest".
+func discardTree(dest, stage string) {
+	if err := os.RemoveAll(dest); err != nil {
+		slog.Error("remove failed "+stage+" dest", "path", dest, "err", err)
+	}
 }
 
 func (r *Registry) markReady(l *Live, h *Hub) {
