@@ -1,5 +1,6 @@
 import * as ed from "@noble/ed25519";
 import { sha256, sha512 } from "@noble/hashes/sha2.js";
+import { b64url } from "./b64";
 
 try {
   ed.hashes.sha512 = sha512;
@@ -137,12 +138,6 @@ export async function getOrCreateLoginSeed(): Promise<Uint8Array> {
   const { secretKey } = ed.keygen();
   await addIdentity(secretKey);
   return secretKey;
-}
-
-export function b64url(buf: Uint8Array): string {
-  let bin = "";
-  for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]!);
-  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 
 export async function verifyLogin(

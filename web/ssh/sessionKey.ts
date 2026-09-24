@@ -1,5 +1,8 @@
 import * as ed from "@noble/ed25519";
 import { sha512 } from "@noble/hashes/sha2.js";
+import { encodeStdB64 } from "./b64";
+
+export { b64url, b64urlDecode, decodeStdB64, encodeStdB64 } from "./b64";
 
 try {
   ed.hashes.sha512 = sha512;
@@ -54,21 +57,6 @@ export function idbPut(key: string, value: Uint8Array): Promise<void> {
   );
 }
 
-export function b64url(buf: Uint8Array): string {
-  let bin = "";
-  for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]!);
-  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-}
-
-export function b64urlDecode(s: string): Uint8Array {
-  const pad = "=".repeat((4 - (s.length % 4)) % 4);
-  const b64 = s.replace(/-/g, "+").replace(/_/g, "/") + pad;
-  const bin = atob(b64);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
-}
-
 function sshString(data: Uint8Array): Uint8Array {
   const out = new Uint8Array(4 + data.length);
   new DataView(out.buffer).setUint32(0, data.length);
@@ -91,9 +79,7 @@ function concat(...parts: Uint8Array[]): Uint8Array {
 export function authorized(pub: Uint8Array): string {
   const algo = new TextEncoder().encode("ssh-ed25519");
   const payload = concat(sshString(algo), sshString(pub));
-  let bin = "";
-  for (let i = 0; i < payload.length; i++) bin += String.fromCharCode(payload[i]!);
-  return `ssh-ed25519 ${btoa(bin)} superfolha`;
+  return `ssh-ed25519 ${encodeStdB64(payload)} superfolha`;
 }
 
 export async function seedFor(remote: string, branch: string): Promise<Uint8Array> {
@@ -115,15 +101,3 @@ export function signSSH(seed: Uint8Array, data: Uint8Array): Uint8Array {
   return ed.sign(data, seed);
 }
 
-export function decodeStdB64(s: string): Uint8Array {
-  const bin = atob(s);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
-}
-
-export function encodeStdB64(buf: Uint8Array): string {
-  let bin = "";
-  for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]!);
-  return btoa(bin);
-}
