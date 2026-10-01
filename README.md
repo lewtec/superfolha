@@ -59,6 +59,16 @@ go run ./cmd/superfolha --state-dir=./data
 
 SQLite lives at `{state-dir}/superfolha.db`. Git repos live at `{state-dir}/repos/{uuid}`.
 
+### Desktop
+
+```bash
+go tool lewkit release run --config eletrocromo.json
+```
+
+`lewkit release run` stamps `br.tec.lew.superfolha` into the binary and starts it with no arguments. That process opens the window through lewkit `x/app`. The editor WebSocket is a loopback HTTP server. SQLite and git repos for the window live in the app data directory.
+
+`--addr` starts the HTTP server on that address. Docker and Railway run the GoReleaser binary, which carries the version stamp only, so `PORT` selects the listen address.
+
 ### Available Tasks
 
 ```bash
