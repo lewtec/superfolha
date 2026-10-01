@@ -3,7 +3,6 @@ package main
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/lewtec/lewkit/x/cmd"
@@ -15,9 +14,7 @@ import (
 
 func TestRootUsage(t *testing.T) {
 	text, err := cmd.Usage[cmd.App[root]]("superfolha")
-	if err != nil {
-		t.Fatalf("Usage: %v", err)
-	}
+	require.NoError(t, err)
 	for _, want := range []string{
 		"Superfolha",
 		"--state-dir",
@@ -27,14 +24,10 @@ func TestRootUsage(t *testing.T) {
 		"env: PORT",
 		"version",
 	} {
-		if !strings.Contains(text, want) {
-			t.Errorf("usage missing %q\n%s", want, text)
-		}
+		assert.Contains(t, text, want)
 	}
 	for _, drop := range []string{"--db-driver", "--db ", "desktop"} {
-		if strings.Contains(text, drop) {
-			t.Errorf("usage still has %q\n%s", drop, text)
-		}
+		assert.NotContains(t, text, drop)
 	}
 }
 
