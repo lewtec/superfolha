@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "package_id": "br.tec.lew.superfolha",
+  "app_name": "Superfolha",
+  "version_name": "0.1.0",
+  "go_main": "./cmd/superfolha",
+  "abis": ["arm64-v8a"]
+}

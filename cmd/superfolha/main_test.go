@@ -31,7 +31,7 @@ func TestRootUsage(t *testing.T) {
 			t.Errorf("usage missing %q\n%s", want, text)
 		}
 	}
-	for _, drop := range []string{"--db-driver", "--db "} {
+	for _, drop := range []string{"--db-driver", "--db ", "desktop"} {
 		if strings.Contains(text, drop) {
 			t.Errorf("usage still has %q\n%s", drop, text)
 		}

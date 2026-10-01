@@ -105,3 +105,7 @@ depends = ["codegen"]
 wait_for = ["codegen"]
 env = { GO_ENV = "development" }
 run = "mkdir -p data && go run ./cmd/superfolha --state-dir=./data"
+
+[tasks.app]
+description = "Stamp a release binary and open the window"
+run = "go tool lewkit release run --config eletrocromo.json"
