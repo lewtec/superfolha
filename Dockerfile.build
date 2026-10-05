@@ -22,7 +22,7 @@ RUN go generate ./...
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /build/server ./cmd/superfolha
 
 # Stage 3: runtime with TeX Live + latexmk
-FROM texlive/texlive:latest@sha256:bd551dda2195c6830bb714f731d74c4f71cda812178abae15a206fd68b5dbb7c
+FROM texlive/texlive:latest@sha256:a7ae4dfa9d521b5db14446872fa488b839021d1f604d0a3c74461784895f2a67
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
