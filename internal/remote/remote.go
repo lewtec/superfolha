@@ -59,22 +59,32 @@ func trimGitSuffix(s string) string {
 	return strings.TrimSuffix(strings.TrimRight(s, "/"), ".git")
 }
 
-func scpURL(raw string) (string, bool) {
-	// git@github.com:owner/repo.git
+// splitSCP parses git@host:path. Host case is kept; callers that want a
+// canonical HTTP URL lowercase the host themselves.
+func splitSCP(raw string) (user, host, path string, ok bool) {
 	if strings.Contains(raw, "://") {
-		return "", false
+		return "", "", "", false
 	}
 	at := strings.IndexByte(raw, '@')
 	colon := strings.LastIndexByte(raw, ':')
 	if at <= 0 || colon <= at {
-		return "", false
+		return "", "", "", false
 	}
-	host := strings.ToLower(raw[at+1 : colon])
-	path := trimGitSuffix(raw[colon+1:])
+	user = raw[:at]
+	host = raw[at+1 : colon]
+	path = trimGitSuffix(raw[colon+1:])
 	if host == "" || path == "" {
+		return "", "", "", false
+	}
+	return user, host, path, true
+}
+
+func scpURL(raw string) (string, bool) {
+	_, host, path, ok := splitSCP(raw)
+	if !ok {
 		return "", false
 	}
-	return "https://" + host + "/" + path, true
+	return "https://" + strings.ToLower(host) + "/" + path, true
 }
 
 // ParseGitHub returns owner and repo for github.com remotes.
@@ -158,13 +168,7 @@ func TransportURL(raw string) string {
 		if strings.HasPrefix(strings.ToLower(raw), "ssh://") {
 			return trimGitSuffix(raw)
 		}
-		// normalize scp: git@host:path
-		at := strings.IndexByte(raw, '@')
-		colon := strings.LastIndexByte(raw, ':')
-		if at > 0 && colon > at {
-			host := raw[at+1 : colon]
-			path := trimGitSuffix(raw[colon+1:])
-			user := raw[:at]
+		if user, host, path, ok := splitSCP(raw); ok {
 			return user + "@" + host + ":" + path
 		}
 		return raw
