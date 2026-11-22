@@ -20,6 +20,7 @@ import (
 	igit "github.com/lewtec/superfolha/internal/git"
 	"github.com/lewtec/superfolha/internal/paths"
 	"github.com/lewtec/superfolha/internal/project"
+	"github.com/lewtec/superfolha/internal/session"
 )
 
 func testServer(t *testing.T) *Server {
@@ -54,13 +55,60 @@ func signIn(t *testing.T, login string) string {
 	return tok
 }
 
+func devEnv(t *testing.T) {
+	t.Helper()
+	t.Setenv("JWT_SECRET", "rod-play-secret")
+	t.Setenv("GO_ENV", "development")
+}
+
+func mustKey(t *testing.T) *igit.SSHKey {
+	t.Helper()
+	k, err := igit.NewSessionSSHKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return k
+}
+
+func authCookie(value string) *http.Cookie {
+	return &http.Cookie{Name: auth.AuthCookieName, Value: value}
+}
+
+func serve(srv *Server, req *http.Request) *httptest.ResponseRecorder {
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, req)
+	return rec
+}
+
+func withAuth(req *http.Request, cookie string) *http.Request {
+	req.AddCookie(authCookie(cookie))
+	return req
+}
+
+func postForm(srv *Server, cookie, target, body string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(http.MethodPost, target, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	return serve(srv, withAuth(req, cookie))
+}
+
+func paperForm(pub string) string {
+	return "remote=git@github.com:t/paper&branch=main&ssh_public=" + url.QueryEscape(pub)
+}
+
+func readyPaper(t *testing.T, srv *Server, pub string) *session.Live {
+	t.Helper()
+	live, err := srv.hubs.Create("alice", "git@github.com:t/paper", "main", pub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	live.Ready = true
+	return live
+}
+
 func TestLandingOK(t *testing.T) {
 	t.Parallel()
 	srv := testServer(t)
-	req := httptest.NewRequest(http.MethodGet, paths.Landing, nil)
-	rec := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(rec, req)
-	res := rec.Result()
+	res := serve(srv, httptest.NewRequest(http.MethodGet, paths.Landing, nil)).Result()
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("GET / = %d", res.StatusCode)
@@ -75,14 +123,10 @@ func TestLandingOK(t *testing.T) {
 }
 
 func TestLandingLoggedInPointsAtSessions(t *testing.T) {
-	t.Setenv("JWT_SECRET", "rod-play-secret")
-	t.Setenv("GO_ENV", "development")
+	devEnv(t)
 	srv := testServer(t)
 	tok := signIn(t, "alice")
-	land := httptest.NewRequest(http.MethodGet, paths.Landing, nil)
-	land.AddCookie(&http.Cookie{Name: auth.AuthCookieName, Value: tok})
-	out := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(out, land)
+	out := serve(srv, withAuth(httptest.NewRequest(http.MethodGet, paths.Landing, nil), tok))
 	body, _ := io.ReadAll(out.Result().Body)
 	if !strings.Contains(string(body), `href="`+paths.Projects()+`"`) {
 		t.Fatalf("logged-in landing should link to sessions: %s", truncateForTest(body, 300))
@@ -94,10 +138,7 @@ func TestCookieWorksOnHTTPWithoutGOEnv(t *testing.T) {
 	t.Setenv("GO_ENV", "")
 	srv := testServer(t)
 	tok := signIn(t, "alice")
-	follow := httptest.NewRequest(http.MethodGet, paths.Projects(), nil)
-	follow.AddCookie(&http.Cookie{Name: auth.AuthCookieName, Value: tok})
-	out := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(out, follow)
+	out := serve(srv, withAuth(httptest.NewRequest(http.MethodGet, paths.Projects(), nil), tok))
 	if out.Code != http.StatusOK {
 		t.Fatalf("GET /sessions with session = %d; want 200 (got Location %q)", out.Code, out.Header().Get("Location"))
 	}
@@ -106,10 +147,7 @@ func TestCookieWorksOnHTTPWithoutGOEnv(t *testing.T) {
 func TestProjectsRedirectsAnonymous(t *testing.T) {
 	t.Parallel()
 	srv := testServer(t)
-	req := httptest.NewRequest(http.MethodGet, paths.Projects(), nil)
-	rec := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(rec, req)
-	res := rec.Result()
+	res := serve(srv, httptest.NewRequest(http.MethodGet, paths.Projects(), nil)).Result()
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusSeeOther {
 		t.Fatalf("GET /sessions = %d; want 303", res.StatusCode)
@@ -121,12 +159,10 @@ func TestProjectsRedirectsAnonymous(t *testing.T) {
 }
 
 func TestChallengeSignLoginSetsCookie(t *testing.T) {
-	t.Setenv("JWT_SECRET", "rod-play-secret")
-	t.Setenv("GO_ENV", "development")
+	devEnv(t)
 	auth.ResetChallengeStateForTest()
 	srv := testServer(t)
-	chRec := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(chRec, httptest.NewRequest(http.MethodGet, paths.LoginChallenge(), nil))
+	chRec := serve(srv, httptest.NewRequest(http.MethodGet, paths.LoginChallenge(), nil))
 	if chRec.Code != http.StatusOK {
 		t.Fatalf("challenge = %d", chRec.Code)
 	}
@@ -152,8 +188,7 @@ func TestChallengeSignLoginSetsCookie(t *testing.T) {
 	}
 	req := httptest.NewRequest(http.MethodPost, paths.LoginVerify(), bytes.NewReader(payload))
 	req.Header.Set("Content-Type", "application/json")
-	rec := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(rec, req)
+	rec := serve(srv, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("verify = %d body %s", rec.Code, rec.Body.String())
 	}
@@ -163,30 +198,18 @@ func TestChallengeSignLoginSetsCookie(t *testing.T) {
 }
 
 func TestSSHCreateStaysOnSessionsWithKey(t *testing.T) {
-	t.Setenv("JWT_SECRET", "rod-play-secret")
-	t.Setenv("GO_ENV", "development")
+	devEnv(t)
 	srv := testServer(t)
 	alice := signIn(t, "alice")
-	k, err := igit.NewSessionSSHKey()
-	if err != nil {
-		t.Fatal(err)
-	}
-	form := strings.NewReader("remote=git@github.com:t/paper&branch=main&ssh_public=" + url.QueryEscape(k.Authorized))
-	req := httptest.NewRequest(http.MethodPost, paths.Projects(), form)
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.AddCookie(&http.Cookie{Name: auth.AuthCookieName, Value: alice})
-	rec := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(rec, req)
+	k := mustKey(t)
+	rec := postForm(srv, alice, paths.Projects(), paperForm(k.Authorized))
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("create = %d", rec.Code)
 	}
 	if strings.HasPrefix(rec.Header().Get("Location"), "/editor/") {
 		t.Fatalf("SSH create must not open editor before deploy key: %q", rec.Header().Get("Location"))
 	}
-	list := httptest.NewRequest(http.MethodGet, paths.Projects(), nil)
-	list.AddCookie(&http.Cookie{Name: auth.AuthCookieName, Value: alice})
-	out := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(out, list)
+	out := serve(srv, withAuth(httptest.NewRequest(http.MethodGet, paths.Projects(), nil), alice))
 	body, _ := io.ReadAll(out.Body)
 	if !strings.Contains(string(body), "ssh-ed25519") && !strings.Contains(string(body), "ssh-") {
 		t.Fatalf("sessions page should show deploy public key: %s", truncateForTest(body, 400))
@@ -194,27 +217,15 @@ func TestSSHCreateStaysOnSessionsWithKey(t *testing.T) {
 }
 
 func TestCreateUsesPostedPublic(t *testing.T) {
-	t.Setenv("JWT_SECRET", "rod-play-secret")
-	t.Setenv("GO_ENV", "development")
+	devEnv(t)
 	srv := testServer(t)
 	alice := signIn(t, "alice")
-	k, err := igit.NewSessionSSHKey()
-	if err != nil {
-		t.Fatal(err)
-	}
-	form := strings.NewReader("remote=git@github.com:t/paper&branch=main&ssh_public=" + url.QueryEscape(k.Authorized))
-	req := httptest.NewRequest(http.MethodPost, paths.Projects(), form)
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.AddCookie(&http.Cookie{Name: auth.AuthCookieName, Value: alice})
-	rec := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(rec, req)
+	k := mustKey(t)
+	rec := postForm(srv, alice, paths.Projects(), paperForm(k.Authorized))
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("create = %d", rec.Code)
 	}
-	list := httptest.NewRequest(http.MethodGet, paths.Projects(), nil)
-	list.AddCookie(&http.Cookie{Name: auth.AuthCookieName, Value: alice})
-	out := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(out, list)
+	out := serve(srv, withAuth(httptest.NewRequest(http.MethodGet, paths.Projects(), nil), alice))
 	body, _ := io.ReadAll(out.Body)
 	if !strings.Contains(string(body), "ssh-ed25519") {
 		t.Fatalf("sessions page missing posted key: %s", truncateForTest(body, 400))
@@ -222,16 +233,10 @@ func TestCreateUsesPostedPublic(t *testing.T) {
 }
 
 func TestCreateRejectsBadPublic(t *testing.T) {
-	t.Setenv("JWT_SECRET", "rod-play-secret")
-	t.Setenv("GO_ENV", "development")
+	devEnv(t)
 	srv := testServer(t)
 	alice := signIn(t, "alice")
-	form := strings.NewReader("remote=git@github.com:t/paper&branch=main&ssh_public=not-a-key")
-	req := httptest.NewRequest(http.MethodPost, paths.Projects(), form)
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.AddCookie(&http.Cookie{Name: auth.AuthCookieName, Value: alice})
-	rec := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(rec, req)
+	rec := postForm(srv, alice, paths.Projects(), "remote=git@github.com:t/paper&branch=main&ssh_public=not-a-key")
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("create = %d", rec.Code)
 	}
@@ -241,20 +246,11 @@ func TestCreateRejectsBadPublic(t *testing.T) {
 }
 
 func TestCloneCreatesSessionAndSecondUserFails(t *testing.T) {
-	t.Setenv("JWT_SECRET", "rod-play-secret")
-	t.Setenv("GO_ENV", "development")
+	devEnv(t)
 	srv := testServer(t)
 	alice := signIn(t, "alice")
-	k, err := igit.NewSessionSSHKey()
-	if err != nil {
-		t.Fatal(err)
-	}
-	form := strings.NewReader("remote=git@github.com:t/paper&branch=main&ssh_public=" + url.QueryEscape(k.Authorized))
-	req := httptest.NewRequest(http.MethodPost, paths.Projects(), form)
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.AddCookie(&http.Cookie{Name: auth.AuthCookieName, Value: alice})
-	rec := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(rec, req)
+	k := mustKey(t)
+	rec := postForm(srv, alice, paths.Projects(), paperForm(k.Authorized))
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("create = %d", rec.Code)
 	}
@@ -262,12 +258,7 @@ func TestCloneCreatesSessionAndSecondUserFails(t *testing.T) {
 		t.Fatalf("create must stay on sessions: %q", rec.Header().Get("Location"))
 	}
 	bob := signIn(t, "bob")
-	form2 := strings.NewReader("remote=git@github.com:t/paper&branch=main&ssh_public=" + url.QueryEscape(k.Authorized))
-	req2 := httptest.NewRequest(http.MethodPost, paths.Projects(), form2)
-	req2.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req2.AddCookie(&http.Cookie{Name: auth.AuthCookieName, Value: bob})
-	rec2 := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(rec2, req2)
+	rec2 := postForm(srv, bob, paths.Projects(), paperForm(k.Authorized))
 	if rec2.Code != http.StatusSeeOther {
 		t.Fatalf("bob create = %d", rec2.Code)
 	}
@@ -277,16 +268,10 @@ func TestCloneCreatesSessionAndSecondUserFails(t *testing.T) {
 }
 
 func TestLocalPathCreateOpensEditor(t *testing.T) {
-	t.Setenv("JWT_SECRET", "rod-play-secret")
-	t.Setenv("GO_ENV", "development")
+	devEnv(t)
 	srv := testServer(t)
 	alice := signIn(t, "alice")
-	form := strings.NewReader("remote=" + url.QueryEscape("/tmp/sf-local-paper") + "&branch=main")
-	req := httptest.NewRequest(http.MethodPost, paths.Projects(), form)
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.AddCookie(&http.Cookie{Name: auth.AuthCookieName, Value: alice})
-	rec := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(rec, req)
+	rec := postForm(srv, alice, paths.Projects(), "remote="+url.QueryEscape("/tmp/sf-local-paper")+"&branch=main")
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("create = %d", rec.Code)
 	}
@@ -297,25 +282,12 @@ func TestLocalPathCreateOpensEditor(t *testing.T) {
 }
 
 func TestHostRetryOfReadySessionOpensEditor(t *testing.T) {
-	t.Setenv("JWT_SECRET", "rod-play-secret")
-	t.Setenv("GO_ENV", "development")
+	devEnv(t)
 	srv := testServer(t)
 	alice := signIn(t, "alice")
-	k, err := igit.NewSessionSSHKey()
-	if err != nil {
-		t.Fatal(err)
-	}
-	live, err := srv.hubs.Create("alice", "git@github.com:t/paper", "main", k.Authorized)
-	if err != nil {
-		t.Fatal(err)
-	}
-	live.Ready = true
-	form := strings.NewReader("remote=git@github.com:t/paper&branch=main&ssh_public=" + url.QueryEscape(k.Authorized))
-	req := httptest.NewRequest(http.MethodPost, paths.Projects(), form)
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.AddCookie(&http.Cookie{Name: auth.AuthCookieName, Value: alice})
-	rec := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(rec, req)
+	k := mustKey(t)
+	live := readyPaper(t, srv, k.Authorized)
+	rec := postForm(srv, alice, paths.Projects(), paperForm(k.Authorized))
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("retry = %d", rec.Code)
 	}
@@ -326,23 +298,12 @@ func TestHostRetryOfReadySessionOpensEditor(t *testing.T) {
 }
 
 func TestHostInviteRedirectsToPreauthLink(t *testing.T) {
-	t.Setenv("JWT_SECRET", "rod-play-secret")
-	t.Setenv("GO_ENV", "development")
+	devEnv(t)
 	srv := testServer(t)
 	alice := signIn(t, "alice")
-	k, err := igit.NewSessionSSHKey()
-	if err != nil {
-		t.Fatal(err)
-	}
-	live, err := srv.hubs.Create("alice", "git@github.com:t/paper", "main", k.Authorized)
-	if err != nil {
-		t.Fatal(err)
-	}
-	live.Ready = true
-	req := httptest.NewRequest(http.MethodPost, paths.SessionPreauth(live.ID), nil)
-	req.AddCookie(&http.Cookie{Name: auth.AuthCookieName, Value: alice})
-	rec := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(rec, req)
+	k := mustKey(t)
+	live := readyPaper(t, srv, k.Authorized)
+	rec := serve(srv, withAuth(httptest.NewRequest(http.MethodPost, paths.SessionPreauth(live.ID), nil), alice))
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("invite = %d", rec.Code)
 	}
@@ -353,24 +314,14 @@ func TestHostInviteRedirectsToPreauthLink(t *testing.T) {
 }
 
 func TestHostInviteJSONReturnsLink(t *testing.T) {
-	t.Setenv("JWT_SECRET", "rod-play-secret")
-	t.Setenv("GO_ENV", "development")
+	devEnv(t)
 	srv := testServer(t)
 	alice := signIn(t, "alice")
-	k, err := igit.NewSessionSSHKey()
-	if err != nil {
-		t.Fatal(err)
-	}
-	live, err := srv.hubs.Create("alice", "git@github.com:t/paper", "main", k.Authorized)
-	if err != nil {
-		t.Fatal(err)
-	}
-	live.Ready = true
-	req := httptest.NewRequest(http.MethodPost, paths.SessionPreauth(live.ID), nil)
+	k := mustKey(t)
+	live := readyPaper(t, srv, k.Authorized)
+	req := withAuth(httptest.NewRequest(http.MethodPost, paths.SessionPreauth(live.ID), nil), alice)
 	req.Header.Set("Accept", "application/json")
-	req.AddCookie(&http.Cookie{Name: auth.AuthCookieName, Value: alice})
-	rec := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(rec, req)
+	rec := serve(srv, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("invite json = %d", rec.Code)
 	}
