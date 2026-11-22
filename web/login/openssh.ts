@@ -1,6 +1,7 @@
 import { ctr } from "@noble/ciphers/aes.js";
 import * as ed from "@noble/ed25519";
 import bpf from "bcrypt-pbkdf";
+import { b64urlDecode, decodeStdB64, encodeStdB64 } from "../ssh/b64";
 
 const MAGIC = "openssh-key-v1\0";
 const BEGIN = "-----BEGIN OPENSSH PRIVATE KEY-----";
@@ -64,19 +65,6 @@ class W {
   }
 }
 
-function fromB64(s: string): Uint8Array {
-  const bin = atob(s);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
-}
-
-function toB64(buf: Uint8Array): string {
-  let bin = "";
-  for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]!);
-  return btoa(bin);
-}
-
 function sshPub(pub: Uint8Array): Uint8Array {
   const w = new W();
   w.str("ssh-ed25519");
@@ -120,14 +108,13 @@ export function parseIdentitySeed(text: string, passphrase: string): Uint8Array 
   if (t.startsWith("{")) {
     const obj = JSON.parse(t) as { seed?: string };
     if (!obj.seed) throw new Error("missing seed");
-    const pad = "=".repeat((4 - (obj.seed.length % 4)) % 4);
-    const raw = fromB64(obj.seed.replace(/-/g, "+").replace(/_/g, "/") + pad);
+    const raw = b64urlDecode(obj.seed);
     if (raw.length !== 32) throw new Error("bad seed");
     return raw;
   }
   if (t.includes(BEGIN)) {
     const b64 = t.replace(/-----[^-]+-----/g, "").replace(/\s+/g, "");
-    const r = new R(fromB64(b64));
+    const r = new R(decodeStdB64(b64));
     const magic = new TextDecoder().decode(r.take(MAGIC.length));
     if (magic !== MAGIC) throw new Error("bad magic");
     const cipher = r.str();
@@ -175,7 +162,7 @@ export function encodeIdentityKey(seed: Uint8Array, comment = "superfolha"): str
   outer.u32(1);
   outer.buf(sshPub(pub));
   outer.buf(block);
-  const b64 = toB64(outer.finish());
+  const b64 = encodeStdB64(outer.finish());
   const lines = [BEGIN];
   for (let i = 0; i < b64.length; i += 70) lines.push(b64.slice(i, i + 70));
   lines.push(END);
