@@ -10,7 +10,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/lewtec/lewkit v0.0.0-20261124190124-d44587ca3404
 	github.com/nicksnyder/go-i18n/v2 v2.6.1
-	github.com/reearth/ygo v1.56.2
+	github.com/reearth/ygo v1.57.1
 	github.com/stretchr/testify v1.12.1
 	golang.org/x/crypto v0.57.0
 	golang.org/x/text v0.42.0
