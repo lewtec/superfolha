@@ -6,9 +6,9 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	db "github.com/lewtec/lewkit/x/db"
+	"github.com/lewtec/lewkit/x/db"
 	_ "github.com/lewtec/lewkit/x/db/sqlite"
-	sqlite "github.com/lewtec/superfolha/internal/db/sqlite"
+	"github.com/lewtec/superfolha/internal/db/sqlite"
 )
 
 type CreateProjectParams struct {
@@ -84,7 +84,7 @@ func (w sqliteWrap) GetUserProjects(ctx context.Context, userID sql.NullString) 
 func (w sqliteWrap) UpdateProjectTimestamp(ctx context.Context, id string) error {
 	return w.q.UpdateProjectTimestamp(ctx, id)
 }
-func New(url string) func(db.DBTX) Queries {
+func New(url string) func(tx db.DBTX) Queries {
 	return func(tx db.DBTX) Queries {
 		switch db.Scheme(url) {
 		case "sqlite":
